@@ -86,8 +86,8 @@ export function PWAInstallPrompt() {
 
         {/* Content Header */}
         <div className="flex items-start space-x-3 pr-6">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/50 flex-shrink-0 flex items-center justify-center overflow-hidden p-1 shadow-sm">
-            <img src="/icon.svg" alt="App Icon" className="w-full h-full object-contain" />
+          <div className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden shadow-md">
+            <img src="/icon.png" alt="Check List Icon" className="w-full h-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-amber-400">

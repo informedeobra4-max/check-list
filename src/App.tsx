@@ -226,9 +226,10 @@ export default function App() {
   const [cloudStatus, setCloudStatus] = useState<CloudSyncStatus>('syncing');
   const [isCloudSetupModalOpen, setIsCloudSetupModalOpen] = useState(false);
   const isInitialCloudLoadRef = useRef(true);
+  const isRemoteUpdateRef = useRef(false);
   const cloudSaveTimerRef = useRef<any>(null);
 
-  // Initial cloud fetch from Supabase
+  // Initial cloud fetch from Supabase and active listeners
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
@@ -240,25 +241,29 @@ export default function App() {
 
         if (res.status === 'synced') {
           if (res.projects && res.projects.length > 0) {
+            isRemoteUpdateRef.current = true;
             setProjects(res.projects);
-            showToast('Datos cargados desde la Nube Supabase', 'Cloud');
+            showToast('Conectado a la Nube Supabase', 'Cloud');
           } else {
-            // If cloud is empty, seed it with current local projects
+            // Seed cloud if empty
             saveProjectsToCloud(projects);
           }
 
           if (res.logos) {
+            isRemoteUpdateRef.current = true;
             setLogos(res.logos);
           } else {
             saveLogosToCloud(logos);
           }
 
-          // Subscribe to real-time changes
+          // Realtime push subscription
           unsubscribe = subscribeToCloudData(
             (cloudProjects) => {
+              isRemoteUpdateRef.current = true;
               setProjects(cloudProjects);
             },
             (cloudLogos) => {
+              isRemoteUpdateRef.current = true;
               setLogos(cloudLogos);
             }
           );
@@ -273,8 +278,49 @@ export default function App() {
 
     initCloud();
 
+    // Auto-refresh when tab is focused / unlocked on mobile or notebook
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const res = await loadCloudData();
+          if (res.status === 'synced') {
+            if (res.projects && res.projects.length > 0) {
+              setProjects(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(res.projects)) {
+                  isRemoteUpdateRef.current = true;
+                  return res.projects!;
+                }
+                return prev;
+              });
+            }
+            if (res.logos) {
+              setLogos(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(res.logos)) {
+                  isRemoteUpdateRef.current = true;
+                  return res.logos!;
+                }
+                return prev;
+              });
+            }
+            setCloudStatus('synced');
+          }
+        } catch (e) {
+          console.warn('Error refreshing cloud data on focus:', e);
+        }
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Heartbeat sync every 15s to keep all devices 100% updated in real-time
+    const heartbeatInterval = setInterval(handleVisibilityOrFocus, 15000);
+
     return () => {
       if (unsubscribe) unsubscribe();
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      clearInterval(heartbeatInterval);
     };
   }, []);
 
@@ -284,17 +330,22 @@ export default function App() {
       localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(projects));
     } catch (e) {
       console.error('Error saving projects to localStorage:', e);
-      showToast('Almacenamiento casi lleno. Reduce fotos si es necesario.', 'AlertCircle');
     }
 
-    // Auto-sync to Supabase cloud (debounced 1s)
+    // If change came from remote cloud, do not re-upload
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+
+    // Auto-sync immediately to Supabase cloud (debounced 300ms)
     if (!isInitialCloudLoadRef.current) {
       if (cloudSaveTimerRef.current) clearTimeout(cloudSaveTimerRef.current);
       cloudSaveTimerRef.current = setTimeout(async () => {
         setCloudStatus('syncing');
         const res = await saveProjectsToCloud(projects);
         setCloudStatus(res.status);
-      }, 1000);
+      }, 300);
     }
   }, [projects]);
 

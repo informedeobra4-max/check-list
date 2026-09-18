@@ -68,7 +68,7 @@ export const MASTER_TRADES_TEMPLATE: TradeTemplate[] = [
   }
 ];
 
-export const DEFAULT_LOGO_URL = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBRGrKuRjth9BjvrebT4yn_Y0gFTXRkHXYS0wdIXTz1uUypqKq7JpdTU7lNn0-Dv6N9O--lcoRRY3UMUlC0ne6ok5QThHzl1GKx217FbVnKtuhj9lbo5s8ApIt0JzZxjRIBnP_xMU8I8FUgNV-5poKNBq7TaTdcXGb21_AVi0-YkRltL2OF1bw9IOb-YwJnYuhnPckC7AFu21XaCXtzmQSkgU68giBZS_C-vN23ESTJm8txSx8sGSMrAbiXkT_dVzGX8A';
+export const DEFAULT_LOGO_URL = '/icon.png';
 
 export const SAMPLE_PHOTO_REVOQUE = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" width="400" height="260"><rect width="400" height="260" fill="%23d6d3d1"/><rect x="20" y="20" width="360" height="220" fill="%23a8a29e" stroke="%2378716c" stroke-width="4"/><line x1="20" y1="85" x2="380" y2="85" stroke="%2357534e" stroke-width="3"/><line x1="20" y1="150" x2="380" y2="150" stroke="%2357534e" stroke-width="3"/><rect x="50" y="35" width="80" height="35" fill="%23e7e5e4"/><text x="200" y="130" font-family="sans-serif" font-size="16" font-weight="bold" fill="%231c1917" text-anchor="middle">REVOQUE GRUESO APROBADO</text><text x="200" y="160" font-family="sans-serif" font-size="11" fill="%23292524" text-anchor="middle">Sector Muro Este - Depto 1-1</text></svg>';
 
