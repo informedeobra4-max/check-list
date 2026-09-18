@@ -1,0 +1,140 @@
+import { X, Camera, Trash2, Calendar, Plus, MessageSquare } from 'lucide-react';
+import { InspectionItem } from '../types';
+
+interface PhotoViewerModalProps {
+  isOpen: boolean;
+  tradeName: string;
+  item: InspectionItem | null;
+  onClose: () => void;
+  onTriggerCamera: () => void;
+  onDeletePhoto: (photoId: string) => void;
+}
+
+export function PhotoViewerModal({
+  isOpen,
+  tradeName,
+  item,
+  onClose,
+  onTriggerCamera,
+  onDeletePhoto
+}: PhotoViewerModalProps) {
+  if (!isOpen || !item) return null;
+
+  const photos = item.photos || [];
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+      <div className="bg-slate-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
+        {/* Modal Header */}
+        <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+          <div className="min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded">
+                {tradeName}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {photos.length} {photos.length === 1 ? 'Foto' : 'Fotos'}
+              </span>
+            </div>
+            <h3 className="font-bold text-white text-sm truncate mt-0.5">
+              {item.name}
+            </h3>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-2 rounded-lg touch-target flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Scrollable Photo Content */}
+        <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-slate-900">
+          {/* Observation Note if exists */}
+          {item.comment && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200 flex items-start gap-2 shadow-xs">
+              <MessageSquare className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">
+                  Observación Técnica Registrada:
+                </span>
+                <p className="mt-0.5 text-slate-200 leading-relaxed font-medium">
+                  {item.comment}
+                </p>
+              </div>
+            </div>
+          )}
+          {photos.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-slate-800/60 rounded-2xl border border-dashed border-slate-700">
+              <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 mb-3">
+                <Camera className="w-7 h-7" />
+              </div>
+              <h4 className="text-white font-bold text-sm">Sin fotografías de registro</h4>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                Toma una foto en terreno con la cámara del dispositivo o selecciona una de tu galería para registrar evidencia técnica.
+              </p>
+              <button
+                onClick={onTriggerCamera}
+                className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 mx-auto touch-target active:scale-95 shadow transition-all"
+              >
+                <Camera className="w-4 h-4" /> Abrir Cámara de Obra
+              </button>
+            </div>
+          ) : (
+            photos.map((photo, index) => (
+              <div
+                key={photo.id}
+                className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-md flex flex-col"
+              >
+                <div className="relative bg-black flex items-center justify-center max-h-72 overflow-hidden">
+                  <img
+                    src={photo.dataUrl}
+                    alt={`Evidencia ${index + 1}`}
+                    className="w-full object-contain max-h-72"
+                  />
+                  <span className="absolute top-2 left-2 bg-slate-950/80 text-amber-400 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
+                    Foto {index + 1} de {photos.length}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-950 flex items-center justify-between border-t border-slate-800">
+                  <div className="flex items-center text-slate-400 text-xs gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="font-mono text-[11px] text-slate-300">
+                      {photo.timestamp || 'Fecha no registrada'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => onDeletePhoto(photo.id)}
+                    className="text-rose-400 hover:text-rose-300 active:scale-90 text-xs font-bold flex items-center gap-1 touch-target px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-800/40 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Modal Footer Actions */}
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex gap-2 items-center">
+          <button
+            onClick={onTriggerCamera}
+            className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg touch-target transition-all"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Tomar / Subir Foto</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl touch-target"
+          >
+            Listo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

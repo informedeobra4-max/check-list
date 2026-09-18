@@ -1,0 +1,412 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  X,
+  Camera,
+  Trash2,
+  Calendar,
+  AlertTriangle,
+  Flame,
+  CheckCircle2,
+  Upload,
+  MessageSquare,
+  Sparkles,
+  Check,
+  ShieldAlert,
+  Info
+} from 'lucide-react';
+import { InspectionItem } from '../types';
+import { compressImageFile } from '../utils/calculations';
+
+interface ItemObservationModalProps {
+  isOpen: boolean;
+  tradeId: string;
+  tradeName: string;
+  item: InspectionItem | null;
+  onClose: () => void;
+  onSaveObservation: (
+    tradeId: string,
+    itemId: string,
+    comment: string,
+    severity: 'low' | 'medium' | 'high' | undefined
+  ) => void;
+  onAddPhoto: (tradeId: string, itemId: string, dataUrl: string) => void;
+  onDeletePhoto: (tradeId: string, itemId: string, photoId: string) => void;
+}
+
+export function ItemObservationModal({
+  isOpen,
+  tradeId,
+  tradeName,
+  item,
+  onClose,
+  onSaveObservation,
+  onAddPhoto,
+  onDeletePhoto
+}: ItemObservationModalProps) {
+  const [commentDraft, setCommentDraft] = useState('');
+  const [severityDraft, setSeverityDraft] = useState<'low' | 'medium' | 'high' | undefined>(undefined);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [activePhotoPreview, setActivePhotoPreview] = useState<string | null>(null);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (item) {
+      setCommentDraft(item.comment || '');
+      setSeverityDraft(item.severity);
+    }
+  }, [item]);
+
+  if (!isOpen || !item) return null;
+
+  const photos = item.photos || [];
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsCompressing(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const compressedBase64 = await compressImageFile(file, 800, 0.72);
+        onAddPhoto(tradeId, item.id, compressedBase64);
+      }
+    } catch (err) {
+      console.error('Error al procesar foto:', err);
+    } finally {
+      setIsCompressing(false);
+      // Reset input value so same photo can be re-selected if needed
+      e.target.value = '';
+    }
+  };
+
+  const handleSave = () => {
+    onSaveObservation(tradeId, item.id, commentDraft.trim(), severityDraft);
+    onClose();
+  };
+
+  const handleDeleteObservation = () => {
+    setCommentDraft('');
+    setSeverityDraft(undefined);
+    onSaveObservation(tradeId, item.id, '', undefined);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 no-print overflow-y-auto">
+      <div className="bg-slate-900 text-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden my-auto">
+        {/* Header */}
+        <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded">
+                {tradeName}
+              </span>
+              {severityDraft && (
+                <span
+                  className={`text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1 ${
+                    severityDraft === 'high'
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      : severityDraft === 'medium'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}
+                >
+                  {severityDraft === 'high' && <Flame className="w-2.5 h-2.5" />}
+                  {severityDraft === 'medium' && <AlertTriangle className="w-2.5 h-2.5" />}
+                  {severityDraft === 'low' && <CheckCircle2 className="w-2.5 h-2.5" />}
+                  Severidad: {severityDraft === 'high' ? 'Crítica' : severityDraft === 'medium' ? 'Media' : 'Leve'}
+                </span>
+              )}
+            </div>
+            <h3 className="font-bold text-white text-sm truncate mt-1">
+              {item.name}
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-2 rounded-lg touch-target flex items-center justify-center transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Scrollable Body */}
+        <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-slate-900">
+          {/* Severity Selector */}
+          <div>
+            <label className="block text-xs font-black text-slate-300 mb-2 flex items-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+              Clasificación de Severidad
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setSeverityDraft(severityDraft === 'low' ? undefined : 'low')}
+                className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                  severityDraft === 'low'
+                    ? 'bg-emerald-950/80 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/50 shadow-sm'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">Leve</span>
+                <span className="text-[9px] text-slate-400 leading-tight">Detalle estético</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSeverityDraft(severityDraft === 'medium' ? undefined : 'medium')}
+                className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                  severityDraft === 'medium'
+                    ? 'bg-amber-950/80 border-amber-400 text-amber-300 ring-2 ring-amber-500/50 shadow-sm'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">Medio</span>
+                <span className="text-[9px] text-slate-400 leading-tight">Falta terminación</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSeverityDraft(severityDraft === 'high' ? undefined : 'high')}
+                className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                  severityDraft === 'high'
+                    ? 'bg-rose-950/80 border-rose-500 text-rose-300 ring-2 ring-rose-500/60 shadow-sm'
+                    : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                <div className="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
+                  <Flame className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-xs font-black">Crítico</span>
+                <span className="text-[9px] text-slate-400 leading-tight">Riesgo o falla</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Technical Note Textarea */}
+          <div>
+            <label className="block text-xs font-black text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                Detalle Técnico u Observación
+              </span>
+              {commentDraft && (
+                <button
+                  type="button"
+                  onClick={() => setCommentDraft('')}
+                  className="text-[10px] text-rose-400 hover:underline"
+                >
+                  Limpiar texto
+                </button>
+              )}
+            </label>
+            <textarea
+              rows={3}
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              placeholder="Ej: Falta sellar zócalo perimetral, revoque con fisura en vértice o pendiente de pintura final..."
+              className="w-full text-xs p-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 leading-relaxed font-medium"
+            />
+
+            {/* Quick Suggestions Chips */}
+            <div className="mt-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">
+                Sugerencias rápidas:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Falta sellar zócalo',
+                  'Revoque con fisura',
+                  'Revisar nivelación / plomo',
+                  'Mancha de humedad / filtración',
+                  'Falta pintura 2° mano',
+                  'Listo para verificación'
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setCommentDraft(prev => (prev ? `${prev}. ${preset}` : preset));
+                      if (!severityDraft && (preset.includes('fisura') || preset.includes('filtración'))) {
+                        setSeverityDraft('high');
+                      } else if (!severityDraft) {
+                        setSeverityDraft('medium');
+                      }
+                    }}
+                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 font-medium transition-colors select-none active:scale-95"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Photographic Evidence Section */}
+          <div className="pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-black text-slate-300 flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-amber-400" />
+                Evidencia Fotográfica ({photos.length})
+              </label>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Compresión automática en Base64
+              </span>
+            </div>
+
+            {/* Hidden Inputs for Camera and Gallery */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={galleryInputRef}
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Camera / Upload Action Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={isCompressing}
+                onClick={() => cameraInputRef.current?.click()}
+                className="p-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 touch-target"
+              >
+                <Camera className="w-4 h-4" />
+                <span>{isCompressing ? 'Procesando...' : 'Tomar con Cámara'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isCompressing}
+                onClick={() => galleryInputRef.current?.click()}
+                className="p-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-95 touch-target"
+              >
+                <Upload className="w-4 h-4 text-amber-400" />
+                <span>Subir de Galería</span>
+              </button>
+            </div>
+
+            {/* Photos List Grid */}
+            {photos.length === 0 ? (
+              <div className="mt-3 p-4 bg-slate-950/60 rounded-xl border border-dashed border-slate-800 text-center">
+                <p className="text-xs text-slate-400">
+                  Sin fotos registradas. Puedes capturar fallas o avances como evidencia visual.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {photos.map((photo, index) => (
+                  <div
+                    key={photo.id}
+                    className="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-800 group shadow-sm flex flex-col"
+                  >
+                    <div
+                      onClick={() => setActivePhotoPreview(photo.dataUrl)}
+                      className="cursor-pointer h-28 bg-black flex items-center justify-center overflow-hidden"
+                    >
+                      <img
+                        src={photo.dataUrl}
+                        alt={`Evidencia ${index + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </div>
+
+                    <div className="p-1.5 flex items-center justify-between bg-slate-950 text-[10px] text-slate-400">
+                      <span className="font-mono truncate">{photo.timestamp || `#${index + 1}`}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeletePhoto(tradeId, item.id, photo.id);
+                        }}
+                        className="text-rose-400 hover:text-rose-300 p-1 rounded hover:bg-rose-950/50"
+                        title="Eliminar foto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Bottom Actions */}
+        <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-2">
+          {item.comment ? (
+            <button
+              type="button"
+              onClick={handleDeleteObservation}
+              className="text-xs font-bold text-rose-400 hover:text-rose-300 px-3 py-2 rounded-xl hover:bg-rose-950/40 transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Quitar Nota</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors touch-target"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-5 py-2 text-xs font-black text-slate-950 bg-amber-500 hover:bg-amber-400 rounded-xl shadow flex items-center gap-1.5 transition-all active:scale-95 touch-target"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>Guardar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Full Size Photo Preview Modal */}
+      {activePhotoPreview && (
+        <div
+          onClick={() => setActivePhotoPreview(null)}
+          className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-2"
+        >
+          <button
+            onClick={() => setActivePhotoPreview(null)}
+            className="absolute top-4 right-4 text-white p-2 rounded-full bg-slate-800/80 hover:bg-slate-700"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={activePhotoPreview}
+            alt="Vista ampliada"
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
