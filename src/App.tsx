@@ -19,6 +19,7 @@ import { exportInspectionPlanillaToExcel } from './utils/excelExport';
 import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
 import { CloudSetupModal } from './components/CloudSetupModal';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V3';
@@ -1128,6 +1129,9 @@ export default function App() {
         onClose={() => setIsCloudSetupModalOpen(false)}
         onRetrySync={handleRetryCloudSync}
       />
+
+      {/* Floating PWA App Download Balloon for Mobile and Notebook */}
+      <PWAInstallPrompt />
     </div>
   );
 }

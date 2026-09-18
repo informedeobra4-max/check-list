@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Rounded Squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  
+  <!-- Subtle Border Accent -->
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="url(#grad)" stroke-width="8" opacity="0.4"/>
+  
+  <!-- Construction Helmet / Shield Icon -->
+  <g transform="translate(106, 96)" fill="none" stroke="url(#grad)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Clipboard / Tablet outline -->
+    <rect x="20" y="40" width="260" height="300" rx="28" fill="#1e293b" stroke="#f59e0b" stroke-width="20" />
+    <rect x="85" y="15" width="130" height="50" rx="16" fill="#f59e0b" stroke="#f59e0b" stroke-width="6" />
+    <circle cx="150" cy="40" r="10" fill="#0f172a" />
+    
+    <!-- Checklist items inside tablet -->
+    <!-- Item 1 with Check -->
+    <path d="M 60 135 L 85 160 L 130 115" stroke="#10b981" stroke-width="20" />
+    <line x1="160" y1="135" x2="235" y2="135" stroke="#94a3b8" stroke-width="16" />
+    
+    <!-- Item 2 with Check -->
+    <path d="M 60 205 L 85 230 L 130 185" stroke="#10b981" stroke-width="20" />
+    <line x1="160" y1="205" x2="235" y2="205" stroke="#94a3b8" stroke-width="16" />
+    
+    <!-- Item 3 In Progress -->
+    <circle cx="95" cy="275" r="14" fill="#f59e0b" stroke="#f59e0b" stroke-width="4" />
+    <line x1="160" y1="275" x2="215" y2="275" stroke="#94a3b8" stroke-width="16" />
+  </g>
+</svg>
