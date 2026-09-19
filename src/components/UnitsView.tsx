@@ -162,6 +162,12 @@ export function UnitsView({
               <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong>{' '}
               {project.expedienteAysam || <span className="text-slate-400 italic">Sin cargar</span>}
             </div>
+            {project.customServices && project.customServices.map(srv => (
+              <div key={srv.id}>
+                <strong className="text-slate-700 dark:text-slate-300">{srv.name.split('(')[0].trim()}:</strong>{' '}
+                {srv.number}
+              </div>
+            ))}
             {project.technicalNotes && (
               <div className="sm:col-span-3 text-[11px] text-slate-600 dark:text-slate-400 italic pt-0.5">
                 Memoria: &ldquo;{project.technicalNotes}&rdquo;

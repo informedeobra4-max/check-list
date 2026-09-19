@@ -270,6 +270,7 @@ export function DashboardView({
               project.expedienteMunicipal ||
               project.expedienteEdemsa ||
               project.expedienteAysam ||
+              (project.customServices && project.customServices.length > 0) ||
               project.technicalNotes
             );
 
@@ -353,6 +354,11 @@ export function DashboardView({
                             <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong> {project.expedienteAysam}
                           </div>
                         )}
+                        {project.customServices && project.customServices.map(srv => (
+                          <div key={srv.id} className="truncate">
+                            <strong className="text-slate-700 dark:text-slate-300">{srv.name.split('(')[0].trim()}:</strong> {srv.number}
+                          </div>
+                        ))}
                         {project.technicalNotes && (
                           <div className="truncate sm:col-span-2 italic text-slate-500 dark:text-slate-400">
                             &ldquo;{project.technicalNotes}&rdquo;
@@ -361,7 +367,7 @@ export function DashboardView({
                       </div>
                     ) : (
                       <p className="text-[10px] text-slate-400 italic">
-                        Sin expedientes cargados (Toca &apos;Editar&apos; para agregar Exp. Municipal, EDEMSA, AYSAM)
+                        Sin expedientes cargados (Toca &apos;Editar&apos; para agregar Exp. Municipal, EDEMSA, AYSAM o nuevos servicios)
                       </p>
                     )}
                   </div>

@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, FileCheck, Calendar, FileText, MapPin, Zap, Droplets, Save } from 'lucide-react';
-import { Project } from '../types';
+import {
+  X,
+  Building2,
+  FileCheck,
+  Calendar,
+  FileText,
+  MapPin,
+  Zap,
+  Droplets,
+  Save,
+  Plus,
+  Trash2,
+  Flame,
+  ShieldAlert,
+  Compass,
+  Radio,
+  Sparkles
+} from 'lucide-react';
+import { Project, ProjectCustomService } from '../types';
 
 interface EditProjectModalProps {
   isOpen: boolean;
@@ -8,6 +25,15 @@ interface EditProjectModalProps {
   project: Project;
   onSaveProject: (updatedData: Partial<Project>) => void;
 }
+
+const SERVICE_PRESETS = [
+  { name: 'Gas (Ecogas / Distribuidora)', icon: '⛽' },
+  { name: 'Bomberos / Seguridad contra Incendio', icon: '🚒' },
+  { name: 'Plano de Mensura / Catastro', icon: '📐' },
+  { name: 'Telecomunicaciones / Fibra Óptica', icon: '📡' },
+  { name: 'Estudio de Impacto Ambiental', icon: '🌿' },
+  { name: 'Seguridad e Higiene Laboral', icon: '🛡️' }
+];
 
 export function EditProjectModal({
   isOpen,
@@ -24,6 +50,14 @@ export function EditProjectModal({
   const [estimatedEndDate, setEstimatedEndDate] = useState(project.estimatedEndDate || '');
   const [technicalNotes, setTechnicalNotes] = useState(project.technicalNotes || '');
 
+  // Dynamic additional custom services & expedientes
+  const [customServices, setCustomServices] = useState<ProjectCustomService[]>(
+    project.customServices || []
+  );
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServiceNumber, setNewServiceNumber] = useState('');
+  const [isAddingService, setIsAddingService] = useState(false);
+
   useEffect(() => {
     setName(project.name || '');
     setLocation(project.location || '');
@@ -33,9 +67,35 @@ export function EditProjectModal({
     setStartDate(project.startDate || project.createdAt?.split('T')[0] || '');
     setEstimatedEndDate(project.estimatedEndDate || '');
     setTechnicalNotes(project.technicalNotes || '');
+    setCustomServices(project.customServices || []);
   }, [project]);
 
   if (!isOpen) return null;
+
+  const handleAddCustomService = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newServiceName.trim() || !newServiceNumber.trim()) return;
+
+    const newEntry: ProjectCustomService = {
+      id: `srv_${Date.now()}`,
+      name: newServiceName.trim(),
+      number: newServiceNumber.trim()
+    };
+
+    setCustomServices(prev => [...prev, newEntry]);
+    setNewServiceName('');
+    setNewServiceNumber('');
+    setIsAddingService(false);
+  };
+
+  const handleRemoveCustomService = (id: string) => {
+    setCustomServices(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handlePresetClick = (presetName: string) => {
+    setNewServiceName(presetName);
+    setIsAddingService(true);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +109,8 @@ export function EditProjectModal({
       expedienteAysam: expedienteAysam.trim(),
       startDate: startDate || undefined,
       estimatedEndDate: estimatedEndDate || undefined,
-      technicalNotes: technicalNotes.trim()
+      technicalNotes: technicalNotes.trim(),
+      customServices
     });
 
     onClose();
@@ -57,10 +118,10 @@ export function EditProjectModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 no-print animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl p-5 shadow-2xl border-t-4 border-amber-500 max-h-[92vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl p-5 shadow-2xl border-t-4 border-amber-500 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
               <Building2 className="w-4 h-4" />
             </div>
             <div>
@@ -68,7 +129,7 @@ export function EditProjectModal({
                 Ficha Técnica y Administrativa
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Edición de expedientes, suministros y memoria técnica
+                Edición de expedientes, suministros, servicios y memoria técnica
               </p>
             </div>
           </div>
@@ -85,7 +146,7 @@ export function EditProjectModal({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                Nombre del Edificio / Complejo
+                Nombre del Edificio / Complejo *
               </label>
               <input
                 type="text"
@@ -112,10 +173,10 @@ export function EditProjectModal({
             </div>
           </div>
 
-          {/* Expedientes y Suministros */}
+          {/* Expedientes y Suministros Principales */}
           <div className="bg-slate-50 dark:bg-slate-850 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
             <span className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400">
-              Expedientes y Servicios
+              Expedientes y Suministros Base
             </span>
 
             <div>
@@ -136,7 +197,7 @@ export function EditProjectModal({
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                   <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  Suministro EDEMSA
+                  Suministro EDEMSA (Electricidad)
                 </label>
                 <input
                   type="text"
@@ -150,7 +211,7 @@ export function EditProjectModal({
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                   <Droplets className="w-3.5 h-3.5 text-sky-500" />
-                  Suministro AYSAM
+                  Suministro AYSAM (Agua y Cloacas)
                 </label>
                 <input
                   type="text"
@@ -161,6 +222,122 @@ export function EditProjectModal({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Expedientes y Servicios Adicionales */}
+          <div className="bg-slate-50 dark:bg-slate-850 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Más Expedientes y Servicios ({customServices.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAddingService(prev => !prev)}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Agregar Servicio</span>
+              </button>
+            </div>
+
+            {/* Presets rápidos */}
+            <div className="flex flex-wrap gap-1">
+              {SERVICE_PRESETS.map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handlePresetClick(p.name)}
+                  className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-amber-50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  <span>{p.icon}</span>
+                  <span>{p.name.split('(')[0].trim()}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Formulario para agregar nuevo servicio */}
+            {isAddingService && (
+              <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-amber-300 dark:border-amber-800/60 space-y-2 animate-scale-up">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-0.5">
+                      Entidad / Nombre del Servicio
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Gas (Ecogas), Bomberos, Catastro..."
+                      value={newServiceName}
+                      onChange={(e) => setNewServiceName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-xs font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-0.5">
+                      Nº Expediente / Cuenta / Suministro
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Cuenta 29401 / Exp. 4910-B"
+                      value={newServiceNumber}
+                      onChange={(e) => setNewServiceNumber(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-xs font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingService(false)}
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomService}
+                    disabled={!newServiceName.trim() || !newServiceNumber.trim()}
+                    className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-black"
+                  >
+                    Confirmar Servicio
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Listado de servicios agregados */}
+            {customServices.length > 0 ? (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {customServices.map((srv) => (
+                  <div
+                    key={srv.id}
+                    className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-slate-900 dark:text-white block truncate">
+                        {srv.name}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 block truncate">
+                        {srv.number}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCustomService(srv.id)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex-shrink-0"
+                      title="Eliminar este expediente"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 italic">
+                No hay servicios adicionales cargados. Puedes agregar Gas, Bomberos, Catastro, etc.
+              </p>
+            )}
           </div>
 
           {/* Plazos de Ejecución */}

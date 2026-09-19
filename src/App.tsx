@@ -863,6 +863,7 @@ export default function App() {
       expedienteMunicipal: payload.expedienteMunicipal,
       expedienteEdemsa: payload.expedienteEdemsa,
       expedienteAysam: payload.expedienteAysam,
+      customServices: payload.customServices || [],
       floorsConfig: payload.floorsConfig,
       units: newUnits
     };

@@ -69,6 +69,12 @@ export interface Milestone {
   notes?: string;
 }
 
+export interface ProjectCustomService {
+  id: string;
+  name: string;
+  number: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -81,6 +87,7 @@ export interface Project {
   expedienteAysam?: string;
   technicalNotes?: string;
   floorsConfig?: FloorConfig[];
+  customServices?: ProjectCustomService[];
   milestones?: Milestone[];
   units: Unit[];
 }
