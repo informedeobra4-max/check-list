@@ -23,12 +23,32 @@ export interface Trade {
   items: InspectionItem[];
 }
 
+export interface BlueprintDocument {
+  id: string;
+  name: string;
+  type: 'pdf' | 'cad' | 'image' | 'link';
+  url: string; // Base64 dataURL, blob, or web URL
+  size?: number;
+  uploadedAt: string;
+  category?: 'arquitectura' | 'estructura' | 'sanitaria' | 'electrica' | 'gas' | 'otro';
+  cadViewerUrl?: string; // Link to external CAD/BIM viewer like Autodesk Viewer, ShareCAD, etc.
+}
+
+export interface FloorConfig {
+  floorNumber: number; // 0 for PB, 1 for Piso 1, etc.
+  floorLabel: string; // "Planta Baja", "Piso 1", etc.
+  unitsCount: number; // Number of units on this floor
+}
+
 export interface Unit {
   id: string;
   name: string;
   trades: Trade[];
   type?: 'unit' | 'common_area';
   category?: string;
+  floorNumber?: number;
+  floorLabel?: string;
+  blueprints?: BlueprintDocument[];
   signature?: string; // Base64 dataURL of digital signature
   signedBy?: string; // Signatory full name
   signRole?: string; // Signatory role/cargo
@@ -56,6 +76,11 @@ export interface Project {
   createdAt: string;
   startDate?: string;
   estimatedEndDate?: string;
+  expedienteMunicipal?: string;
+  expedienteEdemsa?: string;
+  expedienteAysam?: string;
+  technicalNotes?: string;
+  floorsConfig?: FloorConfig[];
   milestones?: Milestone[];
   units: Unit[];
 }

@@ -18,6 +18,8 @@ import {
 import { Project, StatusFilter } from '../types';
 import { calculateProjectProgress } from '../utils/calculations';
 import { ProjectTimeline } from './ProjectTimeline';
+import { AnimatedCircularProgress } from './AnimatedCircularProgress';
+import { Pencil, Info, FileCheck, Zap, Droplets } from 'lucide-react';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -32,6 +34,7 @@ interface DashboardViewProps {
   onOpenMilestonesConfig: (projectId: string) => void;
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
+  onEditProject?: (project: Project) => void;
 }
 
 export function DashboardView({
@@ -46,7 +49,8 @@ export function DashboardView({
   onExportExcel,
   onOpenMilestonesConfig,
   onToggleManualMilestone,
-  onUpdateProjectDates
+  onUpdateProjectDates,
+  onEditProject
 }: DashboardViewProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -234,10 +238,10 @@ export function DashboardView({
         </button>
       </div>
 
-      {/* Projects List */}
-      <div className="space-y-3">
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredProjects.length === 0 ? (
-          <div className="text-center py-10 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+          <div className="col-span-full text-center py-10 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
             <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No se encontraron obras</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Prueba cambiando el filtro de búsqueda o crea una obra.</p>
@@ -262,60 +266,116 @@ export function DashboardView({
               statusLabel = `En curso (${progress}%)`;
             }
 
+            const hasTechInfo = !!(
+              project.expedienteMunicipal ||
+              project.expedienteEdemsa ||
+              project.expedienteAysam ||
+              project.technicalNotes
+            );
+
             return (
               <div
                 key={project.id}
                 onClick={() => onSelectProject(project.id)}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 active:bg-slate-50 dark:active:bg-slate-850 transition-all cursor-pointer relative overflow-hidden group"
+                className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 active:bg-slate-50 dark:active:bg-slate-850 transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between"
               >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1 pr-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor} border`}>
-                        {unitCount} {unitCount === 1 ? 'Unidad' : 'Unidades'}
-                      </span>
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        • {statusLabel}
-                      </span>
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 pr-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor} border`}>
+                          {unitCount} {unitCount === 1 ? 'Unidad' : 'Unidades'}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                          • {statusLabel}
+                        </span>
+                      </div>
+
+                      <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                        {project.name}
+                      </h4>
+
+                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
+                        <MapPin className="w-3.5 h-3.5 mr-1 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                        <span className="truncate">{project.location || 'Obra en construcción'}</span>
+                      </p>
                     </div>
 
-                    <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                      {project.name}
-                    </h4>
-
-                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
-                      <MapPin className="w-3.5 h-3.5 mr-1 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <span className="truncate">{project.location || 'Obra en construcción'}</span>
-                    </p>
+                    {/* Animated Circular Progress for Project */}
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <AnimatedCircularProgress
+                        percentage={progress}
+                        size={60}
+                        strokeWidth={5}
+                        color="#10B981"
+                      />
+                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 tracking-wider">
+                        Consolidado
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="text-right pl-2 flex-shrink-0">
-                    <span className="text-2xl font-black font-mono text-slate-900 dark:text-white leading-none">
-                      {progress}%
-                    </span>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase mt-1">
-                      Consolidado
-                    </span>
+                  {/* Ficha Técnica y Administrativa Card */}
+                  <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                        <FileCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        Ficha Técnica & Expedientes
+                      </span>
+                      {onEditProject && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditProject(project);
+                          }}
+                          className="text-[10px] font-black text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/10"
+                        >
+                          <Pencil className="w-2.5 h-2.5" /> Editar
+                        </button>
+                      )}
+                    </div>
+
+                    {hasTechInfo ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
+                        {project.expedienteMunicipal && (
+                          <div className="truncate">
+                            <strong className="text-slate-700 dark:text-slate-300">Mun:</strong> {project.expedienteMunicipal}
+                          </div>
+                        )}
+                        {project.expedienteEdemsa && (
+                          <div className="truncate">
+                            <strong className="text-slate-700 dark:text-slate-300">EDEMSA:</strong> {project.expedienteEdemsa}
+                          </div>
+                        )}
+                        {project.expedienteAysam && (
+                          <div className="truncate">
+                            <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong> {project.expedienteAysam}
+                          </div>
+                        )}
+                        {project.technicalNotes && (
+                          <div className="truncate sm:col-span-2 italic text-slate-500 dark:text-slate-400">
+                            &ldquo;{project.technicalNotes}&rdquo;
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-400 italic">
+                        Sin expedientes cargados (Toca &apos;Editar&apos; para agregar Exp. Municipal, EDEMSA, AYSAM)
+                      </p>
+                    )}
                   </div>
-                </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden mt-3.5 border border-slate-200 dark:border-slate-700">
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-
-                {/* Línea de Tiempo e Hitos Críticos con Alarmas Rojas */}
-                <div className="mt-3">
-                  <ProjectTimeline
-                    project={project}
-                    compact={true}
-                    onOpenMilestonesConfig={onOpenMilestonesConfig}
-                    onToggleManualMilestone={onToggleManualMilestone}
-                    onUpdateProjectDates={onUpdateProjectDates}
-                  />
+                  {/* Línea de Tiempo e Hitos Críticos con Alarmas Rojas */}
+                  <div className="mt-3">
+                    <ProjectTimeline
+                      project={project}
+                      compact={true}
+                      onOpenMilestonesConfig={onOpenMilestonesConfig}
+                      onToggleManualMilestone={onToggleManualMilestone}
+                      onUpdateProjectDates={onUpdateProjectDates}
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
@@ -364,7 +424,7 @@ export function DashboardView({
                       </button>
                     )}
 
-                    <span className="text-slate-900 font-black text-xs flex items-center group-hover:text-amber-600 transition-colors ml-1">
+                    <span className="text-slate-900 dark:text-white font-black text-xs flex items-center group-hover:text-amber-600 transition-colors ml-1">
                       Abrir <ChevronRight className="w-4 h-4 ml-0.5 text-amber-500" />
                     </span>
                   </div>

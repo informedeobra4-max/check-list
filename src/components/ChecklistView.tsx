@@ -27,13 +27,15 @@ import {
   PenTool,
   Lock,
   Unlock,
-  FileCheck2
+  FileCheck2,
+  Compass
 } from 'lucide-react';
 import { Project, Unit, TaskFilter, InspectionItem, Trade } from '../types';
 import { calculateUnitProgress, getUnitItemCounts } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ItemObservationModal } from './ItemObservationModal';
 import { AddItemScopeModal } from './AddItemScopeModal';
+import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 
 function WhatsAppIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -69,6 +71,7 @@ interface ChecklistViewProps {
   onAddPhoto?: (tradeId: string, itemId: string, dataUrl: string) => void;
   onDeletePhoto?: (tradeId: string, itemId: string, photoId: string) => void;
   onUnlockUnit?: (unitId: string) => void;
+  onOpenBlueprints?: () => void;
 }
 
 export function ChecklistView({
@@ -90,7 +93,8 @@ export function ChecklistView({
   onSaveObservation,
   onAddPhoto,
   onDeletePhoto,
-  onUnlockUnit
+  onUnlockUnit,
+  onOpenBlueprints
 }: ChecklistViewProps) {
   const [selectedTradeFilter, setSelectedTradeFilter] = useState<string>('all');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskFilter>('all');
@@ -254,15 +258,27 @@ export function ChecklistView({
                 <span>{unit.signature ? 'Acta Firmada ✔' : 'Firmar Acta'}</span>
               </button>
             )}
+
+            {onOpenBlueprints && (
+              <button
+                onClick={onOpenBlueprints}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border border-amber-500/40"
+                title="Abrir y verificar planos técnicos de esta unidad"
+              >
+                <Compass className="w-3.5 h-3.5 text-amber-400" />
+                <span>Planos ({unit.blueprints?.length || 0})</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-col items-end flex-shrink-0">
-          <div className="flex items-center justify-center w-16 h-16 bg-slate-950 rounded-full border-2 border-amber-500 shadow-inner">
-            <span className="text-base font-black text-amber-400 font-mono">
-              {unitPct}%
-            </span>
-          </div>
+        <div className="flex flex-col items-center flex-shrink-0">
+          <AnimatedCircularProgress
+            percentage={unitPct}
+            size={58}
+            strokeWidth={4.5}
+            color="#10B981"
+          />
         </div>
       </div>
 
@@ -944,6 +960,20 @@ export function ChecklistView({
             }
           }}
         />
+      )}
+      {/* Floating Blueprint Quick-Access Action Button */}
+      {onOpenBlueprints && (
+        <div className="fixed bottom-20 right-4 sm:right-8 z-30 no-print">
+          <button
+            type="button"
+            onClick={onOpenBlueprints}
+            className="px-4 py-2.5 rounded-full bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 font-black text-xs flex items-center gap-2 shadow-2xl border-2 border-amber-500 dark:border-slate-900 active:scale-95 hover:scale-105 transition-all touch-target"
+            title="Cotejar tareas contra el plano técnico"
+          >
+            <Compass className="w-4 h-4 text-amber-400 dark:text-slate-950" />
+            <span>📐 Ver Planos ({unit.blueprints?.length || 0})</span>
+          </button>
+        </div>
       )}
     </section>
   );

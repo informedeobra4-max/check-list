@@ -61,7 +61,7 @@ export function Header({
   return (
     <>
       <header className="bg-slate-900 text-white border-b-2 border-amber-500 sticky top-0 z-40 shadow-md no-print">
-        <div className="px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
           {/* Left: Interactive Logo + CONTROL DE AVANCE */}
           <div className="flex items-center space-x-3">
             {/* Logo Touch Trigger */}
@@ -182,24 +182,26 @@ export function Header({
 
       {/* Breadcrumb Sub-Header for internal navigation */}
       {currentView !== 'dashboard' && (
-        <div className="bg-slate-950 px-4 py-2 text-xs text-slate-300 flex items-center justify-between border-b border-slate-800 no-print">
-          <button
-            onClick={onBack}
-            className="flex items-center text-amber-400 font-bold touch-target py-1 hover:text-amber-300 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1.5" />
-            <span>{currentView === 'checklist' ? 'Departamentos' : 'Obras'}</span>
-          </button>
-          
-          <div className="flex items-center gap-2">
+        <div className="bg-slate-950 border-b border-slate-800 no-print">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 text-xs text-slate-300 flex items-center justify-between">
             <button
-              onClick={() => onOpenReportModal(currentView === 'checklist' ? 'unit' : 'project')}
-              className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold flex items-center gap-1"
+              onClick={onBack}
+              className="flex items-center text-amber-400 font-bold touch-target py-1 hover:text-amber-300 transition-colors"
             >
-              <FileText className="w-3 h-3 text-rose-400" /> Exportar PDF
+              <ArrowLeft className="w-4 h-4 mr-1.5" />
+              <span>{currentView === 'checklist' ? 'Departamentos' : 'Obras'}</span>
             </button>
-            <div className="font-extrabold text-white truncate max-w-[140px] text-right">
-              {currentView === 'checklist' ? selectedUnit?.name : selectedProject?.name}
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onOpenReportModal(currentView === 'checklist' ? 'unit' : 'project')}
+                className="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 font-bold flex items-center gap-1"
+              >
+                <FileText className="w-3 h-3 text-rose-400" /> Exportar PDF
+              </button>
+              <div className="font-extrabold text-white truncate max-w-[200px] text-right">
+                {currentView === 'checklist' ? selectedUnit?.name : selectedProject?.name}
+              </div>
             </div>
           </div>
         </div>

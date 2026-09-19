@@ -94,6 +94,22 @@ export function ProjectTimeline({
 
   const timeElapsedPercent = Math.min(100, Math.max(0, Math.round((daysElapsed / totalDurationDays) * 100)));
 
+  // Natural language duration helper
+  const formatNaturalDuration = (days: number): string => {
+    if (days <= 0) return '0 días';
+    const months = Math.round(days / 30.4375);
+    if (days < 30) return `${days} días`;
+    if (months < 12) return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+    const years = Math.floor(months / 12);
+    const remMonths = months % 12;
+    if (remMonths === 0) return `${years} ${years === 1 ? 'año' : 'años'}`;
+    return `${years} ${years === 1 ? 'año' : 'años'} y ${remMonths} ${remMonths === 1 ? 'mes' : 'meses'}`;
+  };
+
+  const naturalTotalDuration = formatNaturalDuration(totalDurationDays);
+  const naturalElapsedDuration = formatNaturalDuration(daysElapsed);
+  const naturalRemainingDuration = formatNaturalDuration(daysRemaining);
+
   // Progress diagnosis: Physical vs Calendar
   const progressDiff = physicalProgress - timeElapsedPercent;
   const isOptimal = progressDiff >= 0;
@@ -366,19 +382,72 @@ export function ProjectTimeline({
             </div>
           </div>
 
-          {/* Bottom Footnote: Dates & Days Details */}
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/80 flex-wrap gap-2">
+          {/* Bottom Footnote: Natural Language Duration & Dates Details */}
+          <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex-wrap gap-2">
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
-              Plazo pactado: <strong className="text-slate-200 font-mono">{daysElapsed}</strong> de{' '}
-              <strong className="text-slate-200 font-mono">{totalDurationDays}</strong> días consumidos ({timeElapsedPercent}%)
+              <span>Plazo previsto:</span>
+              <strong className="text-white font-mono">{naturalTotalDuration}</strong>
+              <span className="text-slate-400 font-mono">({totalDurationDays} días)</span>
             </span>
 
-            <span className="flex items-center gap-1 font-bold">
+            <span className="flex items-center gap-1">
+              <span>Transcurrido:</span>
+              <strong className="text-amber-300 font-mono">{naturalElapsedDuration}</strong>
+              <span className="text-slate-400">({timeElapsedPercent}%)</span>
+              <span className="text-slate-500">• Restan: {naturalRemainingDuration}</span>
+            </span>
+
+            <span className="flex items-center gap-1 font-bold ml-auto">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              Culminación prevista:{' '}
+              <span>Entrega:</span>
               <span className="text-amber-300 font-mono">{formatDateLabel(endDateStr)}</span>
             </span>
+          </div>
+
+          {/* DYNAMIC COMPARISON BAR: AVANCE FÍSICO VS TIEMPO TRANSCURRIDO */}
+          <div className="mt-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Comparativa: Obra Ejecutada vs Plazo Transcurrido
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                isOptimal
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+              }`}>
+                {isOptimal ? `Al día (+${progressDiff}% de margen)` : `Retraso de ${delayGap}% respecto al tiempo`}
+              </span>
+            </div>
+
+            {/* Barra 1: Avance Físico */}
+            <div>
+              <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                <span className="font-medium">Avance Físico Ejecutado</span>
+                <span className="font-mono font-black text-emerald-400">{physicalProgress}%</span>
+              </div>
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(100, Math.max(0, physicalProgress))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Barra 2: Tiempo Transcurrido */}
+            <div>
+              <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                <span className="font-medium">Tiempo Transcurrido ({naturalElapsedDuration})</span>
+                <span className="font-mono font-black text-amber-400">{timeElapsedPercent}%</span>
+              </div>
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-700"
+                  style={{ width: `${Math.min(100, Math.max(0, timeElapsedPercent))}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 

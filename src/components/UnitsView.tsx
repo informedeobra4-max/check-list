@@ -16,12 +16,15 @@ import {
   Pencil,
   Building2,
   Trash2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Compass,
+  FileCheck
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
+import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 
 interface UnitsViewProps {
   project: Project;
@@ -35,6 +38,8 @@ interface UnitsViewProps {
   onOpenMilestonesConfig: (projectId: string) => void;
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
+  onEditProject?: (project: Project) => void;
+  onOpenUnitBlueprints?: (unit: Unit) => void;
 }
 
 export function UnitsView({
@@ -48,7 +53,9 @@ export function UnitsView({
   onExportExcel,
   onOpenMilestonesConfig,
   onToggleManualMilestone,
-  onUpdateProjectDates
+  onUpdateProjectDates,
+  onEditProject,
+  onOpenUnitBlueprints
 }: UnitsViewProps) {
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -100,29 +107,71 @@ export function UnitsView({
       {/* Project Summary Card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
         <div className="flex items-start justify-between">
-          <div>
+          <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Obra Activa
             </span>
             <h2 className="text-lg font-black text-slate-900 dark:text-white leading-tight">
               {project.name}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {project.location} • {project.units.length} Espacios ({countDeptos} deptos, {countCommon} comunes)
             </p>
           </div>
-          <div className="text-right">
-            <span className="text-2xl font-black text-slate-900 dark:text-white font-mono">
-              {overallProgress}%
-            </span>
-            <p className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-              {tradeFilter === 'all' ? 'Avance General' : `Avance en ${activeTrade?.shortName}`}
+          <div className="flex flex-col items-center flex-shrink-0">
+            <AnimatedCircularProgress
+              percentage={overallProgress}
+              size={56}
+              strokeWidth={4.5}
+              color="#10B981"
+            />
+            <p className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+              {tradeFilter === 'all' ? 'Avance General' : activeTrade?.shortName}
             </p>
           </div>
         </div>
 
+        {/* Ficha Técnica y Administrativa Collapsible/Card */}
+        <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+              <FileCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              Ficha Técnica y Administrativa de la Obra
+            </span>
+            {onEditProject && (
+              <button
+                type="button"
+                onClick={() => onEditProject(project)}
+                className="text-[10px] font-black text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 px-2 py-0.5 rounded bg-amber-500/10"
+              >
+                <Pencil className="w-2.5 h-2.5" /> Editar Datos
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
+            <div>
+              <strong className="text-slate-700 dark:text-slate-300">Exp. Municipal:</strong>{' '}
+              {project.expedienteMunicipal || <span className="text-slate-400 italic">Sin cargar</span>}
+            </div>
+            <div>
+              <strong className="text-slate-700 dark:text-slate-300">EDEMSA:</strong>{' '}
+              {project.expedienteEdemsa || <span className="text-slate-400 italic">Sin cargar</span>}
+            </div>
+            <div>
+              <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong>{' '}
+              {project.expedienteAysam || <span className="text-slate-400 italic">Sin cargar</span>}
+            </div>
+            {project.technicalNotes && (
+              <div className="sm:col-span-3 text-[11px] text-slate-600 dark:text-slate-400 italic pt-0.5">
+                Memoria: &ldquo;{project.technicalNotes}&rdquo;
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Action buttons inside project summary */}
-        <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
           <button
             onClick={() => onOpenReportModal('project', project.id)}
             className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors shadow-2xs"
@@ -339,18 +388,18 @@ export function UnitsView({
       </div>
 
       {/* Units Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {filteredUnits.length === 0 ? (
-          <div className="col-span-2 text-center py-8 bg-white rounded-2xl border border-slate-200 p-4">
-            <p className="text-xs font-bold text-slate-700">Sin unidades con este filtro</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Prueba cambiando el filtro de estado o tipo arriba.</p>
+          <div className="col-span-full text-center py-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Sin unidades con este filtro</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Prueba cambiando el filtro de estado o tipo arriba.</p>
             <button
               onClick={() => {
                 setStatusFilter('all');
                 setTradeFilter('all');
                 setTypeFilter('all');
               }}
-              className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg"
+              className="mt-3 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-lg"
             >
               Ver Todas las Unidades
             </button>
@@ -359,13 +408,12 @@ export function UnitsView({
           filteredUnits.map(({ unit, progress }) => {
             const counts = getUnitItemCounts(unit, tradeFilter);
             const isComplete = progress === 100;
-            const isInProgress = progress > 0 && progress < 100;
             const isCommonArea = unit.type === 'common_area';
 
             let badgeBg = 'bg-slate-900 text-amber-400';
             if (isComplete) {
               badgeBg = 'bg-emerald-600 text-white';
-            } else if (isInProgress) {
+            } else if (progress > 0) {
               badgeBg = 'bg-amber-600 text-white';
             }
 
@@ -383,7 +431,7 @@ export function UnitsView({
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className={`w-7 h-7 rounded-lg ${badgeBg} flex items-center justify-center font-bold text-xs shadow-xs`}>
+                    <span className={`w-7 h-7 rounded-lg ${badgeBg} flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0`}>
                       {isComplete ? (
                         <CircleCheck className="w-4 h-4" />
                       ) : isCommonArea ? (
@@ -392,30 +440,38 @@ export function UnitsView({
                         <DoorOpen className="w-4 h-4" />
                       )}
                     </span>
-                    <div className="text-right">
-                      <span className="text-base font-black font-mono text-slate-900 dark:text-white">
-                        {progress}%
-                      </span>
-                    </div>
+
+                    {/* Animated Circular Progress on Unit Card */}
+                    <AnimatedCircularProgress
+                      percentage={progress}
+                      size={44}
+                      strokeWidth={4}
+                      color="#10B981"
+                    />
                   </div>
 
                   {/* Type & Status Badges */}
-                  <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                  <div className="mt-2 flex items-center gap-1 flex-wrap">
                     <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
                       isCommonArea
                         ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     }`}>
-                      {isCommonArea ? 'Espacio Común' : 'Depto'}
+                      {isCommonArea ? 'Común' : 'Depto'}
                     </span>
+                    {unit.floorLabel && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100/70 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 truncate max-w-[85px]">
+                        {unit.floorLabel}
+                      </span>
+                    )}
                     {unit.signature && (
                       <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                        ✔ Firmada
+                        ✔
                       </span>
                     )}
                     {unit.isLocked && (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
-                        🔒 Bloqueada
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                        🔒
                       </span>
                     )}
                   </div>
@@ -456,12 +512,12 @@ export function UnitsView({
                   </div>
 
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems' : 'tareas gremio'}
+                    {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems' : 'tareas'}
                   </p>
                 </div>
 
-                <div className="mt-3">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
+                <div className="mt-2.5">
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
                         isComplete ? 'bg-emerald-500' : 'bg-amber-500'
@@ -470,8 +526,8 @@ export function UnitsView({
                     />
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1">
+                  <div className="mt-2 flex items-center justify-between gap-1 flex-wrap">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -482,6 +538,21 @@ export function UnitsView({
                       >
                         <FileText className="w-2.5 h-2.5" /> PDF
                       </button>
+
+                      {onOpenUnitBlueprints && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenUnitBlueprints(unit);
+                          }}
+                          className="text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                          title="Ver o adjuntar planos de esta unidad"
+                        >
+                          <Compass className="w-2.5 h-2.5 text-amber-500" />
+                          <span>Planos ({unit.blueprints?.length || 0})</span>
+                        </button>
+                      )}
 
                       {onExportExcel && (
                         <button
@@ -497,7 +568,7 @@ export function UnitsView({
                       )}
                     </div>
 
-                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ml-auto">
                       Auditar <ArrowRight className="w-3 h-3" />
                     </span>
                   </div>

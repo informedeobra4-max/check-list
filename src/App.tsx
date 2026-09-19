@@ -10,7 +10,9 @@ import { ChecklistView } from './components/ChecklistView';
 import { PhotoViewerModal } from './components/PhotoViewerModal';
 import { ReportModal } from './components/ReportModal';
 import { LogoEditorModal } from './components/LogoEditorModal';
-import { NewProjectModal } from './components/NewProjectModal';
+import { EditProjectModal } from './components/EditProjectModal';
+import { BlueprintViewerModal } from './components/BlueprintViewerModal';
+import { NewProjectModal, NewProjectPayload } from './components/NewProjectModal';
 import { NewUnitModal } from './components/NewUnitModal';
 import { EditUnitModal } from './components/EditUnitModal';
 import { SecurityConfirmModal } from './components/SecurityConfirmModal';
@@ -20,6 +22,7 @@ import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { BlueprintDocument } from './types';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V3';
@@ -126,6 +129,8 @@ export default function App() {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isNewUnitModalOpen, setIsNewUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [activeBlueprintViewerUnit, setActiveBlueprintViewerUnit] = useState<Unit | null>(null);
   const [isLogoEditorOpen, setIsLogoEditorOpen] = useState(false);
   const [logoEditorTarget, setLogoEditorTarget] = useState<'header' | 'banner'>('header');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -837,19 +842,28 @@ export default function App() {
     showToast('Fotografía eliminada', 'Trash2');
   };
 
-  // Create Project
-  const handleCreateProject = (name: string, location: string, unitNames: string[]) => {
-    const newUnits = unitNames.map((uName, idx) => ({
+  // Create Project with flexible floor configuration and amenities
+  const handleCreateProject = (payload: NewProjectPayload) => {
+    const newUnits: Unit[] = payload.units.map((uConfig, idx) => ({
       id: `unit_${Date.now()}_${idx + 1}`,
-      name: uName,
-      trades: createInitialTrades()
+      name: uConfig.name,
+      type: uConfig.type || 'unit',
+      floorNumber: uConfig.floorNumber,
+      floorLabel: uConfig.floorLabel,
+      category: uConfig.category || (uConfig.type === 'common_area' ? 'Espacio Común' : 'Departamento'),
+      trades: createInitialTrades(),
+      blueprints: []
     }));
 
     const newProject: Project = {
       id: `proj_${Date.now()}`,
-      name,
-      location: location || 'Obra en ejecución',
+      name: payload.name,
+      location: payload.location || 'Obra en ejecución',
       createdAt: new Date().toISOString().split('T')[0],
+      expedienteMunicipal: payload.expedienteMunicipal,
+      expedienteEdemsa: payload.expedienteEdemsa,
+      expedienteAysam: payload.expedienteAysam,
+      floorsConfig: payload.floorsConfig,
       units: newUnits
     };
 
@@ -858,7 +872,67 @@ export default function App() {
     setSelectedProjectId(newProject.id);
     setSelectedUnitId(null);
     setCurrentView('units');
-    showToast(`Obra "${name}" creada con ${newUnits.length} departamentos`, 'Check');
+    showToast(`Obra "${payload.name}" creada con ${newUnits.length} espacios`, 'Check');
+  };
+
+  // Update Project Data (Ficha Técnica y Administrativa)
+  const handleSaveProjectData = (updatedData: Partial<Project>) => {
+    if (!editingProject) return;
+    setProjects(prev => prev.map(p => {
+      if (p.id !== editingProject.id) return p;
+      return { ...p, ...updatedData };
+    }));
+    showToast('Ficha técnica y administrativa actualizada', 'Check');
+  };
+
+  // Unit Blueprints Management
+  const handleAddUnitBlueprint = (unitId: string, docData: Omit<BlueprintDocument, 'id' | 'uploadedAt'>) => {
+    const newDoc: BlueprintDocument = {
+      ...docData,
+      id: `bp_${Date.now()}`,
+      uploadedAt: new Date().toISOString()
+    };
+
+    setProjects(prev => prev.map(proj => {
+      if (proj.id !== selectedProjectId) return proj;
+      return {
+        ...proj,
+        units: proj.units.map(u => {
+          if (u.id !== unitId) return u;
+          const currentBlueprints = u.blueprints || [];
+          const updated = [newDoc, ...currentBlueprints];
+          return { ...u, blueprints: updated };
+        })
+      };
+    }));
+
+    setActiveBlueprintViewerUnit(prev => {
+      if (!prev || prev.id !== unitId) return prev;
+      return { ...prev, blueprints: [newDoc, ...(prev.blueprints || [])] };
+    });
+
+    showToast('Plano técnico adjuntado con éxito', 'Check');
+  };
+
+  const handleDeleteUnitBlueprint = (unitId: string, docId: string) => {
+    setProjects(prev => prev.map(proj => {
+      if (proj.id !== selectedProjectId) return proj;
+      return {
+        ...proj,
+        units: proj.units.map(u => {
+          if (u.id !== unitId) return u;
+          const updated = (u.blueprints || []).filter(d => d.id !== docId);
+          return { ...u, blueprints: updated };
+        })
+      };
+    }));
+
+    setActiveBlueprintViewerUnit(prev => {
+      if (!prev || prev.id !== unitId) return prev;
+      return { ...prev, blueprints: (prev.blueprints || []).filter(d => d.id !== docId) };
+    });
+
+    showToast('Plano eliminado', 'Trash2');
   };
 
   // Create Unit
@@ -961,7 +1035,7 @@ export default function App() {
   })();
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col shadow-2xl relative pb-16 transition-colors duration-200">
+    <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col relative pb-16 transition-colors duration-200">
       {/* Toast Notification */}
       <Toast message={toastMessage} iconName={toastIcon} />
 
@@ -997,7 +1071,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 p-4 pb-20 overflow-y-auto">
+      <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 pb-24 overflow-y-auto">
         {currentView === 'dashboard' && (
           <DashboardView
             projects={projects}
@@ -1015,6 +1089,7 @@ export default function App() {
             onOpenMilestonesConfig={handleOpenMilestonesConfig}
             onToggleManualMilestone={handleToggleManualMilestone}
             onUpdateProjectDates={handleUpdateProjectDates}
+            onEditProject={(proj) => setEditingProject(proj)}
           />
         )}
 
@@ -1031,6 +1106,8 @@ export default function App() {
             onOpenMilestonesConfig={handleOpenMilestonesConfig}
             onToggleManualMilestone={handleToggleManualMilestone}
             onUpdateProjectDates={handleUpdateProjectDates}
+            onEditProject={(proj) => setEditingProject(proj)}
+            onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
           />
         )}
 
@@ -1052,12 +1129,13 @@ export default function App() {
             onEditUnit={setEditingUnit}
             onRequestDeleteUnit={handleRequestDeleteUnit}
             onExportExcel={handleExportExcel}
+            onOpenBlueprints={() => setActiveBlueprintViewerUnit(selectedUnit)}
           />
         )}
       </main>
 
       {/* Bottom Sticky Mobile Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-2 flex justify-around items-center z-30 shadow-lg no-print transition-colors">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-lg md:max-w-xl mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 md:rounded-2xl md:mb-3 px-6 py-2 flex justify-around items-center z-30 shadow-2xl no-print transition-colors">
         <button
           onClick={() => handleNavigate('dashboard')}
           className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target ${
@@ -1098,7 +1176,7 @@ export default function App() {
           className="flex flex-col items-center justify-center text-slate-700 hover:text-slate-950 font-black text-[11px] touch-target group"
         >
           <FileText className="w-5 h-5 mb-0.5 text-rose-600 group-hover:scale-110 transition-transform" />
-          <span className="text-slate-900 font-black">Exportar PDF</span>
+          <span className="text-slate-900 dark:text-white font-black">Exportar PDF</span>
         </button>
       </nav>
 
@@ -1108,6 +1186,27 @@ export default function App() {
         onClose={() => setIsNewProjectModalOpen(false)}
         onCreateProject={handleCreateProject}
       />
+
+      {editingProject && (
+        <EditProjectModal
+          isOpen={!!editingProject}
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+          onSaveProject={handleSaveProjectData}
+        />
+      )}
+
+      {activeBlueprintViewerUnit && (
+        <BlueprintViewerModal
+          isOpen={!!activeBlueprintViewerUnit}
+          unitName={activeBlueprintViewerUnit.name}
+          projectName={selectedProject?.name || ''}
+          blueprints={activeBlueprintViewerUnit.blueprints || []}
+          onClose={() => setActiveBlueprintViewerUnit(null)}
+          onAddBlueprint={(doc) => handleAddUnitBlueprint(activeBlueprintViewerUnit.id, doc)}
+          onDeleteBlueprint={(docId) => handleDeleteUnitBlueprint(activeBlueprintViewerUnit.id, docId)}
+        />
+      )}
 
       <NewUnitModal
         isOpen={isNewUnitModalOpen}
