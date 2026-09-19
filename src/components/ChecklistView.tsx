@@ -31,7 +31,7 @@ import {
   Compass
 } from 'lucide-react';
 import { Project, Unit, TaskFilter, InspectionItem, Trade } from '../types';
-import { calculateUnitProgress, getUnitItemCounts } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ItemObservationModal } from './ItemObservationModal';
 import { AddItemScopeModal } from './AddItemScopeModal';
@@ -190,7 +190,7 @@ export function ChecklistView({
         <div className="min-w-0 pr-2">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-black rounded uppercase">
-              {unit.type === 'common_area' ? 'Espacio Común' : 'Departamento'}
+              {isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento'}
             </span>
             <span className="text-xs text-slate-300 font-bold truncate">
               {project.name}

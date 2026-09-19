@@ -47,13 +47,60 @@ export function getUnitItemCounts(unit: Unit, tradeFilter: string = 'all'): { to
   return { total, completed, inProgress };
 }
 
-export function calculateProjectProgress(project: Project, tradeFilter: string = 'all'): number {
+/**
+ * Accurately determines whether a unit is a common area (Espacio Común / Sala de Máquinas / etc.)
+ * even if older data did not have the `type` field explicitly set.
+ */
+export function isUnitCommonArea(unit: { name?: string; type?: 'unit' | 'common_area'; category?: string } | null | undefined): boolean {
+  if (!unit) return false;
+  if (unit.type === 'common_area') return true;
+  if (unit.type === 'unit') return false;
+
+  // Fallback checks for legacy or untyped data:
+  if (unit.category === 'Espacio Común' || unit.category === 'Espacio Técnico') return true;
+
+  const n = (unit.name || '').toLowerCase();
+  // If explicitly designated with depto/departamento/piso, it is a unit
+  if (/^depto\b|^departamento\b|^\d+[-_]\d+/.test(n)) {
+    return false;
+  }
+
+  // Keywords that denote common spaces / service areas
+  const commonKeywords = [
+    'quincho', 'sum', 'terraza', 'cochera', 'estacionamiento',
+    'baulera', 'hall', 'máquina', 'maquina', 'bomba',
+    'transformador', 'set', 'palier', 'escalera', 'común', 'comun',
+    'lavadero', 'tendedero', 'tablero', 'portón', 'porton', 'fachada',
+    'acceso', 'solarium', 'solárium', 'seguridad', 'garita'
+  ];
+
+  if (commonKeywords.some(k => n.includes(k))) {
+    return true;
+  }
+
+  // Common emojis used for common areas
+  if (/[🏢🍖🏊🚗📦⚡🚒📐🛡️🌿]/.test(unit.name || '')) {
+    return true;
+  }
+
+  return false;
+}
+
+export function calculateProjectProgress(
+  project: Project,
+  tradeFilter: string = 'all',
+  typeFilter: 'all' | 'unit' | 'common_area' = 'all'
+): number {
   if (!project || !project.units || project.units.length === 0) return 0;
   let totalItemsCount = 0;
   let totalProgressSum = 0;
 
   project.units.forEach(unit => {
     if (!unit || !unit.trades) return;
+    const isCommon = isUnitCommonArea(unit);
+    if (typeFilter === 'unit' && isCommon) return;
+    if (typeFilter === 'common_area' && !isCommon) return;
+
     unit.trades.forEach(trade => {
       if (tradeFilter === 'all' || trade.id === tradeFilter) {
         trade.items.forEach(item => {

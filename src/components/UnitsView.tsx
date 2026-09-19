@@ -21,7 +21,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
-import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
@@ -64,8 +64,21 @@ export function UnitsView({
   const overallProgress = calculateProjectProgress(project, tradeFilter);
   const activeTrade = MASTER_TRADES_TEMPLATE.find(t => t.id === tradeFilter);
 
-  // Compute stats for units based on active trade filter
-  const unitsWithStatus = project.units.map(unit => {
+  // Global counts by space type
+  const countDeptos = project.units.filter(u => !isUnitCommonArea(u)).length;
+  const countCommon = project.units.filter(u => isUnitCommonArea(u)).length;
+  const countAll = project.units.length;
+
+  // Filter units matching active type filter (solapa: 'all' | 'unit' | 'common_area')
+  const unitsMatchingType = project.units.filter(unit => {
+    const isCommon = isUnitCommonArea(unit);
+    if (typeFilter === 'unit') return !isCommon;
+    if (typeFilter === 'common_area') return isCommon;
+    return true;
+  });
+
+  // Calculate status for each unit in the active type filter
+  const tabUnitsWithStatus = unitsMatchingType.map(unit => {
     const progress = calculateUnitProgress(unit, tradeFilter);
     let status: StatusFilter = 'pending';
     if (progress >= 100) {
@@ -76,18 +89,18 @@ export function UnitsView({
     return { unit, progress, status };
   });
 
-  const countAll = project.units.length;
-  const countCompleted = unitsWithStatus.filter(u => u.status === 'completed').length;
-  const countInProgress = unitsWithStatus.filter(u => u.status === 'in_progress').length;
-  const countPending = unitsWithStatus.filter(u => u.status === 'pending').length;
+  // Active tab progress (average of units in current tab)
+  const tabProgress = calculateProjectProgress(project, tradeFilter, typeFilter);
 
-  const countDeptos = project.units.filter(u => u.type !== 'common_area').length;
-  const countCommon = project.units.filter(u => u.type === 'common_area').length;
+  // Dynamic counts for status chips based on selected space tab (Deptos vs Comunes vs Todos)
+  const tabTotalCount = tabUnitsWithStatus.length;
+  const tabCompletedCount = tabUnitsWithStatus.filter(u => u.status === 'completed').length;
+  const tabInProgressCount = tabUnitsWithStatus.filter(u => u.status === 'in_progress').length;
+  const tabPendingCount = tabUnitsWithStatus.filter(u => u.status === 'pending').length;
 
-  const filteredUnits = unitsWithStatus.filter(item => {
+  // Final filtered units applying the status filter chip ('all' | 'completed' | 'in_progress' | 'pending')
+  const filteredUnits = tabUnitsWithStatus.filter(item => {
     if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-    if (typeFilter === 'unit' && item.unit.type === 'common_area') return false;
-    if (typeFilter === 'common_area' && item.unit.type !== 'common_area') return false;
     return true;
   });
 
@@ -116,17 +129,26 @@ export function UnitsView({
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {project.location} • {project.units.length} Espacios ({countDeptos} deptos, {countCommon} comunes)
+              {typeFilter !== 'all' && (
+                <span className="font-bold text-amber-600 dark:text-amber-400 block sm:inline sm:ml-1">
+                  • Viendo {typeFilter === 'unit' ? `${countDeptos} Deptos` : `${countCommon} Espacios Comunes`}
+                </span>
+              )}
             </p>
           </div>
           <div className="flex flex-col items-center flex-shrink-0">
             <AnimatedCircularProgress
-              percentage={overallProgress}
+              percentage={typeFilter === 'all' ? overallProgress : tabProgress}
               size={56}
               strokeWidth={4.5}
               color="#10B981"
             />
-            <p className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-              {tradeFilter === 'all' ? 'Avance General' : activeTrade?.shortName}
+            <p className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mt-0.5 text-center">
+              {typeFilter === 'all'
+                ? (tradeFilter === 'all' ? 'Avance General' : activeTrade?.shortName)
+                : typeFilter === 'unit'
+                ? (tradeFilter === 'all' ? 'Avance Deptos' : `${activeTrade?.shortName} Deptos`)
+                : (tradeFilter === 'all' ? 'Avance Comunes' : `${activeTrade?.shortName} Comunes`)}
             </p>
           </div>
         </div>
@@ -214,7 +236,7 @@ export function UnitsView({
         <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden mt-3 p-0.5 border border-slate-200 dark:border-slate-700">
           <div
             className="h-full bg-gradient-to-r from-amber-500 to-emerald-600 rounded-full transition-all duration-300"
-            style={{ width: `${overallProgress}%` }}
+            style={{ width: `${typeFilter === 'all' ? overallProgress : tabProgress}%` }}
           />
         </div>
 
@@ -279,11 +301,27 @@ export function UnitsView({
       <div className="flex items-center justify-between pt-1">
         <div>
           <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-            <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            Unidades y Espacios Comunes
+            {typeFilter === 'unit' ? (
+              <>
+                <DoorOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Departamentos ({countDeptos})</span>
+              </>
+            ) : typeFilter === 'common_area' ? (
+              <>
+                <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Espacios Comunes y de Servicio ({countCommon})</span>
+              </>
+            ) : (
+              <>
+                <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Unidades y Espacios Comunes ({countAll})</span>
+              </>
+            )}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {tradeFilter === 'all' ? 'Toca para abrir checklist técnico' : `Mostrando avance de ${activeTrade?.name}`}
+            {tradeFilter === 'all'
+              ? `Toca para abrir checklist técnico (${tabTotalCount} ${typeFilter === 'unit' ? 'deptos' : typeFilter === 'common_area' ? 'comunes' : 'espacios'})`
+              : `Mostrando avance de ${activeTrade?.name} en ${tabTotalCount} espacios`}
           </p>
         </div>
 
@@ -343,7 +381,7 @@ export function UnitsView({
         >
           <span>Todos</span>
           <span className="bg-slate-950/15 dark:bg-slate-100/15 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-            {countAll}
+            {tabTotalCount}
           </span>
         </button>
 
@@ -358,7 +396,7 @@ export function UnitsView({
           <CircleCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>Completado</span>
           <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
-            {countCompleted}
+            {tabCompletedCount}
           </span>
         </button>
 
@@ -373,7 +411,7 @@ export function UnitsView({
           <Clock className="w-3.5 h-3.5 text-amber-500" />
           <span>En curso</span>
           <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
-            {countInProgress}
+            {tabInProgressCount}
           </span>
         </button>
 
@@ -388,7 +426,7 @@ export function UnitsView({
           <Circle className="w-3.5 h-3.5 text-slate-400" />
           <span>Pendiente</span>
           <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
-            {countPending}
+            {tabPendingCount}
           </span>
         </button>
       </div>
@@ -402,10 +440,9 @@ export function UnitsView({
             <button
               onClick={() => {
                 setStatusFilter('all');
-                setTradeFilter('all');
                 setTypeFilter('all');
               }}
-              className="mt-3 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-lg"
+              className="mt-3 px-3 py-1.5 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-amber-400 transition-colors"
             >
               Ver Todas las Unidades
             </button>
@@ -414,7 +451,7 @@ export function UnitsView({
           filteredUnits.map(({ unit, progress }) => {
             const counts = getUnitItemCounts(unit, tradeFilter);
             const isComplete = progress === 100;
-            const isCommonArea = unit.type === 'common_area';
+            const isCommonArea = isUnitCommonArea(unit);
 
             let badgeBg = 'bg-slate-900 text-amber-400';
             if (isComplete) {

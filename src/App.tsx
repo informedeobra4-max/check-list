@@ -937,12 +937,16 @@ export default function App() {
   };
 
   // Create Unit
-  const handleCreateUnit = (unitName: string) => {
+  const handleCreateUnit = (unitName: string, unitType?: 'unit' | 'common_area') => {
     if (!selectedProjectId) return;
-    const newUnit = {
+    const resolvedType = unitType || (unitName.toLowerCase().includes('depto') ? 'unit' : 'common_area');
+    const newUnit: Unit = {
       id: `unit_${Date.now()}`,
       name: unitName,
-      trades: createInitialTrades()
+      type: resolvedType,
+      category: resolvedType === 'common_area' ? 'Espacio Común' : 'Departamento',
+      trades: createInitialTrades(),
+      blueprints: []
     };
 
     setProjects(prev => prev.map(p => {
@@ -954,17 +958,23 @@ export default function App() {
     }));
 
     setIsNewUnitModalOpen(false);
-    showToast(`Unidad "${unitName}" agregada`, 'Check');
+    showToast(`${resolvedType === 'common_area' ? 'Espacio común' : 'Departamento'} "${unitName}" agregado`, 'Check');
   };
 
-  // Edit Unit Name (Denomination by floor)
-  const handleSaveUnitName = (unitId: string, newName: string) => {
+  // Edit Unit Name and Type (Denomination by floor)
+  const handleSaveUnitName = (unitId: string, newName: string, newType?: 'unit' | 'common_area') => {
     setProjects(prev => prev.map(p => {
       return {
         ...p,
         units: p.units.map(u => {
           if (u.id === unitId) {
-            return { ...u, name: newName };
+            const updatedType = newType || u.type || (newName.toLowerCase().includes('depto') ? 'unit' : 'common_area');
+            return {
+              ...u,
+              name: newName,
+              type: updatedType,
+              category: updatedType === 'common_area' ? 'Espacio Común' : 'Departamento'
+            };
           }
           return u;
         })

@@ -16,7 +16,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { Project, StatusFilter } from '../types';
-import { calculateProjectProgress } from '../utils/calculations';
+import { calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 import { Pencil, Info, FileCheck, Zap, Droplets } from 'lucide-react';
@@ -28,9 +28,9 @@ interface DashboardViewProps {
   onOpenNewProjectModal: () => void;
   onOpenLogoEditor: () => void;
   onOpenReportModal: (type?: 'auto' | 'project' | 'unit', projectId?: string) => void;
-  onResetData: () => void;
   onRequestDeleteProject?: (projectId: string, projectName: string) => void;
-  onExportExcel?: (projectId: string) => void;
+  onExportExcel?: (projectId: string, unitId?: string) => void;
+  onResetData: () => void;
   onOpenMilestonesConfig: (projectId: string) => void;
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
@@ -44,9 +44,9 @@ export function DashboardView({
   onOpenNewProjectModal,
   onOpenLogoEditor,
   onOpenReportModal,
-  onResetData,
   onRequestDeleteProject,
   onExportExcel,
+  onResetData,
   onOpenMilestonesConfig,
   onToggleManualMilestone,
   onUpdateProjectDates,
@@ -56,6 +56,8 @@ export function DashboardView({
   const [searchQuery, setSearchQuery] = useState('');
 
   const totalUnits = projects.reduce((acc, p) => acc + p.units.length, 0);
+  const totalDeptos = projects.reduce((acc, p) => acc + p.units.filter(u => !isUnitCommonArea(u)).length, 0);
+  const totalCommon = projects.reduce((acc, p) => acc + p.units.filter(u => isUnitCommonArea(u)).length, 0);
 
   // Compute status and counts for each project
   const projectsWithProgress = projects.map(project => {
@@ -135,7 +137,7 @@ export function DashboardView({
           </span>
           <span className="flex items-center gap-1">
             <DoorClosed className="w-3.5 h-3.5 text-amber-400" />
-            <strong className="text-white">{totalUnits}</strong> Unidades
+            <strong className="text-white">{totalDeptos}</strong> Deptos{totalCommon > 0 ? ` (${totalCommon} comunes)` : ''}
           </span>
           <button
             onClick={onResetData}
@@ -255,6 +257,8 @@ export function DashboardView({
         ) : (
           filteredProjects.map(({ project, progress, status }) => {
             const unitCount = project.units.length;
+            const deptosCount = project.units.filter(u => !isUnitCommonArea(u)).length;
+            const commonCount = project.units.filter(u => isUnitCommonArea(u)).length;
 
             let badgeColor = 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
             let statusLabel = 'Pendiente (0%)';
@@ -285,7 +289,7 @@ export function DashboardView({
                     <div className="space-y-1 pr-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor} border`}>
-                          {unitCount} {unitCount === 1 ? 'Unidad' : 'Unidades'}
+                          {deptosCount} {deptosCount === 1 ? 'Depto' : 'Deptos'}{commonCount > 0 ? ` • ${commonCount} Común${commonCount > 1 ? 'es' : ''}` : ''}
                         </span>
                         <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                           • {statusLabel}

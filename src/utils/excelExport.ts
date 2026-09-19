@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Project, Unit } from '../types';
-import { calculateUnitProgress } from './calculations';
+import { calculateUnitProgress, isUnitCommonArea } from './calculations';
 
 export function exportInspectionPlanillaToExcel(project: Project, unitId?: string) {
   const isSingleUnit = Boolean(unitId);
@@ -14,9 +14,7 @@ export function exportInspectionPlanillaToExcel(project: Project, unitId?: strin
   const dateStr = now.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric'
-  });
-  const timeStr = now.toLocaleTimeString('es-AR', {
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   });
@@ -25,7 +23,7 @@ export function exportInspectionPlanillaToExcel(project: Project, unitId?: strin
   const detailedRows: Array<Record<string, string | number>> = [];
 
   targetUnits.forEach(unit => {
-    const unitTypeLabel = unit.type === 'common_area' ? 'Espacio Común' : 'Departamento';
+    const unitTypeLabel = isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento';
 
     unit.trades.forEach(trade => {
       trade.items.forEach(item => {
@@ -58,7 +56,7 @@ export function exportInspectionPlanillaToExcel(project: Project, unitId?: strin
 
   // Sheet 2: Summary by Unit/Space
   const summaryRows = targetUnits.map(unit => {
-    const unitTypeLabel = unit.type === 'common_area' ? 'Espacio Común' : 'Departamento';
+    const unitTypeLabel = isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento';
     const totalItems = unit.trades.reduce((acc, t) => acc + t.items.length, 0);
     const completedItems = unit.trades.reduce(
       (acc, t) => acc + t.items.filter(i => i.completed).length,
