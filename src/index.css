@@ -50,3 +50,25 @@
     page-break-inside: avoid !important;
   }
 }
+
+/* Ocultar insignia/badge de Netlify y cualquier widget o iframe inyectado en el borde */
+iframe[src*="netlify"],
+iframe[id*="netlify"],
+iframe[title*="netlify" i],
+#netlify-badge,
+[data-netlify-badge],
+.netlify-badge,
+div[id*="netlify" i],
+div[class*="netlify" i],
+body > iframe {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  top: -99999px !important;
+  left: -99999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  z-index: -99999 !important;
+}
