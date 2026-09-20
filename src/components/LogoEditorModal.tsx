@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check } from 'lucide-react';
 import { CustomLogos } from '../types';
 import { DEFAULT_LOGO_URL } from '../data/initialData';
 import { compressImageFile } from '../utils/calculations';
@@ -12,6 +12,60 @@ interface LogoEditorModalProps {
   onSaveLogos: (logos: CustomLogos) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
+
+const APP_BG_PRESETS = [
+  { label: 'Original', value: '', colorClass: 'bg-slate-900 border-slate-700' },
+  { label: 'Pizarra Negra', value: '#020617', colorClass: 'bg-[#020617] border-slate-700' },
+  { label: 'Carbón Obra', value: '#0f172a', colorClass: 'bg-[#0f172a] border-slate-700' },
+  { label: 'Noche Azul', value: '#09111e', colorClass: 'bg-[#09111e] border-slate-700' },
+  { label: 'Verde Bosque', value: '#031a10', colorClass: 'bg-[#031a10] border-slate-700' },
+  { label: 'Grafito Zinc', value: '#18181b', colorClass: 'bg-[#18181b] border-slate-700' },
+  { label: 'Gris Claro', value: '#f1f5f9', colorClass: 'bg-[#f1f5f9] border-slate-300' },
+  { label: 'Blanco Puro', value: '#ffffff', colorClass: 'bg-[#ffffff] border-slate-300' }
+];
+
+const PRESENTATION_BG_PRESETS = [
+  {
+    label: 'Original',
+    value: '',
+    previewStyle: { background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #020617 100%)' }
+  },
+  {
+    label: 'Esmeralda',
+    value: 'linear-gradient(135deg, #06281e 0%, #0d3d2c 50%, #021a11 100%)',
+    previewStyle: { background: 'linear-gradient(135deg, #06281e 0%, #0d3d2c 50%, #021a11 100%)' }
+  },
+  {
+    label: 'Azul Acero',
+    value: 'linear-gradient(135deg, #0f2b48 0%, #1e3a5f 50%, #0a192f 100%)',
+    previewStyle: { background: 'linear-gradient(135deg, #0f2b48 0%, #1e3a5f 50%, #0a192f 100%)' }
+  },
+  {
+    label: 'Ámbar Ocre',
+    value: 'linear-gradient(135deg, #451a03 0%, #78350f 50%, #271104 100%)',
+    previewStyle: { background: 'linear-gradient(135deg, #451a03 0%, #78350f 50%, #271104 100%)' }
+  },
+  {
+    label: 'Cobalto 900',
+    value: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #0f172a 100%)',
+    previewStyle: { background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #0f172a 100%)' }
+  },
+  {
+    label: 'Titanio',
+    value: '#18181b',
+    previewStyle: { backgroundColor: '#18181b' }
+  },
+  {
+    label: 'Pizarra',
+    value: '#020617',
+    previewStyle: { backgroundColor: '#020617' }
+  },
+  {
+    label: 'Carbón',
+    value: '#0f172a',
+    previewStyle: { backgroundColor: '#0f172a' }
+  }
+];
 
 export function LogoEditorModal({
   isOpen,
@@ -26,6 +80,16 @@ export function LogoEditorModal({
     initialTarget === 'header' ? currentLogos.header : currentLogos.banner
   );
   const [urlInput, setUrlInput] = useState<string>('');
+  const [appBg, setAppBg] = useState<string>(currentLogos.appBackground || '');
+  const [presentationBg, setPresentationBg] = useState<string>(currentLogos.presentationBackground || '');
+
+  useEffect(() => {
+    if (isOpen) {
+      setAppBg(currentLogos.appBackground || '');
+      setPresentationBg(currentLogos.presentationBackground || '');
+      setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
+    }
+  }, [isOpen, currentLogos, initialTarget]);
 
   if (!isOpen) return null;
 
@@ -61,23 +125,35 @@ export function LogoEditorModal({
   const handleSave = () => {
     const updated: CustomLogos = {
       ...currentLogos,
-      [target]: tempPreview
+      [target]: tempPreview,
+      appBackground: appBg,
+      presentationBackground: presentationBg
     };
     onSaveLogos(updated);
     onClose();
-    onShowToast('¡Logotipo actualizado con éxito!', 'Check');
+    onShowToast('¡Configuración de marca y colores guardada con éxito!', 'Check');
+  };
+
+  const handleResetColors = () => {
+    setAppBg('');
+    setPresentationBg('');
+    onShowToast('Colores restablecidos a los valores originales', 'RotateCcw');
   };
 
   const handleReset = () => {
-    if (confirm('¿Restablecer logotipos al diseño original?')) {
+    if (confirm('¿Restablecer logotipos y colores al diseño original?')) {
       const resetLogos: CustomLogos = {
         header: DEFAULT_LOGO_URL,
-        banner: DEFAULT_LOGO_URL
+        banner: DEFAULT_LOGO_URL,
+        appBackground: '',
+        presentationBackground: ''
       };
       setTempPreview(DEFAULT_LOGO_URL);
+      setAppBg('');
+      setPresentationBg('');
       onSaveLogos(resetLogos);
       onClose();
-      onShowToast('Logotipos restablecidos', 'RotateCcw');
+      onShowToast('Logotipos y colores restablecidos al original', 'RotateCcw');
     }
   };
 
@@ -197,6 +273,134 @@ export function LogoEditorModal({
               >
                 Probar
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sector de Personalización de Fondos y Colores de la App y Obras */}
+        <div className="mt-5 pt-4 border-t-2 border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 flex items-center justify-center">
+                <Palette className="w-3.5 h-3.5" />
+              </div>
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                Colores & Fondos de la App
+              </h4>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetColors}
+              className="text-[11px] text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 transition-colors touch-target"
+              title="Restaurar los colores originales de la app y presentación"
+            >
+              <RotateCcw className="w-3 h-3 text-amber-600" />
+              <span>Restaurar colores originales</span>
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-3.5">
+            Personaliza el fondo general de la aplicación y el estilo de presentación de las obras con la paleta de colores.
+          </p>
+
+          {/* 1. Fondo de la App */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                <span>1. Color del Fondo de la App</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">
+                  {appBg ? appBg : 'Original'}
+                </span>
+                <label className="w-6 h-6 rounded-full border border-slate-300 shadow-xs cursor-pointer overflow-hidden flex items-center justify-center p-0 relative" title="Seleccionar color personalizado">
+                  <input
+                    type="color"
+                    value={appBg || '#0f172a'}
+                    onChange={(e) => setAppBg(e.target.value)}
+                    className="w-8 h-8 cursor-pointer opacity-0 absolute"
+                  />
+                  <span
+                    className="w-full h-full rounded-full border border-white"
+                    style={{ backgroundColor: appBg || '#0f172a' }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Quick Palette Chips for App Background */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {APP_BG_PRESETS.map((p) => {
+                const isSelected = appBg === p.value;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setAppBg(p.value)}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center justify-center gap-1 ${
+                      isSelected
+                        ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 border border-slate-400/40 ${p.colorClass}`}
+                      style={p.value ? { backgroundColor: p.value } : undefined}
+                    />
+                    <span className="truncate">{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Fondo de la Presentación de cada Obra */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                <span>2. Fondos de Presentación de Obras</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase truncate max-w-[90px]">
+                  {presentationBg ? 'Personalizado' : 'Original'}
+                </span>
+                <label className="w-6 h-6 rounded-full border border-slate-300 shadow-xs cursor-pointer overflow-hidden flex items-center justify-center p-0 relative" title="Seleccionar color sólido para obras">
+                  <input
+                    type="color"
+                    value={presentationBg && !presentationBg.startsWith('linear') ? presentationBg : '#0f172a'}
+                    onChange={(e) => setPresentationBg(e.target.value)}
+                    className="w-8 h-8 cursor-pointer opacity-0 absolute"
+                  />
+                  <span
+                    className="w-full h-full rounded-full border border-white"
+                    style={presentationBg ? (presentationBg.startsWith('linear') ? { background: presentationBg } : { backgroundColor: presentationBg }) : { background: 'linear-gradient(135deg, #0f172a, #020617)' }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Quick Palette Chips for Presentation Background */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {PRESENTATION_BG_PRESETS.map((p) => {
+                const isSelected = presentationBg === p.value;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setPresentationBg(p.value)}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded-md shrink-0 border border-slate-400/40 shadow-xs"
+                      style={p.previewStyle}
+                    />
+                    <span className="truncate">{p.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

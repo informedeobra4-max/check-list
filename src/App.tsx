@@ -36,9 +36,24 @@ const normalizeLogo = (url?: string): string => {
   return url;
 };
 
+const isDarkColor = (color?: string): boolean => {
+  if (!color) return false;
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.slice(0, 2), 16) || 0;
+    const g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.slice(2, 4), 16) || 0;
+    const b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.slice(4, 6), 16) || 0;
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+  }
+  return false;
+};
+
 const normalizeCustomLogos = (raw?: CustomLogos | null): CustomLogos => ({
   header: normalizeLogo(raw?.header),
-  banner: normalizeLogo(raw?.banner)
+  banner: normalizeLogo(raw?.banner),
+  appBackground: raw?.appBackground || '',
+  presentationBackground: raw?.presentationBackground || ''
 });
 
 /**
@@ -154,9 +169,22 @@ export default function App() {
     }
     return {
       header: DEFAULT_LOGO_URL,
-      banner: DEFAULT_LOGO_URL
+      banner: DEFAULT_LOGO_URL,
+      appBackground: '',
+      presentationBackground: ''
     };
   });
+
+  // Sincronización del color de fondo personalizado con html y body
+  useEffect(() => {
+    if (logos.appBackground) {
+      document.documentElement.style.backgroundColor = logos.appBackground;
+      document.body.style.backgroundColor = logos.appBackground;
+    } else {
+      document.documentElement.style.backgroundColor = '';
+      document.body.style.backgroundColor = '';
+    }
+  }, [logos.appBackground]);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -1165,7 +1193,14 @@ export default function App() {
   })();
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col relative pb-16 transition-colors duration-200">
+    <div
+      className={`w-full min-h-screen flex flex-col relative pb-16 transition-colors duration-200 ${
+        logos.appBackground
+          ? isDarkColor(logos.appBackground) ? 'text-slate-100' : 'text-slate-900'
+          : 'bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100'
+      }`}
+      style={{ backgroundColor: logos.appBackground || undefined }}
+    >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
 
@@ -1209,6 +1244,7 @@ export default function App() {
           <DashboardView
             projects={projects}
             bannerLogoUrl={logos.banner}
+            presentationBg={logos.presentationBackground}
             onSelectProject={handleSelectProject}
             onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
             onOpenLogoEditor={() => {
@@ -1229,6 +1265,7 @@ export default function App() {
         {currentView === 'units' && selectedProject && (
           <UnitsView
             project={selectedProject}
+            presentationBg={logos.presentationBackground}
             onSelectUnit={handleSelectUnit}
             onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
             onOpenReportModal={handleOpenReportModal}

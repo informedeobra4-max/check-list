@@ -28,6 +28,7 @@ import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 
 interface UnitsViewProps {
   project: Project;
+  presentationBg?: string;
   onSelectUnit: (unitId: string) => void;
   onOpenNewUnitModal: () => void;
   onOpenReportModal: (type?: 'auto' | 'project' | 'unit', projectId?: string, unitId?: string) => void;
@@ -44,6 +45,7 @@ interface UnitsViewProps {
 
 export function UnitsView({
   project,
+  presentationBg,
   onSelectUnit,
   onOpenNewUnitModal,
   onOpenReportModal,
@@ -118,19 +120,26 @@ export function UnitsView({
   return (
     <section className="space-y-4">
       {/* Project Summary Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+      <div
+        className={`rounded-2xl p-4 shadow-sm border transition-colors ${
+          presentationBg
+            ? 'text-white border-slate-700/60 shadow-lg'
+            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+        }`}
+        style={presentationBg ? (presentationBg.startsWith('linear') ? { background: presentationBg } : { backgroundColor: presentationBg }) : undefined}
+      >
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${presentationBg ? 'text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}>
               Obra Activa
             </span>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white leading-tight">
+            <h2 className={`text-lg font-black leading-tight ${presentationBg ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
               {project.name}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className={`text-xs ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
               {project.location} • {project.units.length} Espacios ({countDeptos} deptos, {countCommon} comunes)
               {typeFilter !== 'all' && (
-                <span className="font-bold text-amber-600 dark:text-amber-400 block sm:inline sm:ml-1">
+                <span className={`font-bold block sm:inline sm:ml-1 ${presentationBg ? 'text-amber-300' : 'text-amber-600 dark:text-amber-400'}`}>
                   • Viendo {typeFilter === 'unit' ? `${countDeptos} Deptos` : `${countCommon} Espacios Comunes`}
                 </span>
               )}
@@ -143,7 +152,7 @@ export function UnitsView({
               strokeWidth={4.5}
               color="#10B981"
             />
-            <p className="text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400 mt-0.5 text-center">
+            <p className={`text-[9px] uppercase font-bold mt-0.5 text-center ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
               {typeFilter === 'all'
                 ? (tradeFilter === 'all' ? 'Avance General' : activeTrade?.shortName)
                 : typeFilter === 'unit'
@@ -154,44 +163,48 @@ export function UnitsView({
         </div>
 
         {/* Ficha Técnica y Administrativa Collapsible/Card */}
-        <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1">
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
-            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
-              <FileCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+        <div className={`mt-3 p-2.5 rounded-xl border text-xs space-y-1 ${
+          presentationBg
+            ? 'bg-black/30 border-white/10 text-slate-200'
+            : 'bg-slate-50 dark:bg-slate-850 border-slate-200/80 dark:border-slate-800'
+        }`}>
+          <div className={`flex items-center justify-between text-[11px] font-bold ${presentationBg ? 'text-slate-200' : 'text-slate-700 dark:text-slate-300'}`}>
+            <span className={`flex items-center gap-1 ${presentationBg ? 'text-amber-300' : 'text-amber-700 dark:text-amber-400'}`}>
+              <FileCheck className="w-3.5 h-3.5 text-amber-500" />
               Ficha Técnica y Administrativa de la Obra
             </span>
             {onEditProject && (
               <button
                 type="button"
                 onClick={() => onEditProject(project)}
-                className="text-[10px] font-black text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 px-2 py-0.5 rounded bg-amber-500/10"
+                className="text-[10px] font-black text-amber-500 hover:underline flex items-center gap-0.5 px-2 py-0.5 rounded bg-amber-500/10"
               >
                 <Pencil className="w-2.5 h-2.5" /> Editar Datos
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
+          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] pt-0.5 ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
             <div>
-              <strong className="text-slate-700 dark:text-slate-300">Exp. Municipal:</strong>{' '}
+              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>Exp. Municipal:</strong>{' '}
               {project.expedienteMunicipal || <span className="text-slate-400 italic">Sin cargar</span>}
             </div>
             <div>
-              <strong className="text-slate-700 dark:text-slate-300">EDEMSA:</strong>{' '}
+              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>EDEMSA:</strong>{' '}
               {project.expedienteEdemsa || <span className="text-slate-400 italic">Sin cargar</span>}
             </div>
             <div>
-              <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong>{' '}
+              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>AYSAM:</strong>{' '}
               {project.expedienteAysam || <span className="text-slate-400 italic">Sin cargar</span>}
             </div>
             {project.customServices && project.customServices.map(srv => (
               <div key={srv.id}>
-                <strong className="text-slate-700 dark:text-slate-300">{srv.name.split('(')[0].trim()}:</strong>{' '}
+                <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>{srv.name.split('(')[0].trim()}:</strong>{' '}
                 {srv.number}
               </div>
             ))}
             {project.technicalNotes && (
-              <div className="sm:col-span-3 text-[11px] text-slate-600 dark:text-slate-400 italic pt-0.5">
+              <div className={`sm:col-span-3 text-[11px] italic pt-0.5 ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
                 Memoria: &ldquo;{project.technicalNotes}&rdquo;
               </div>
             )}
@@ -199,7 +212,9 @@ export function UnitsView({
         </div>
 
         {/* Action buttons inside project summary */}
-        <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className={`flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t ${
+          presentationBg ? 'border-white/10' : 'border-slate-100 dark:border-slate-800'
+        }`}>
           <button
             onClick={() => onOpenReportModal('project', project.id)}
             className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors shadow-2xs"

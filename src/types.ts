@@ -104,6 +104,8 @@ export interface TradeTemplate {
 export interface CustomLogos {
   header: string;
   banner: string;
+  appBackground?: string;
+  presentationBackground?: string;
 }
 
 export type ViewMode = 'dashboard' | 'units' | 'checklist';

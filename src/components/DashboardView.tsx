@@ -25,6 +25,7 @@ import { DEFAULT_LOGO_URL } from '../data/initialData';
 interface DashboardViewProps {
   projects: Project[];
   bannerLogoUrl: string;
+  presentationBg?: string;
   onSelectProject: (projectId: string) => void;
   onOpenNewProjectModal: () => void;
   onOpenLogoEditor: () => void;
@@ -41,6 +42,7 @@ interface DashboardViewProps {
 export function DashboardView({
   projects,
   bannerLogoUrl,
+  presentationBg,
   onSelectProject,
   onOpenNewProjectModal,
   onOpenLogoEditor,
@@ -91,7 +93,10 @@ export function DashboardView({
   return (
     <section className="space-y-4">
       {/* Hero card with Brand Cover Logo */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 rounded-2xl p-4 text-white shadow-xl border border-slate-700 relative overflow-hidden">
+      <div
+        className="rounded-2xl p-4 text-white shadow-xl border border-slate-700 relative overflow-hidden"
+        style={presentationBg ? (presentationBg.startsWith('linear') ? { background: presentationBg } : { backgroundColor: presentationBg }) : { background: 'linear-gradient(to bottom right, #0f172a, #1e293b, #020617)' }}
+      >
         <div className="flex items-center gap-3.5 relative z-10">
           <div
             className="relative group cursor-pointer flex-shrink-0"
@@ -286,7 +291,12 @@ export function DashboardView({
               <div
                 key={project.id}
                 onClick={() => onSelectProject(project.id)}
-                className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500 active:bg-slate-50 dark:active:bg-slate-850 transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between"
+                className={`rounded-2xl p-4 shadow-sm border hover:border-amber-400 dark:hover:border-amber-500 active:bg-slate-50 dark:active:bg-slate-850 transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
+                  presentationBg
+                    ? 'text-white border-slate-700/60 shadow-lg'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                }`}
+                style={presentationBg ? (presentationBg.startsWith('linear') ? { background: presentationBg } : { backgroundColor: presentationBg }) : undefined}
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -295,17 +305,17 @@ export function DashboardView({
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${badgeColor} border`}>
                           {deptosCount} {deptosCount === 1 ? 'Depto' : 'Deptos'}{commonCount > 0 ? ` • ${commonCount} Común${commonCount > 1 ? 'es' : ''}` : ''}
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className={`text-[10px] font-semibold ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                           • {statusLabel}
                         </span>
                       </div>
 
-                      <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                      <h4 className={`text-base font-black tracking-tight leading-snug group-hover:text-amber-400 transition-colors ${presentationBg ? 'text-white' : 'text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400'}`}>
                         {project.name}
                       </h4>
 
-                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
-                        <MapPin className="w-3.5 h-3.5 mr-1 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                      <p className={`text-xs flex items-center ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <MapPin className={`w-3.5 h-3.5 mr-1 flex-shrink-0 ${presentationBg ? 'text-amber-400' : 'text-amber-600 dark:text-amber-400'}`} />
                         <span className="truncate">{project.location || 'Obra en construcción'}</span>
                       </p>
                     </div>
@@ -318,17 +328,21 @@ export function DashboardView({
                         strokeWidth={5}
                         color="#10B981"
                       />
-                      <span className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 tracking-wider">
+                      <span className={`text-[9px] font-bold uppercase mt-0.5 tracking-wider ${presentationBg ? 'text-slate-300' : 'text-slate-400'}`}>
                         Consolidado
                       </span>
                     </div>
                   </div>
 
                   {/* Ficha Técnica y Administrativa Card */}
-                  <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                      <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
-                        <FileCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <div className={`mt-3 p-2.5 rounded-xl border text-xs space-y-1 ${
+                    presentationBg
+                      ? 'bg-black/30 border-white/10 text-slate-200'
+                      : 'bg-slate-50 dark:bg-slate-850 border-slate-200/80 dark:border-slate-800'
+                  }`}>
+                    <div className={`flex items-center justify-between text-[11px] font-bold ${presentationBg ? 'text-slate-200' : 'text-slate-700 dark:text-slate-300'}`}>
+                      <span className={`flex items-center gap-1 ${presentationBg ? 'text-amber-300' : 'text-amber-700 dark:text-amber-400'}`}>
+                        <FileCheck className="w-3.5 h-3.5 text-amber-500" />
                         Ficha Técnica & Expedientes
                       </span>
                       {onEditProject && (
@@ -338,7 +352,7 @@ export function DashboardView({
                             e.stopPropagation();
                             onEditProject(project);
                           }}
-                          className="text-[10px] font-black text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/10"
+                          className="text-[10px] font-black text-amber-500 hover:underline flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500/10"
                         >
                           <Pencil className="w-2.5 h-2.5" /> Editar
                         </button>
@@ -346,35 +360,35 @@ export function DashboardView({
                     </div>
 
                     {hasTechInfo ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-600 dark:text-slate-400 pt-0.5">
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] pt-0.5 ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
                         {project.expedienteMunicipal && (
                           <div className="truncate">
-                            <strong className="text-slate-700 dark:text-slate-300">Mun:</strong> {project.expedienteMunicipal}
+                            <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>Mun:</strong> {project.expedienteMunicipal}
                           </div>
                         )}
                         {project.expedienteEdemsa && (
                           <div className="truncate">
-                            <strong className="text-slate-700 dark:text-slate-300">EDEMSA:</strong> {project.expedienteEdemsa}
+                            <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>EDEMSA:</strong> {project.expedienteEdemsa}
                           </div>
                         )}
                         {project.expedienteAysam && (
                           <div className="truncate">
-                            <strong className="text-slate-700 dark:text-slate-300">AYSAM:</strong> {project.expedienteAysam}
+                            <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>AYSAM:</strong> {project.expedienteAysam}
                           </div>
                         )}
                         {project.customServices && project.customServices.map(srv => (
                           <div key={srv.id} className="truncate">
-                            <strong className="text-slate-700 dark:text-slate-300">{srv.name.split('(')[0].trim()}:</strong> {srv.number}
+                            <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>{srv.name.split('(')[0].trim()}:</strong> {srv.number}
                           </div>
                         ))}
                         {project.technicalNotes && (
-                          <div className="truncate sm:col-span-2 italic text-slate-500 dark:text-slate-400">
+                          <div className={`truncate sm:col-span-2 italic ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                             &ldquo;{project.technicalNotes}&rdquo;
                           </div>
                         )}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-slate-400 italic">
+                      <p className={`text-[10px] italic ${presentationBg ? 'text-slate-400' : 'text-slate-400'}`}>
                         Sin expedientes cargados (Toca &apos;Editar&apos; para agregar Exp. Municipal, EDEMSA, AYSAM o nuevos servicios)
                       </p>
                     )}
@@ -392,9 +406,13 @@ export function DashboardView({
                   </div>
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span className="flex items-center text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                    <CircleCheck className="w-3.5 h-3.5 mr-1 text-amber-600 dark:text-amber-400" />
+                <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-xs ${
+                  presentationBg
+                    ? 'border-white/10 text-slate-300'
+                    : 'border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                }`}>
+                  <span className={`flex items-center text-[11px] font-medium ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                    <CircleCheck className="w-3.5 h-3.5 mr-1 text-amber-500" />
                     Supervisión activa
                   </span>
 
@@ -431,14 +449,14 @@ export function DashboardView({
                           e.stopPropagation();
                           onRequestDeleteProject(project.id, project.name);
                         }}
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 transition-colors"
                         title="Eliminar esta obra (Clave 2600)"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
 
-                    <span className="text-slate-900 dark:text-white font-black text-xs flex items-center group-hover:text-amber-600 transition-colors ml-1">
+                    <span className={`font-black text-xs flex items-center group-hover:text-amber-400 transition-colors ml-1 ${presentationBg ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
                       Abrir <ChevronRight className="w-4 h-4 ml-0.5 text-amber-500" />
                     </span>
                   </div>
