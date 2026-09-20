@@ -7,9 +7,11 @@ import { compressImageFile } from '../utils/calculations';
 interface LogoEditorModalProps {
   isOpen: boolean;
   currentLogos: CustomLogos;
+  localAppBackground?: string;
+  localPresentationBackground?: string;
   initialTarget?: 'header' | 'banner';
   onClose: () => void;
-  onSaveLogos: (logos: CustomLogos) => void;
+  onSaveLogos: (logos: CustomLogos, localColors?: { appBackground: string; presentationBackground: string }) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
 
@@ -70,6 +72,8 @@ const PRESENTATION_BG_PRESETS = [
 export function LogoEditorModal({
   isOpen,
   currentLogos,
+  localAppBackground = '',
+  localPresentationBackground = '',
   initialTarget = 'header',
   onClose,
   onSaveLogos,
@@ -80,16 +84,16 @@ export function LogoEditorModal({
     initialTarget === 'header' ? currentLogos.header : currentLogos.banner
   );
   const [urlInput, setUrlInput] = useState<string>('');
-  const [appBg, setAppBg] = useState<string>(currentLogos.appBackground || '');
-  const [presentationBg, setPresentationBg] = useState<string>(currentLogos.presentationBackground || '');
+  const [appBg, setAppBg] = useState<string>(localAppBackground);
+  const [presentationBg, setPresentationBg] = useState<string>(localPresentationBackground);
 
   useEffect(() => {
     if (isOpen) {
-      setAppBg(currentLogos.appBackground || '');
-      setPresentationBg(currentLogos.presentationBackground || '');
+      setAppBg(localAppBackground);
+      setPresentationBg(localPresentationBackground);
       setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
     }
-  }, [isOpen, currentLogos, initialTarget]);
+  }, [isOpen, localAppBackground, localPresentationBackground, currentLogos, initialTarget]);
 
   if (!isOpen) return null;
 
@@ -123,35 +127,35 @@ export function LogoEditorModal({
   };
 
   const handleSave = () => {
-    const updated: CustomLogos = {
+    const updatedLogos: CustomLogos = {
       ...currentLogos,
-      [target]: tempPreview,
+      [target]: tempPreview
+    };
+    const localColors = {
       appBackground: appBg,
       presentationBackground: presentationBg
     };
-    onSaveLogos(updated);
+    onSaveLogos(updatedLogos, localColors);
     onClose();
-    onShowToast('¡Configuración de marca y colores guardada con éxito!', 'Check');
+    onShowToast('¡Configuración guardada en este equipo!', 'Check');
   };
 
   const handleResetColors = () => {
     setAppBg('');
     setPresentationBg('');
-    onShowToast('Colores restablecidos a los valores originales', 'RotateCcw');
+    onShowToast('Colores restablecidos a los originales en este dispositivo', 'RotateCcw');
   };
 
   const handleReset = () => {
     if (confirm('¿Restablecer logotipos y colores al diseño original?')) {
       const resetLogos: CustomLogos = {
         header: DEFAULT_LOGO_URL,
-        banner: DEFAULT_LOGO_URL,
-        appBackground: '',
-        presentationBackground: ''
+        banner: DEFAULT_LOGO_URL
       };
       setTempPreview(DEFAULT_LOGO_URL);
       setAppBg('');
       setPresentationBg('');
-      onSaveLogos(resetLogos);
+      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '' });
       onClose();
       onShowToast('Logotipos y colores restablecidos al original', 'RotateCcw');
     }
@@ -285,21 +289,22 @@ export function LogoEditorModal({
                 <Palette className="w-3.5 h-3.5" />
               </div>
               <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Colores & Fondos de la App
+                Colores & Fondos (Este Dispositivo)
               </h4>
             </div>
             <button
               type="button"
               onClick={handleResetColors}
               className="text-[11px] text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 transition-colors touch-target"
-              title="Restaurar los colores originales de la app y presentación"
+              title="Restaurar los colores originales en este dispositivo"
             >
               <RotateCcw className="w-3 h-3 text-amber-600" />
               <span>Restaurar colores originales</span>
             </button>
           </div>
-          <p className="text-[11px] text-slate-500 mb-3.5">
-            Personaliza el fondo general de la aplicación y el estilo de presentación de las obras con la paleta de colores.
+          <p className="text-[11px] text-slate-500 mb-3.5 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 inline-block"></span>
+            <span>Ajuste exclusivo para este equipo. No modifica los colores de otros celulares ni computadoras.</span>
           </p>
 
           {/* 1. Fondo de la App */}

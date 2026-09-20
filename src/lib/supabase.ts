@@ -82,11 +82,18 @@ export async function saveProjectsToCloud(projects: Project[]): Promise<{ succes
  */
 export async function saveLogosToCloud(logos: CustomLogos): Promise<{ success: boolean; status: CloudSyncStatus; error?: any }> {
   try {
+    // Solo guardamos en la nube los logotipos corporativos (cabecera y portada).
+    // Los fondos y estilos de color se conservan estrictamente locales en cada equipo.
+    const cloudLogosPayload = {
+      header: logos.header,
+      banner: logos.banner
+    };
+
     const { error } = await supabase
       .from('app_data')
       .upsert({
         key: 'logos',
-        data: logos,
+        data: cloudLogosPayload,
         updated_at: new Date().toISOString()
       }, { onConflict: 'key' });
 

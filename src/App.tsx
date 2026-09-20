@@ -28,6 +28,7 @@ import { SplashScreen } from './components/SplashScreen';
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V4';
 const STORAGE_KEY_THEME = 'theme_preference';
+const STORAGE_KEY_LOCAL_COLORS = 'CONTROL_AVANCE_LOCAL_COLORS_V1';
 
 const normalizeLogo = (url?: string): string => {
   if (!url || typeof url !== 'string' || url.startsWith('data:image/jpeg') || url === '/icon.png') {
@@ -51,9 +52,7 @@ const isDarkColor = (color?: string): boolean => {
 
 const normalizeCustomLogos = (raw?: CustomLogos | null): CustomLogos => ({
   header: normalizeLogo(raw?.header),
-  banner: normalizeLogo(raw?.banner),
-  appBackground: raw?.appBackground || '',
-  presentationBackground: raw?.presentationBackground || ''
+  banner: normalizeLogo(raw?.banner)
 });
 
 /**
@@ -169,22 +168,59 @@ export default function App() {
     }
     return {
       header: DEFAULT_LOGO_URL,
-      banner: DEFAULT_LOGO_URL,
+      banner: DEFAULT_LOGO_URL
+    };
+  });
+
+  // Colores de fondo y presentación exclusivos y locales de este dispositivo
+  const [localColors, setLocalColors] = useState<{ appBackground: string; presentationBackground: string }>(() => {
+    try {
+      const storedColors = localStorage.getItem(STORAGE_KEY_LOCAL_COLORS);
+      if (storedColors) {
+        const parsed = JSON.parse(storedColors);
+        return {
+          appBackground: parsed.appBackground || '',
+          presentationBackground: parsed.presentationBackground || ''
+        };
+      }
+      // Retrocompatibilidad: si ya se habían guardado colores en STORAGE_KEY_LOGOS en este dispositivo
+      const storedLogos = localStorage.getItem(STORAGE_KEY_LOGOS);
+      if (storedLogos) {
+        const parsed = JSON.parse(storedLogos);
+        if (parsed.appBackground || parsed.presentationBackground) {
+          const migrated = {
+            appBackground: parsed.appBackground || '',
+            presentationBackground: parsed.presentationBackground || ''
+          };
+          localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(migrated));
+          return migrated;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading local colors from storage:', e);
+    }
+    return {
       appBackground: '',
       presentationBackground: ''
     };
   });
 
-  // Sincronización del color de fondo personalizado con html y body
+  // Guardado persistente exclusivo en localStorage y sincronización con html y body
   useEffect(() => {
-    if (logos.appBackground) {
-      document.documentElement.style.backgroundColor = logos.appBackground;
-      document.body.style.backgroundColor = logos.appBackground;
+    try {
+      localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(localColors));
+    } catch (e) {
+      console.error('Error saving local colors to localStorage:', e);
+    }
+
+    if (localColors.appBackground) {
+      document.documentElement.style.backgroundColor = localColors.appBackground;
+      document.body.style.backgroundColor = localColors.appBackground;
     } else {
       document.documentElement.style.backgroundColor = '';
       document.body.style.backgroundColor = '';
     }
-  }, [logos.appBackground]);
+  }, [localColors]);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -1195,11 +1231,11 @@ export default function App() {
   return (
     <div
       className={`w-full min-h-screen flex flex-col relative pb-16 transition-colors duration-200 ${
-        logos.appBackground
-          ? isDarkColor(logos.appBackground) ? 'text-slate-100' : 'text-slate-900'
+        localColors.appBackground
+          ? isDarkColor(localColors.appBackground) ? 'text-slate-100' : 'text-slate-900'
           : 'bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100'
       }`}
-      style={{ backgroundColor: logos.appBackground || undefined }}
+      style={{ backgroundColor: localColors.appBackground || undefined }}
     >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
@@ -1244,7 +1280,7 @@ export default function App() {
           <DashboardView
             projects={projects}
             bannerLogoUrl={logos.banner}
-            presentationBg={logos.presentationBackground}
+            presentationBg={localColors.presentationBackground}
             onSelectProject={handleSelectProject}
             onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
             onOpenLogoEditor={() => {
@@ -1265,7 +1301,7 @@ export default function App() {
         {currentView === 'units' && selectedProject && (
           <UnitsView
             project={selectedProject}
-            presentationBg={logos.presentationBackground}
+            presentationBg={localColors.presentationBackground}
             onSelectUnit={handleSelectUnit}
             onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
             onOpenReportModal={handleOpenReportModal}
@@ -1430,9 +1466,19 @@ export default function App() {
       <LogoEditorModal
         isOpen={isLogoEditorOpen}
         currentLogos={logos}
+        localAppBackground={localColors.appBackground}
+        localPresentationBackground={localColors.presentationBackground}
         initialTarget={logoEditorTarget}
         onClose={() => setIsLogoEditorOpen(false)}
-        onSaveLogos={setLogos}
+        onSaveLogos={(newLogos, newLocalColors) => {
+          setLogos({
+            header: newLogos.header,
+            banner: newLogos.banner
+          });
+          if (newLocalColors) {
+            setLocalColors(newLocalColors);
+          }
+        }}
         onShowToast={showToast}
       />
 
