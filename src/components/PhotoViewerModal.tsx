@@ -25,6 +25,9 @@ export function PhotoViewerModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const isMobileDevice = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
+
   if (!isOpen || !item) return null;
 
   const photos = item.photos || [];
@@ -57,7 +60,7 @@ export function PhotoViewerModal({
         type="file"
         ref={cameraInputRef}
         accept="image/*"
-        capture="environment"
+        capture={isMobileDevice ? 'environment' : undefined}
         onChange={handleFileChange}
         className="hidden"
       />
@@ -127,7 +130,7 @@ export function PhotoViewerModal({
                   className="px-3 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 touch-target active:scale-95 shadow transition-all"
                 >
                   <Camera className="w-4 h-4" />
-                  <span>{isProcessing ? 'Procesando...' : 'Cámara'}</span>
+                  <span>{isProcessing ? 'Procesando...' : (isMobileDevice ? 'Cámara' : 'Subir Foto')}</span>
                 </button>
                 <button
                   disabled={isProcessing}
@@ -135,7 +138,7 @@ export function PhotoViewerModal({
                   className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-700 touch-target active:scale-95 transition-all"
                 >
                   <Upload className="w-4 h-4 text-amber-400" />
-                  <span>Galería</span>
+                  <span>{isMobileDevice ? 'Galería' : 'Examinar PC'}</span>
                 </button>
               </div>
             </div>
@@ -184,7 +187,7 @@ export function PhotoViewerModal({
             className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg touch-target transition-all"
           >
             <Camera className="w-4 h-4" />
-            <span>{isProcessing ? 'Procesando...' : 'Tomar Foto'}</span>
+            <span>{isProcessing ? 'Procesando...' : (isMobileDevice ? 'Tomar Foto' : 'Subir Foto')}</span>
           </button>
           <button
             disabled={isProcessing}
@@ -192,7 +195,7 @@ export function PhotoViewerModal({
             className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 touch-target transition-all"
           >
             <Upload className="w-4 h-4 text-amber-400" />
-            <span>Subir Galería</span>
+            <span>{isMobileDevice ? 'Subir Galería' : 'Examinar PC'}</span>
           </button>
           <button
             onClick={onClose}

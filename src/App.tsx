@@ -431,13 +431,18 @@ export default function App() {
     };
   }, []);
 
-  // Persist projects: lightweight to localStorage, full data with photos to Supabase Cloud
+  // Persist projects: save full data locally when space allows, with fallback and 100% sync to Supabase Cloud
   useEffect(() => {
     try {
-      const lightProjects = createLightweightProjectsForLocal(projects);
-      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(lightProjects));
-    } catch (e) {
-      console.warn('Almacenamiento local restringido (datos seguros en la Nube Supabase):', e);
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(projects));
+    } catch (quotaError) {
+      console.warn('LocalStorage al límite, guardando versión ligera (fotos completas aseguradas en Supabase Cloud):', quotaError);
+      try {
+        const lightProjects = createLightweightProjectsForLocal(projects);
+        localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(lightProjects));
+      } catch (e) {
+        // Ignorar si el almacenamiento local está completamente saturado
+      }
     }
 
     // If change came from remote cloud, do not re-upload
@@ -869,42 +874,46 @@ export default function App() {
       timestamp
     };
 
-    const updatedProjects = projects.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  return {
-                    ...item,
-                    photos: [...(item.photos || []), newPhoto]
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                if (t.id !== tradeId) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    return {
+                      ...item,
+                      photos: [...(item.photos || []), newPhoto]
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
     });
 
-    setProjects(updatedProjects);
-
-    // Persist immediately to Supabase Cloud
+    // Sincronizar de inmediato a Supabase Cloud con datos completos
     setCloudStatus('syncing');
-    saveProjectsToCloud(updatedProjects).then(res => {
+    saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
       if (res.success) {
-        showToast('Foto guardada en la Nube Supabase', 'Cloud');
+        showToast('Foto guardada en la Nube Supabase', 'Check');
       } else {
-        showToast('Foto guardada (sincronizando con la nube...)', 'AlertCircle');
+        showToast('Foto guardada localmente (sincronizando...)', 'AlertCircle');
       }
     });
   };
@@ -914,37 +923,41 @@ export default function App() {
     if (!confirm('¿Eliminar esta fotografía de la inspección?')) return;
     if (!selectedProjectId || !selectedUnitId) return;
 
-    const updatedProjects = projects.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  return {
-                    ...item,
-                    photos: (item.photos || []).filter(p => p.id !== photoId)
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
-    });
+    let updatedProjectsList: Project[] = [];
 
-    setProjects(updatedProjects);
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                if (t.id !== tradeId) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    return {
+                      ...item,
+                      photos: (item.photos || []).filter(p => p.id !== photoId)
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
 
     // Persist immediately to Supabase Cloud
     setCloudStatus('syncing');
-    saveProjectsToCloud(updatedProjects).then(res => {
+    saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
       showToast('Fotografía eliminada en la Nube', 'Trash2');
     });
@@ -955,47 +968,56 @@ export default function App() {
     tradeId: string,
     itemId: string,
     comment: string,
-    severity: 'low' | 'medium' | 'high' | undefined
+    severity: 'low' | 'medium' | 'high' | undefined,
+    isExplicitDelete: boolean = false
   ) => {
     if (!selectedProjectId || !selectedUnitId) return;
     const trimmed = comment.trim();
 
-    const updatedProjects = projects.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  return {
-                    ...item,
-                    comment: trimmed ? trimmed : undefined,
-                    severity: trimmed ? severity : undefined
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
+    let updatedProjectsList: Project[] = [];
+    let hadPriorComment = false;
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                if (t.id !== tradeId) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    hadPriorComment = !!(item.comment && item.comment.trim());
+                    return {
+                      ...item,
+                      comment: trimmed ? trimmed : undefined,
+                      severity: trimmed ? severity : undefined
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
     });
 
-    setProjects(updatedProjects);
-
     setCloudStatus('syncing');
-    saveProjectsToCloud(updatedProjects).then(res => {
+    saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
       if (trimmed) {
         showToast('Observación guardada en la Nube Supabase', 'Cloud');
-      } else {
+      } else if (isExplicitDelete && hadPriorComment) {
         showToast('Observación eliminada en la Nube', 'Trash2');
+      } else {
+        showToast('Cambios guardados en la Nube', 'Check');
       }
     });
   };
@@ -1248,7 +1270,6 @@ export default function App() {
         ref={cameraInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handlePhotoCaptured}
         className="hidden"
       />

@@ -67,7 +67,7 @@ interface ChecklistViewProps {
   onRequestDeleteUnit?: (unitId: string, unitName: string) => void;
   onExportExcel?: (projectId: string, unitId?: string) => void;
   onOpenSignatureModal?: (unitId: string) => void;
-  onSaveObservation?: (tradeId: string, itemId: string, comment: string, severity: 'low' | 'medium' | 'high' | undefined) => void;
+  onSaveObservation?: (tradeId: string, itemId: string, comment: string, severity: 'low' | 'medium' | 'high' | undefined, isExplicitDelete?: boolean) => void;
   onAddPhoto?: (tradeId: string, itemId: string, dataUrl: string) => void;
   onDeletePhoto?: (tradeId: string, itemId: string, photoId: string) => void;
   onUnlockUnit?: (unitId: string) => void;
@@ -870,14 +870,14 @@ export function ChecklistView({
                                 </div>
                               ))}
 
-                              {/* Quick button to capture another photo */}
+                              {/* Quick button to capture or add another photo */}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onTriggerQuickPhoto(trade.id, item.id, trade.name, item.name);
+                                  setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
                                 }}
-                                className="w-11 h-11 rounded-lg border border-dashed border-amber-500 text-amber-700 bg-amber-500/10 flex flex-col items-center justify-center flex-shrink-0 hover:bg-amber-500/20 active:scale-95 text-[10px] font-bold"
-                                title="Tomar otra foto"
+                                className="w-11 h-11 rounded-lg border border-dashed border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-500/10 flex flex-col items-center justify-center flex-shrink-0 hover:bg-amber-500/20 active:scale-95 text-[10px] font-bold"
+                                title="Agregar o tomar foto"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span className="text-[8px] leading-none mt-0.5">Foto</span>
@@ -942,9 +942,9 @@ export function ChecklistView({
               ?.items.find(i => i.id === observationModalItem.item.id) || observationModalItem.item
           }
           onClose={() => setObservationModalItem(null)}
-          onSaveObservation={(tradeId, itemId, comment, severity) => {
+          onSaveObservation={(tradeId, itemId, comment, severity, isExplicitDelete) => {
             if (onSaveObservation) {
-              onSaveObservation(tradeId, itemId, comment, severity);
+              onSaveObservation(tradeId, itemId, comment, severity, isExplicitDelete);
             } else {
               onSaveComment(tradeId, itemId, comment);
             }

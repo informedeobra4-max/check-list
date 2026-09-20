@@ -27,7 +27,8 @@ interface ItemObservationModalProps {
     tradeId: string,
     itemId: string,
     comment: string,
-    severity: 'low' | 'medium' | 'high' | undefined
+    severity: 'low' | 'medium' | 'high' | undefined,
+    isExplicitDelete?: boolean
   ) => void;
   onAddPhoto: (tradeId: string, itemId: string, dataUrl: string) => void;
   onDeletePhoto: (tradeId: string, itemId: string, photoId: string) => void;
@@ -50,6 +51,8 @@ export function ItemObservationModal({
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const isMobileDevice = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
 
   useEffect(() => {
     if (item) {
@@ -83,14 +86,22 @@ export function ItemObservationModal({
   };
 
   const handleSave = () => {
-    onSaveObservation(tradeId, item.id, commentDraft.trim(), severityDraft);
+    const trimmed = commentDraft.trim();
+    const origComment = (item.comment || '').trim();
+    const origSeverity = item.severity;
+
+    const hasChanged = trimmed !== origComment || severityDraft !== origSeverity;
+
+    if (hasChanged) {
+      onSaveObservation(tradeId, item.id, trimmed, severityDraft, false);
+    }
     onClose();
   };
 
   const handleDeleteObservation = () => {
     setCommentDraft('');
     setSeverityDraft(undefined);
-    onSaveObservation(tradeId, item.id, '', undefined);
+    onSaveObservation(tradeId, item.id, '', undefined, true);
     onClose();
   };
 
@@ -270,7 +281,7 @@ export function ItemObservationModal({
               type="file"
               ref={cameraInputRef}
               accept="image/*"
-              capture="environment"
+              capture={isMobileDevice ? 'environment' : undefined}
               onChange={handleFileChange}
               className="hidden"
             />
@@ -292,7 +303,7 @@ export function ItemObservationModal({
                 className="p-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 touch-target"
               >
                 <Camera className="w-4 h-4" />
-                <span>{isCompressing ? 'Procesando...' : 'Tomar con Cámara'}</span>
+                <span>{isCompressing ? 'Procesando...' : (isMobileDevice ? 'Tomar con Cámara' : 'Subir Foto')}</span>
               </button>
 
               <button
@@ -302,7 +313,7 @@ export function ItemObservationModal({
                 className="p-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-95 touch-target"
               >
                 <Upload className="w-4 h-4 text-amber-400" />
-                <span>Subir de Galería</span>
+                <span>{isMobileDevice ? 'Subir de Galería' : 'Examinar Archivos'}</span>
               </button>
             </div>
 
