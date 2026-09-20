@@ -23,10 +23,23 @@ import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudD
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { BlueprintDocument } from './types';
+import { SplashScreen } from './components/SplashScreen';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V4';
 const STORAGE_KEY_THEME = 'theme_preference';
+
+const normalizeLogo = (url?: string): string => {
+  if (!url || typeof url !== 'string' || url.startsWith('data:image/jpeg') || url === '/icon.png') {
+    return DEFAULT_LOGO_URL;
+  }
+  return url;
+};
+
+const normalizeCustomLogos = (raw?: CustomLogos | null): CustomLogos => ({
+  header: normalizeLogo(raw?.header),
+  banner: normalizeLogo(raw?.banner)
+});
 
 export default function App() {
   // Theme state: Dark & Light Mode support with persistence in localStorage 'theme_preference'
@@ -105,12 +118,16 @@ export default function App() {
     return getInitialMockData();
   });
 
+  const [showSplash, setShowSplash] = useState(true);
+
   const [logos, setLogos] = useState<CustomLogos>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_LOGOS);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.header && parsed.banner) return parsed;
+        if (parsed.header && parsed.banner) {
+          return normalizeCustomLogos(parsed);
+        }
       }
     } catch (e) {
       console.error('Error loading logos from storage:', e);
@@ -256,7 +273,7 @@ export default function App() {
 
           if (res.logos) {
             isRemoteUpdateRef.current = true;
-            setLogos(res.logos);
+            setLogos(normalizeCustomLogos(res.logos));
           } else {
             saveLogosToCloud(logos);
           }
@@ -269,7 +286,7 @@ export default function App() {
             },
             (cloudLogos) => {
               isRemoteUpdateRef.current = true;
-              setLogos(cloudLogos);
+              setLogos(normalizeCustomLogos(cloudLogos));
             }
           );
         }
@@ -299,10 +316,11 @@ export default function App() {
               });
             }
             if (res.logos) {
+              const normalized = normalizeCustomLogos(res.logos);
               setLogos(prev => {
-                if (JSON.stringify(prev) !== JSON.stringify(res.logos)) {
+                if (JSON.stringify(prev) !== JSON.stringify(normalized)) {
                   isRemoteUpdateRef.current = true;
-                  return res.logos!;
+                  return normalized;
                 }
                 return prev;
               });
@@ -1047,6 +1065,9 @@ export default function App() {
 
   return (
     <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col relative pb-16 transition-colors duration-200">
+      {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+
       {/* Toast Notification */}
       <Toast message={toastMessage} iconName={toastIcon} />
 

@@ -142,11 +142,14 @@ export function LogoEditorModal({
           <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2">
             Vista Previa
           </span>
-          <div className="w-20 h-20 bg-white rounded-xl p-1.5 border-2 border-amber-500 shadow-md flex items-center justify-center overflow-hidden">
+          <div className="w-20 h-20 bg-slate-950 rounded-xl p-2 border-2 border-emerald-500 shadow-md shadow-emerald-950/50 flex items-center justify-center overflow-hidden">
             <img
-              src={tempPreview}
+              src={tempPreview || DEFAULT_LOGO_URL}
               alt="Vista previa logo"
               className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = DEFAULT_LOGO_URL;
+              }}
             />
           </div>
           <p className="text-[11px] text-slate-300 mt-2 text-center">

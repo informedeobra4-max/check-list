@@ -20,6 +20,7 @@ import { calculateProjectProgress, isUnitCommonArea } from '../utils/calculation
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 import { Pencil, Info, FileCheck, Zap, Droplets } from 'lucide-react';
+import { DEFAULT_LOGO_URL } from '../data/initialData';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -97,11 +98,14 @@ export function DashboardView({
             onClick={onOpenLogoEditor}
             title="Toca para cambiar logo o foto de marca"
           >
-            <div className="w-16 h-16 rounded-xl object-contain bg-white p-1 border-2 border-amber-500 shadow-md flex items-center justify-center overflow-hidden">
+            <div className="w-16 h-16 rounded-2xl bg-slate-950/80 p-1.5 border-2 border-emerald-500 shadow-md shadow-emerald-950/50 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-all">
               <img
-                src={bannerLogoUrl}
+                src={bannerLogoUrl || DEFAULT_LOGO_URL}
                 alt="Logo Portada"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain filter drop-shadow-[0_0_8px_rgba(34,197,94,0.4)]"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = DEFAULT_LOGO_URL;
+                }}
               />
             </div>
             <span className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shadow">

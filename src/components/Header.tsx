@@ -3,6 +3,7 @@ import { FileText, ArrowLeft, Sun, Moon, Cloud, CloudOff, RefreshCw, AlertCircle
 import { ViewMode, Project, Unit } from '../types';
 import { compressImageFile } from '../utils/calculations';
 import { CloudSyncStatus } from '../lib/supabase';
+import { DEFAULT_LOGO_URL } from '../data/initialData';
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -76,11 +77,14 @@ export function Header({
               }}
               title="Cargar o cambiar logotipo desde los archivos de tu dispositivo"
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-white p-0.5 border-2 border-amber-500 flex-shrink-0 flex items-center justify-center shadow-sm hover:border-amber-400 active:scale-95 transition-all">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-950/80 p-1 border-2 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)] flex-shrink-0 flex items-center justify-center hover:border-emerald-400 active:scale-95 transition-all">
                 <img
-                  src={logoUrl}
+                  src={logoUrl || DEFAULT_LOGO_URL}
                   alt="Control de Avance Logo"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain filter drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = DEFAULT_LOGO_URL;
+                  }}
                 />
               </div>
               <input

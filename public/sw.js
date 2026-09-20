@@ -1,11 +1,12 @@
 // Minimal PWA Service Worker for Control de Avance
-const CACHE_NAME = 'control-avance-v2';
+const CACHE_NAME = 'control-avance-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.ico',
   '/icon.png',
+  '/icon.svg',
   '/portada.png',
   '/og-banner.png',
   '/icon-48.png',
