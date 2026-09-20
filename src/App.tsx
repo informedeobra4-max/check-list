@@ -41,6 +41,26 @@ const normalizeCustomLogos = (raw?: CustomLogos | null): CustomLogos => ({
   banner: normalizeLogo(raw?.banner)
 });
 
+/**
+ * Genera una versión ligera de proyectos para localStorage excluyendo los blobs pesados de fotos.
+ * Todas las fotos completas en alta resolución se guardan y leen directamente desde la nube de Supabase.
+ */
+const createLightweightProjectsForLocal = (projs: Project[]): any[] => {
+  return projs.map(p => ({
+    ...p,
+    units: p.units?.map(u => ({
+      ...u,
+      trades: u.trades?.map(t => ({
+        ...t,
+        items: t.items?.map(i => ({
+          ...i,
+          photos: i.photos?.map(ph => ({ id: ph.id, timestamp: ph.timestamp })) || []
+        }))
+      }))
+    }))
+  }));
+};
+
 export default function App() {
   // Theme state: Dark & Light Mode support with persistence in localStorage 'theme_preference'
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -347,12 +367,13 @@ export default function App() {
     };
   }, []);
 
-  // Persist projects to localStorage and Supabase Cloud
+  // Persist projects: lightweight to localStorage, full data with photos to Supabase Cloud
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(projects));
+      const lightProjects = createLightweightProjectsForLocal(projects);
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(lightProjects));
     } catch (e) {
-      console.error('Error saving projects to localStorage:', e);
+      console.warn('Almacenamiento local restringido (datos seguros en la Nube Supabase):', e);
     }
 
     // If change came from remote cloud, do not re-upload
@@ -769,70 +790,22 @@ export default function App() {
     }
   };
 
-  // Trigger camera for active item
-  const handleTriggerCamera = (tradeId: string, itemId: string, tradeName: string, itemName: string) => {
-    setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
-    if (cameraInputRef.current) {
-      cameraInputRef.current.value = '';
-      cameraInputRef.current.click();
-    }
-  };
+  // Add photo to item (from camera, file picker or modal) and persist directly to Supabase Cloud
+  const handleAddPhoto = async (tradeId: string, itemId: string, dataUrl: string) => {
+    if (!selectedProjectId || !selectedUnitId) return;
 
-  // Handle camera capture or image selection
-  const handlePhotoCaptured = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activePhotoViewer) return;
+    const now = new Date();
+    const dateString = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = `${dateString}, ${timeString} hs`;
 
-    try {
-      const compressedDataUrl = await compressImageFile(file, 800, 0.72);
-      const now = new Date();
-      const dateString = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      const timestamp = `${dateString}, ${timeString} hs`;
+    const newPhoto = {
+      id: `ph_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      dataUrl,
+      timestamp
+    };
 
-      const newPhoto = {
-        id: `ph_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        dataUrl: compressedDataUrl,
-        timestamp
-      };
-
-      setProjects(prev => prev.map(proj => {
-        if (proj.id !== selectedProjectId) return proj;
-        return {
-          ...proj,
-          units: proj.units.map(u => {
-            if (u.id !== selectedUnitId) return u;
-            return {
-              ...u,
-              trades: u.trades.map(t => {
-                if (t.id !== activePhotoViewer.tradeId) return t;
-                return {
-                  ...t,
-                  items: t.items.map(item => {
-                    if (item.id !== activePhotoViewer.itemId) return item;
-                    return {
-                      ...item,
-                      photos: [...(item.photos || []), newPhoto]
-                    };
-                  })
-                };
-              })
-            };
-          })
-        };
-      }));
-
-      showToast('Fotografía adjuntada con éxito', 'Camera');
-    } catch (err) {
-      console.error('Error processing captured photo:', err);
-      showToast('Error al procesar la imagen', 'AlertCircle');
-    }
-  };
-
-  // Delete photo
-  const handleDeletePhoto = (photoId: string) => {
-    if (!activePhotoViewer || !confirm('¿Eliminar esta fotografía de la inspección?')) return;
-    setProjects(prev => prev.map(proj => {
+    const updatedProjects = projects.map(proj => {
       if (proj.id !== selectedProjectId) return proj;
       return {
         ...proj,
@@ -841,11 +814,56 @@ export default function App() {
           return {
             ...u,
             trades: u.trades.map(t => {
-              if (t.id !== activePhotoViewer.tradeId) return t;
+              if (t.id !== tradeId) return t;
               return {
                 ...t,
                 items: t.items.map(item => {
-                  if (item.id !== activePhotoViewer.itemId) return item;
+                  if (item.id !== itemId) return item;
+                  return {
+                    ...item,
+                    photos: [...(item.photos || []), newPhoto]
+                  };
+                })
+              };
+            })
+          };
+        })
+      };
+    });
+
+    setProjects(updatedProjects);
+
+    // Persist immediately to Supabase Cloud
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjects).then(res => {
+      setCloudStatus(res.status);
+      if (res.success) {
+        showToast('Foto guardada en la Nube Supabase', 'Cloud');
+      } else {
+        showToast('Foto guardada (sincronizando con la nube...)', 'AlertCircle');
+      }
+    });
+  };
+
+  // Delete photo from item and persist immediately to Supabase Cloud
+  const handleDeletePhoto = async (tradeId: string, itemId: string, photoId: string) => {
+    if (!confirm('¿Eliminar esta fotografía de la inspección?')) return;
+    if (!selectedProjectId || !selectedUnitId) return;
+
+    const updatedProjects = projects.map(proj => {
+      if (proj.id !== selectedProjectId) return proj;
+      return {
+        ...proj,
+        units: proj.units.map(u => {
+          if (u.id !== selectedUnitId) return u;
+          return {
+            ...u,
+            trades: u.trades.map(t => {
+              if (t.id !== tradeId) return t;
+              return {
+                ...t,
+                items: t.items.map(item => {
+                  if (item.id !== itemId) return item;
                   return {
                     ...item,
                     photos: (item.photos || []).filter(p => p.id !== photoId)
@@ -856,8 +874,91 @@ export default function App() {
           };
         })
       };
-    }));
-    showToast('Fotografía eliminada', 'Trash2');
+    });
+
+    setProjects(updatedProjects);
+
+    // Persist immediately to Supabase Cloud
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjects).then(res => {
+      setCloudStatus(res.status);
+      showToast('Fotografía eliminada en la Nube', 'Trash2');
+    });
+  };
+
+  // Save technical observation with severity directly to Supabase Cloud
+  const handleSaveObservation = async (
+    tradeId: string,
+    itemId: string,
+    comment: string,
+    severity: 'low' | 'medium' | 'high' | undefined
+  ) => {
+    if (!selectedProjectId || !selectedUnitId) return;
+    const trimmed = comment.trim();
+
+    const updatedProjects = projects.map(proj => {
+      if (proj.id !== selectedProjectId) return proj;
+      return {
+        ...proj,
+        units: proj.units.map(u => {
+          if (u.id !== selectedUnitId) return u;
+          return {
+            ...u,
+            trades: u.trades.map(t => {
+              if (t.id !== tradeId) return t;
+              return {
+                ...t,
+                items: t.items.map(item => {
+                  if (item.id !== itemId) return item;
+                  return {
+                    ...item,
+                    comment: trimmed ? trimmed : undefined,
+                    severity: trimmed ? severity : undefined
+                  };
+                })
+              };
+            })
+          };
+        })
+      };
+    });
+
+    setProjects(updatedProjects);
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjects).then(res => {
+      setCloudStatus(res.status);
+      if (trimmed) {
+        showToast('Observación guardada en la Nube Supabase', 'Cloud');
+      } else {
+        showToast('Observación eliminada en la Nube', 'Trash2');
+      }
+    });
+  };
+
+  // Trigger camera for active item
+  const handleTriggerCamera = (tradeId: string, itemId: string, tradeName: string, itemName: string) => {
+    setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
+    }
+  };
+
+  // Handle camera capture or image selection from global input
+  const handlePhotoCaptured = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activePhotoViewer) return;
+
+    try {
+      const compressedDataUrl = await compressImageFile(file, 800, 0.72);
+      await handleAddPhoto(activePhotoViewer.tradeId, activePhotoViewer.itemId, compressedDataUrl);
+    } catch (err) {
+      console.error('Error processing captured photo:', err);
+      showToast('Error al procesar la imagen', 'AlertCircle');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   // Create Project with flexible floor configuration and amenities
@@ -1153,6 +1254,9 @@ export default function App() {
             onDeleteItem={handleDeleteItem}
             onAddItem={handleAddItem}
             onSaveComment={handleSaveItemComment}
+            onSaveObservation={handleSaveObservation}
+            onAddPhoto={handleAddPhoto}
+            onDeletePhoto={handleDeletePhoto}
             onOpenPhotoViewer={(tradeId, itemId, tradeName, itemName) => {
               setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
             }}
@@ -1265,7 +1369,16 @@ export default function App() {
             cameraInputRef.current.click();
           }
         }}
-        onDeletePhoto={handleDeletePhoto}
+        onAddPhoto={(dataUrl) => {
+          if (activePhotoViewer) {
+            handleAddPhoto(activePhotoViewer.tradeId, activePhotoViewer.itemId, dataUrl);
+          }
+        }}
+        onDeletePhoto={(photoId) => {
+          if (activePhotoViewer) {
+            handleDeletePhoto(activePhotoViewer.tradeId, activePhotoViewer.itemId, photoId);
+          }
+        }}
       />
 
       <ReportModal

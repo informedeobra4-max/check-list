@@ -1,5 +1,7 @@
-import { X, Camera, Trash2, Calendar, Plus, MessageSquare } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, Camera, Trash2, Calendar, Plus, MessageSquare, Upload } from 'lucide-react';
 import { InspectionItem } from '../types';
+import { compressImageFile } from '../utils/calculations';
 
 interface PhotoViewerModalProps {
   isOpen: boolean;
@@ -8,6 +10,7 @@ interface PhotoViewerModalProps {
   onClose: () => void;
   onTriggerCamera: () => void;
   onDeletePhoto: (photoId: string) => void;
+  onAddPhoto?: (dataUrl: string) => void;
 }
 
 export function PhotoViewerModal({
@@ -16,14 +19,57 @@ export function PhotoViewerModal({
   item,
   onClose,
   onTriggerCamera,
-  onDeletePhoto
+  onDeletePhoto,
+  onAddPhoto
 }: PhotoViewerModalProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   if (!isOpen || !item) return null;
 
   const photos = item.photos || [];
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsProcessing(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const compressedBase64 = await compressImageFile(file, 800, 0.72);
+        if (onAddPhoto) {
+          onAddPhoto(compressedBase64);
+        }
+      }
+    } catch (err) {
+      console.error('Error al procesar foto:', err);
+    } finally {
+      setIsProcessing(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+      {/* Hidden file inputs for direct camera and gallery upload */}
+      <input
+        type="file"
+        ref={cameraInputRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={galleryInputRef}
+        accept="image/*"
+        multiple
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <div className="bg-slate-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
         {/* Modal Header */}
         <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-950">
@@ -66,20 +112,32 @@ export function PhotoViewerModal({
             </div>
           )}
           {photos.length === 0 ? (
-            <div className="text-center py-12 px-4 bg-slate-800/60 rounded-2xl border border-dashed border-slate-700">
+            <div className="text-center py-10 px-4 bg-slate-800/60 rounded-2xl border border-dashed border-slate-700">
               <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 mb-3">
                 <Camera className="w-7 h-7" />
               </div>
               <h4 className="text-white font-bold text-sm">Sin fotografías de registro</h4>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                Toma una foto en terreno con la cámara del dispositivo o selecciona una de tu galería para registrar evidencia técnica.
+                Toma una foto en terreno con la cámara o sube desde la galería de tu celular o notebook para guardar evidencia en la nube.
               </p>
-              <button
-                onClick={onTriggerCamera}
-                className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 mx-auto touch-target active:scale-95 shadow transition-all"
-              >
-                <Camera className="w-4 h-4" /> Abrir Cámara de Obra
-              </button>
+              <div className="grid grid-cols-2 gap-2 mt-4 max-w-xs mx-auto">
+                <button
+                  disabled={isProcessing}
+                  onClick={() => cameraInputRef.current ? cameraInputRef.current.click() : onTriggerCamera()}
+                  className="px-3 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 touch-target active:scale-95 shadow transition-all"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>{isProcessing ? 'Procesando...' : 'Cámara'}</span>
+                </button>
+                <button
+                  disabled={isProcessing}
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-700 touch-target active:scale-95 transition-all"
+                >
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  <span>Galería</span>
+                </button>
+              </div>
             </div>
           ) : (
             photos.map((photo, index) => (
@@ -121,11 +179,20 @@ export function PhotoViewerModal({
         {/* Modal Footer Actions */}
         <div className="p-3 bg-slate-950 border-t border-slate-800 flex gap-2 items-center">
           <button
-            onClick={onTriggerCamera}
+            disabled={isProcessing}
+            onClick={() => cameraInputRef.current ? cameraInputRef.current.click() : onTriggerCamera()}
             className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg touch-target transition-all"
           >
             <Camera className="w-4 h-4" />
-            <span>Tomar / Subir Foto</span>
+            <span>{isProcessing ? 'Procesando...' : 'Tomar Foto'}</span>
+          </button>
+          <button
+            disabled={isProcessing}
+            onClick={() => galleryInputRef.current?.click()}
+            className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700 touch-target transition-all"
+          >
+            <Upload className="w-4 h-4 text-amber-400" />
+            <span>Subir Galería</span>
           </button>
           <button
             onClick={onClose}
