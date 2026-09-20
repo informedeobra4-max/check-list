@@ -25,7 +25,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { BlueprintDocument } from './types';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
-const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V3';
+const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V4';
 const STORAGE_KEY_THEME = 'theme_preference';
 
 export default function App() {

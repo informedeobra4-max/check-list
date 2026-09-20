@@ -1,12 +1,16 @@
 // Minimal PWA Service Worker for Control de Avance
-const CACHE_NAME = 'control-avance-v1';
+const CACHE_NAME = 'control-avance-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/icon.png',
+  '/portada.png',
   '/icon-192.png',
   '/icon-512.png',
-  '/icon.svg'
+  '/apple-touch-icon.png',
+  '/favicon.png',
+  '/favicon-32x32.png'
 ];
 
 self.addEventListener('install', (event) => {
