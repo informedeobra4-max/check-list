@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FileText, ArrowLeft, Sun, Moon, Cloud, CloudOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { FileText, ArrowLeft, Sun, Moon, Cloud, CloudOff, RefreshCw, AlertCircle, Building2 } from 'lucide-react';
 import { ViewMode, Project, Unit } from '../types';
 import { compressImageFile } from '../utils/calculations';
 import { CloudSyncStatus } from '../lib/supabase';
@@ -96,11 +96,23 @@ export function Header({
               />
             </div>
 
-            {/* Brand Title */}
+            {/* Brand Title with Active Complex Name */}
             <div className="cursor-pointer select-none" onClick={() => onNavigate('dashboard')}>
               <h1 className="font-black tracking-wider text-sm sm:text-base leading-none text-white uppercase">
                 CONTROL DE AVANCE
               </h1>
+              {selectedProject && currentView !== 'dashboard' && (
+                <div className="text-[11px] sm:text-xs font-bold text-amber-400 truncate max-w-[200px] sm:max-w-[340px] flex items-center gap-1 mt-1">
+                  <Building2 className="w-3 h-3 text-amber-400 inline-block flex-shrink-0" />
+                  <span className="truncate">{selectedProject.name}</span>
+                  {currentView === 'checklist' && selectedUnit && (
+                    <>
+                      <span className="text-slate-400 font-normal">›</span>
+                      <span className="text-white truncate font-extrabold">{selectedUnit.name}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -203,8 +215,14 @@ export function Header({
               >
                 <FileText className="w-3 h-3 text-rose-400" /> Exportar PDF
               </button>
-              <div className="font-extrabold text-white truncate max-w-[200px] text-right">
-                {currentView === 'checklist' ? selectedUnit?.name : selectedProject?.name}
+              <div className="font-extrabold text-white truncate max-w-[280px] sm:max-w-none text-right flex items-center gap-1.5">
+                <span className="text-amber-400 font-bold truncate max-w-[140px] sm:max-w-[200px]">{selectedProject?.name}</span>
+                {currentView === 'checklist' && selectedUnit && (
+                  <>
+                    <span className="text-slate-400 font-normal">›</span>
+                    <span className="text-white font-black truncate max-w-[140px] sm:max-w-[200px]">{selectedUnit.name}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>

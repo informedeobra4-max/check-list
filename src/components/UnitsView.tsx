@@ -41,6 +41,8 @@ interface UnitsViewProps {
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
   onOpenUnitBlueprints?: (unit: Unit) => void;
+  onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
+  onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
 }
 
 export function UnitsView({
@@ -57,14 +59,36 @@ export function UnitsView({
   onToggleManualMilestone,
   onUpdateProjectDates,
   onEditProject,
-  onOpenUnitBlueprints
+  onOpenUnitBlueprints,
+  onAddTrade,
+  onDeleteTrade
 }: UnitsViewProps) {
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'unit' | 'common_area'>('all');
+  const [tradeSectionTab, setTradeSectionTab] = useState<'filter' | 'manage'>('filter');
+  const [newTradeNameDraft, setNewTradeNameDraft] = useState<string>('');
 
   const overallProgress = calculateProjectProgress(project, tradeFilter);
-  const activeTrade = MASTER_TRADES_TEMPLATE.find(t => t.id === tradeFilter);
+
+  const availableTrades = (() => {
+    const map = new Map<string, { id: string; name: string; shortName?: string; icon: string }>();
+    project.units.forEach(u => {
+      u.trades.forEach(t => {
+        if (!map.has(t.id)) {
+          map.set(t.id, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
+        }
+      });
+    });
+    if (map.size === 0) {
+      MASTER_TRADES_TEMPLATE.forEach(t => {
+        map.set(t.id, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
+      });
+    }
+    return Array.from(map.values());
+  })();
+
+  const activeTrade = availableTrades.find(t => t.id === tradeFilter) || MASTER_TRADES_TEMPLATE.find(t => t.id === tradeFilter);
 
   // Global counts by space type
   const countDeptos = project.units.filter(u => !isUnitCommonArea(u)).length;
@@ -268,48 +292,188 @@ export function UnitsView({
         </div>
       </div>
 
-      {/* Specialty / Trade Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5 transition-colors">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            Filtrar por Gremio:
-          </span>
-          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
-            {tradeFilter === 'all' ? 'Todos los gremios' : activeTrade?.name}
+      {/* Specialty / Trade Filter & Management Bar */}
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 transition-colors">
+        {/* Navigation Tabs Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setTradeSectionTab('filter')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
+                tradeSectionTab === 'filter'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-amber-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-500" />
+              <span>Filtrar Gremios</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTradeSectionTab('manage')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
+                tradeSectionTab === 'manage'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-amber-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+              <span>Agregar o Eliminar Gremios</span>
+            </button>
+          </div>
+
+          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold hidden sm:inline">
+            {tradeSectionTab === 'filter'
+              ? (tradeFilter === 'all' ? 'Todos los gremios' : activeTrade?.name)
+              : `${availableTrades.length} Gremios en el complejo`}
           </span>
         </div>
 
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
-          <button
-            onClick={() => setTradeFilter('all')}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-              tradeFilter === 'all'
-                ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
-            }`}
-          >
-            <span>Todos</span>
-          </button>
-
-          {MASTER_TRADES_TEMPLATE.map(trade => {
-            const isActive = tradeFilter === trade.id;
-            return (
+        {/* TAB 1: FILTRAR GREMIOS */}
+        {tradeSectionTab === 'filter' && (
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
               <button
-                key={trade.id}
-                onClick={() => setTradeFilter(trade.id)}
+                onClick={() => setTradeFilter('all')}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-                  isActive
+                  tradeFilter === 'all'
                     ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
                     : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
                 }`}
               >
-                {getTradeIcon(trade.id)}
-                <span>{trade.shortName}</span>
+                <span>Todos</span>
               </button>
-            );
-          })}
-        </div>
+
+              {availableTrades.map(trade => {
+                const isActive = tradeFilter === trade.id;
+                return (
+                  <button
+                    key={trade.id}
+                    onClick={() => setTradeFilter(trade.id)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                      isActive
+                        ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    {getTradeIcon(trade.id)}
+                    <span>{trade.shortName || trade.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: AGREGAR O ELIMINAR GREMIOS */}
+        {tradeSectionTab === 'manage' && (
+          <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+            {/* Form to Add New Trade */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+              <label className="block text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+                Agregar Nuevo Gremio al Complejo ({project.name})
+              </label>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={newTradeNameDraft}
+                  onChange={(e) => setNewTradeNameDraft(e.target.value)}
+                  placeholder="Ej: Pintura, Instalación de Gas, Herrería..."
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+
+                <button
+                  type="button"
+                  disabled={!newTradeNameDraft.trim()}
+                  onClick={() => {
+                    if (onAddTrade && newTradeNameDraft.trim()) {
+                      onAddTrade(newTradeNameDraft.trim(), 'all_units');
+                      setNewTradeNameDraft('');
+                    }
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 touch-target"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Agregar en Todas las Unidades</span>
+                </button>
+              </div>
+
+              {/* Quick Preset Badges */}
+              <div className="pt-1">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                  Sugerencias rápidas:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Pintura',
+                    'Instalación de Gas',
+                    'Herrería',
+                    'Yesería y Durlock',
+                    'Vidrios',
+                    'Climatización / AA',
+                    'Limpieza de Obra'
+                  ].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNewTradeNameDraft(preset)}
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors active:scale-95"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* List of Current Trades for Deletion / Management */}
+            <div>
+              <span className="text-xs font-black text-slate-800 dark:text-slate-200 block mb-2">
+                Gremios del Complejo ({availableTrades.length}):
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {availableTrades.map(trade => (
+                  <div
+                    key={trade.id}
+                    className="p-2.5 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                        {getTradeIcon(trade.id)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                          {trade.name}
+                        </p>
+                      </div>
+                    </div>
+
+                    {onDeleteTrade && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDeleteTrade(trade.id, trade.name, 'all_units');
+                          if (tradeFilter === trade.id) {
+                            setTradeFilter('all');
+                          }
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 transition-colors active:scale-95 touch-target flex-shrink-0"
+                        title={`Eliminar gremio ${trade.name} en todo el complejo`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Eliminar</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Subheader and Add Unit button */}

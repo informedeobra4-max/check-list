@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress } from './utils/calculations';
 import { Header } from './components/Header';
@@ -823,6 +823,90 @@ export default function App() {
     }
   };
 
+  // Add new Trade to current unit or all units in project
+  const handleAddTrade = (tradeName: string, scope: 'current_unit' | 'all_units' = 'current_unit') => {
+    const trimmed = tradeName.trim();
+    if (!trimmed || !selectedProjectId) return;
+
+    const newTradeId = `trade_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newTrade: Trade = {
+      id: newTradeId,
+      name: trimmed,
+      shortName: trimmed,
+      icon: 'Wrench',
+      color: 'text-amber-800 bg-amber-50 border-amber-300',
+      items: [
+        {
+          id: `item_${Date.now()}_init`,
+          name: `Verificación general de ${trimmed}`,
+          completed: false,
+          progressPercentage: 0,
+          photos: []
+        }
+      ]
+    };
+
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (scope === 'current_unit' && u.id !== selectedUnitId) return u;
+            const exists = u.trades.some(t => t.name.toLowerCase() === trimmed.toLowerCase());
+            if (exists) return u;
+            return {
+              ...u,
+              trades: [...u.trades, { ...newTrade, id: `${newTradeId}_${u.id}` }]
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Gremio "${trimmed}" agregado ${scope === 'all_units' ? 'en todo el complejo' : 'en este depto'}`, 'Check');
+    });
+  };
+
+  // Delete a Trade from unit or all units in project
+  const handleDeleteTrade = (tradeId: string, tradeName: string, scope: 'current_unit' | 'all_units' = 'current_unit') => {
+    if (!confirm(`¿Eliminar el gremio "${tradeName}" y todas sus tareas asociadas?`)) return;
+    if (!selectedProjectId) return;
+
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (scope === 'current_unit' && u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.filter(t => t.id !== tradeId && t.name.toLowerCase() !== tradeName.toLowerCase())
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Gremio "${tradeName}" eliminado`, 'Trash2');
+    });
+  };
+
   // Save or remove technical comment / observation on checklist item
   const handleSaveItemComment = (tradeId: string, itemId: string, comment: string) => {
     const trimmed = comment.trim();
@@ -1335,6 +1419,8 @@ export default function App() {
             onUpdateProjectDates={handleUpdateProjectDates}
             onEditProject={(proj) => setEditingProject(proj)}
             onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
+            onAddTrade={handleAddTrade}
+            onDeleteTrade={handleDeleteTrade}
           />
         )}
 
@@ -1360,6 +1446,8 @@ export default function App() {
             onRequestDeleteUnit={handleRequestDeleteUnit}
             onExportExcel={handleExportExcel}
             onOpenBlueprints={() => setActiveBlueprintViewerUnit(selectedUnit)}
+            onAddTrade={handleAddTrade}
+            onDeleteTrade={handleDeleteTrade}
           />
         )}
       </main>

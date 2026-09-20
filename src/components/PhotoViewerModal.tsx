@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { X, Camera, Trash2, Calendar, Plus, MessageSquare, Upload } from 'lucide-react';
+import { X, Camera, Trash2, Calendar, Plus, MessageSquare, Upload, Download } from 'lucide-react';
 import { InspectionItem } from '../types';
 import { compressImageFile } from '../utils/calculations';
 
@@ -50,6 +50,21 @@ export function PhotoViewerModal({
     } finally {
       setIsProcessing(false);
       e.target.value = '';
+    }
+  };
+
+  const handleDownloadPhoto = (dataUrl: string, index: number) => {
+    try {
+      const cleanItemName = (item?.name || 'evidencia').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
+      const fileName = `Foto_${cleanItemName}_${index + 1}.jpg`;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error al descargar imagen:', err);
     }
   };
 
@@ -148,7 +163,7 @@ export function PhotoViewerModal({
                 key={photo.id}
                 className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-md flex flex-col"
               >
-                <div className="relative bg-black flex items-center justify-center max-h-72 overflow-hidden">
+                <div className="relative bg-black flex items-center justify-center max-h-72 overflow-hidden group">
                   <img
                     src={photo.dataUrl}
                     alt={`Evidencia ${index + 1}`}
@@ -157,6 +172,14 @@ export function PhotoViewerModal({
                   <span className="absolute top-2 left-2 bg-slate-950/80 text-amber-400 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
                     Foto {index + 1} de {photos.length}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPhoto(photo.dataUrl, index)}
+                    className="absolute top-2 right-2 bg-slate-950/80 hover:bg-slate-900 text-amber-400 border border-amber-500/40 p-1.5 rounded-full shadow-lg backdrop-blur-xs active:scale-95 transition-all"
+                    title="Descargar esta foto"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div className="p-3 bg-slate-950 flex items-center justify-between border-t border-slate-800">
@@ -167,12 +190,23 @@ export function PhotoViewerModal({
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => onDeletePhoto(photo.id)}
-                    className="text-rose-400 hover:text-rose-300 active:scale-90 text-xs font-bold flex items-center gap-1 touch-target px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-800/40 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPhoto(photo.dataUrl, index)}
+                      className="text-amber-400 hover:text-amber-300 active:scale-90 text-xs font-bold flex items-center gap-1 touch-target px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                      title="Descargar imagen a tu dispositivo"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Descargar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeletePhoto(photo.id)}
+                      className="text-rose-400 hover:text-rose-300 active:scale-90 text-xs font-bold flex items-center gap-1 touch-target px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-800/40 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
             ))

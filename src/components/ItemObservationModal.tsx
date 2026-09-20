@@ -12,7 +12,8 @@ import {
   Sparkles,
   Check,
   ShieldAlert,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 import { InspectionItem } from '../types';
 import { compressImageFile } from '../utils/calculations';
@@ -82,6 +83,22 @@ export function ItemObservationModal({
       setIsCompressing(false);
       // Reset input value so same photo can be re-selected if needed
       e.target.value = '';
+    }
+  };
+
+  const handleDownloadPhoto = (dataUrl: string, index?: number) => {
+    try {
+      const cleanItemName = (item?.name || 'evidencia').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
+      const suffix = index !== undefined ? `_${index + 1}` : '';
+      const fileName = `Foto_${cleanItemName}${suffix}.jpg`;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error al descargar imagen:', err);
     }
   };
 
@@ -342,19 +359,32 @@ export function ItemObservationModal({
                       />
                     </div>
 
-                    <div className="p-1.5 flex items-center justify-between bg-slate-950 text-[10px] text-slate-400">
+                    <div className="p-1.5 flex items-center justify-between bg-slate-950 text-[10px] text-slate-400 border-t border-slate-800/80">
                       <span className="font-mono truncate">{photo.timestamp || `#${index + 1}`}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeletePhoto(tradeId, item.id, photo.id);
-                        }}
-                        className="text-rose-400 hover:text-rose-300 p-1 rounded hover:bg-rose-950/50"
-                        title="Eliminar foto"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadPhoto(photo.dataUrl, index);
+                          }}
+                          className="text-amber-400 hover:text-amber-300 p-1 rounded hover:bg-amber-950/50 transition-colors"
+                          title="Descargar foto"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeletePhoto(tradeId, item.id, photo.id);
+                          }}
+                          className="text-rose-400 hover:text-rose-300 p-1 rounded hover:bg-rose-950/50 transition-colors"
+                          title="Eliminar foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -403,18 +433,30 @@ export function ItemObservationModal({
       {activePhotoPreview && (
         <div
           onClick={() => setActivePhotoPreview(null)}
-          className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-2"
+          className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-2 sm:p-6"
         >
-          <button
-            onClick={() => setActivePhotoPreview(null)}
-            className="absolute top-4 right-4 text-white p-2 rounded-full bg-slate-800/80 hover:bg-slate-700"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => handleDownloadPhoto(activePhotoPreview)}
+              className="text-amber-400 hover:text-amber-300 bg-slate-900/90 hover:bg-slate-800 border border-amber-500/40 p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-lg active:scale-95 transition-all"
+              title="Descargar esta fotografía"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Descargar Foto</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePhotoPreview(null)}
+              className="text-white p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 shadow-lg active:scale-95 transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           <img
             src={activePhotoPreview}
             alt="Vista ampliada"
-            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
           />
         </div>
       )}
