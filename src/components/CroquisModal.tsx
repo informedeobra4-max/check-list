@@ -17,7 +17,6 @@ import {
   Type,
   Maximize2,
   Minimize2,
-  Sparkles,
   Building2,
   DoorOpen,
   Calendar,
@@ -26,9 +25,18 @@ import {
   Highlighter,
   Layers,
   FileSpreadsheet,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  Upload,
+  FileText,
+  Compass,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Sliders,
+  Sparkles
 } from 'lucide-react';
-import { Project, Unit, SketchDocument } from '../types';
+import { Project, Unit, SketchDocument, BlueprintDocument } from '../types';
 
 interface CroquisModalProps {
   isOpen: boolean;
@@ -42,6 +50,16 @@ interface CroquisModalProps {
 type ToolType = 'pen' | 'highlighter' | 'line' | 'arrow' | 'rect' | 'circle' | 'text' | 'eraser';
 type PaperType = 'white' | 'grid' | 'lines' | 'dark';
 
+interface BackgroundDoc {
+  dataUrl: string;
+  name: string;
+  type: 'camera' | 'image' | 'pdf';
+  page?: number;
+  totalPages?: number;
+  fileBlob?: Blob;
+  opacity: number;
+}
+
 function WhatsAppIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -51,8 +69,8 @@ function WhatsAppIcon({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 const COLOR_PALETTE = [
-  { label: 'Negro Carbón', value: '#0f172a' },
   { label: 'Rojo Obra', value: '#dc2626' },
+  { label: 'Negro Carbón', value: '#0f172a' },
   { label: 'Azul Técnico', value: '#2563eb' },
   { label: 'Verde Instalación', value: '#16a34a' },
   { label: 'Naranja / Cota', value: '#ea580c' },
@@ -78,6 +96,60 @@ const PRESET_REFERENCES = [
   'Medidas en Sitio'
 ];
 
+/**
+ * Loads a PDF page and renders it to a sharp PNG data URL using PDF.js CDN
+ */
+async function renderPdfPageToDataUrl(
+  fileOrBlob: Blob,
+  pageNumber = 1
+): Promise<{ dataUrl: string; totalPages: number }> {
+  if (!(window as any).pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const existing = document.getElementById('pdfjs-cdn-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'pdfjs-cdn-script';
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = () => {
+        try {
+          (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          resolve(true);
+        } catch {
+          resolve(true);
+        }
+      };
+      script.onerror = () => reject(new Error('No se pudo cargar el motor PDF'));
+      document.head.appendChild(script);
+    });
+  }
+
+  const pdfjsLib = (window as any).pdfjsLib;
+  const arrayBuffer = await fileOrBlob.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const totalPages = pdf.numPages;
+  const targetPage = Math.max(1, Math.min(pageNumber, totalPages));
+  const page = await pdf.getPage(targetPage);
+
+  // Render at 2.0 scale for sharp blueprint lines
+  const viewport = page.getViewport({ scale: 2.0 });
+  const offscreen = document.createElement('canvas');
+  offscreen.width = viewport.width;
+  offscreen.height = viewport.height;
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) throw new Error('No 2d context');
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return {
+    dataUrl: offscreen.toDataURL('image/png', 0.95),
+    totalPages
+  };
+}
+
 export function CroquisModal({
   isOpen,
   project,
@@ -97,13 +169,23 @@ export function CroquisModal({
   const [activeTab, setActiveTab] = useState<'draw' | 'history'>('draw');
   const [sketchTitle, setSketchTitle] = useState<string>('Croquis en sitio');
   const [tool, setTool] = useState<ToolType>('pen');
-  const [color, setColor] = useState<string>('#0f172a');
+  const [color, setColor] = useState<string>('#dc2626'); // Red default for technical markups
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [paperType, setPaperType] = useState<PaperType>('grid');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Canvas Refs
+  // Background Document / Photo / PDF state
+  const [bgDocument, setBgDocument] = useState<BackgroundDoc | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [isBlueprintsDropdownOpen, setIsBlueprintsDropdownOpen] = useState(false);
+
+  // File Inputs Refs
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Canvas & Container Refs
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
@@ -118,6 +200,7 @@ export function CroquisModal({
   // Current Unit Object
   const currentUnit = project.units.find(u => u.id === selectedUnitId) || project.units[0];
   const unitSketches = currentUnit?.sketches || [];
+  const unitBlueprints = currentUnit?.blueprints || [];
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -148,49 +231,97 @@ export function CroquisModal({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    undoStackRef.current.push(imageData);
-    if (undoStackRef.current.length > 25) {
-      undoStackRef.current.shift();
+    try {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      undoStackRef.current.push(imageData);
+      if (undoStackRef.current.length > 25) {
+        undoStackRef.current.shift();
+      }
+      redoStackRef.current = [];
+      updateHistoryState();
+    } catch (err) {
+      console.error('Error pushing undo state:', err);
     }
-    redoStackRef.current = [];
-    updateHistoryState();
   };
 
-  // Initialize Canvas
+  // High-precision Canvas Initialization & Resizing
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
     const dpr = window.devicePixelRatio || 1;
-    const width = Math.max(600, Math.floor(rect.width));
-    const height = Math.max(450, Math.floor(rect.height));
+    const w = Math.round(rect.width);
+    const h = Math.round(rect.height);
 
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    // Save previous drawing content if canvas already had strokes
+    let prevData: ImageData | null = null;
+    try {
+      if (canvas.width > 0 && canvas.height > 0) {
+        prevData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+    } catch {
+      // ignore
+    }
 
+    // Set physical buffer size
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+
+    // Set CSS displayed size explicitly matching container to ensure 1:1 screen mapping
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+
+    // Scale context by devicePixelRatio
     ctx.scale(dpr, dpr);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Clear with transparent layer (paper background is handled via CSS / composite export)
-    ctx.clearRect(0, 0, width, height);
+    if (prevData) {
+      try {
+        ctx.putImageData(prevData, 0, 0);
+      } catch {
+        // ignore
+      }
+    } else {
+      ctx.clearRect(0, 0, w, h);
+    }
 
-    undoStackRef.current = [];
-    redoStackRef.current = [];
     updateHistoryState();
   }, []);
 
+  // ResizeObserver on the paper container to keep 1:1 precision at all times
   useEffect(() => {
-    if (isOpen && activeTab === 'draw') {
-      const timer = setTimeout(() => {
+    if (!isOpen || activeTab !== 'draw') return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Run after layout settle
+    const initTimer = setTimeout(() => {
+      initCanvas();
+    }, 100);
+
+    let resizeTimer: any = null;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
         initCanvas();
-      }, 150);
-      return () => clearTimeout(timer);
-    }
+      }, 50);
+    });
+
+    observer.observe(container);
+
+    return () => {
+      clearTimeout(initTimer);
+      clearTimeout(resizeTimer);
+      observer.disconnect();
+    };
   }, [isOpen, activeTab, initCanvas, isFullscreen]);
 
   // Undo Handler
@@ -229,7 +360,7 @@ export function CroquisModal({
 
   // Clear Canvas
   const handleClear = () => {
-    if (!confirm('¿Deseas limpiar todo el dibujo de la hoja?')) return;
+    if (!confirm('¿Deseas limpiar todos los trazos dibujados sobre la hoja?')) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -239,15 +370,60 @@ export function CroquisModal({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  // Pointer coordinate calculation (supports mouse, touch, and stylus pen)
+  /**
+   * High-Precision Point Mapping:
+   * Maps physical screen pointer (stylus/touch/mouse) directly to canvas logical coordinate space.
+   * This completely eliminates any lateral offset (e.g. 7mm shift) by computing the true scale ratio.
+   */
   const getCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0, pressure: 0.5 };
+
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const dpr = window.devicePixelRatio || 1;
+
+    // Logical canvas dimensions expected by 2D context
+    const logicalWidth = canvas.width / dpr;
+    const logicalHeight = canvas.height / dpr;
+
+    // Absolute scale ratio between screen CSS pixels and context coordinates
+    const scaleX = logicalWidth / (rect.width || 1);
+    const scaleY = logicalHeight / (rect.height || 1);
+
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    // S-Pen / Apple Pencil stylus pressure
     const pressure = e.pressure && e.pressure > 0 ? e.pressure : 0.5;
+
     return { x, y, pressure };
+  };
+
+  // Context Styling Configuration
+  const applyContextStyle = (ctx: CanvasRenderingContext2D, pressure = 0.5) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = strokeWidth * 4.0;
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+      ctx.globalAlpha = 1.0;
+    } else if (tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = Math.max(14, strokeWidth * 2.8);
+      ctx.globalAlpha = 0.38;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      // Stylus pressure dynamic modulation
+      const effectiveWidth = Math.max(1, strokeWidth * (0.65 + pressure * 0.7));
+      ctx.lineWidth = effectiveWidth;
+      ctx.globalAlpha = 1.0;
+    }
   };
 
   // Pointer Down (Pen / Touch / Mouse Start)
@@ -258,60 +434,30 @@ export function CroquisModal({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Capture pointer to prevent losing events outside canvas
     e.currentTarget.setPointerCapture(e.pointerId);
 
-    const { x, y } = getCanvasPoint(e);
+    const { x, y, pressure } = getCanvasPoint(e);
     isDrawingRef.current = true;
     startPointRef.current = { x, y };
 
-    // Push previous state for undo
     pushUndoState();
 
-    // Snapshot for shape previews (line, rect, circle, arrow)
     snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') {
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.lineTo(x, y); // Initial point dot
-      applyContextStyle(ctx, e.pressure);
+      ctx.lineTo(x, y);
+      applyContextStyle(ctx, pressure);
       ctx.stroke();
     } else if (tool === 'text') {
-      const text = prompt('Escribe el texto o cota para este punto del croquis:');
+      const text = prompt('Escribe el texto, cota o anotación para este punto:');
       if (text && text.trim()) {
         ctx.font = 'bold 16px sans-serif';
         ctx.fillStyle = color;
         ctx.fillText(text.trim(), x, y);
       }
       isDrawingRef.current = false;
-    }
-  };
-
-  // Context Styling Configuration
-  const applyContextStyle = (ctx: CanvasRenderingContext2D, pressure = 0.5) => {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = strokeWidth * 3.5;
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-      ctx.globalAlpha = 1.0;
-    } else if (tool === 'highlighter') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
-      ctx.lineWidth = Math.max(12, strokeWidth * 2.5);
-      ctx.globalAlpha = 0.35;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
-      // Stylus pressure modulation
-      const effectiveWidth = Math.max(1, strokeWidth * (0.6 + pressure * 0.8));
-      ctx.lineWidth = effectiveWidth;
-      ctx.globalAlpha = 1.0;
     }
   };
 
@@ -332,7 +478,7 @@ export function CroquisModal({
       ctx.beginPath();
       ctx.moveTo(x, y);
     } else {
-      // Shape Preview: Restore snapshot before drawing current preview
+      // Shape Preview: Restore snapshot before drawing preview
       if (snapshotRef.current) {
         ctx.putImageData(snapshotRef.current, 0, 0);
       }
@@ -362,7 +508,7 @@ export function CroquisModal({
     }
   };
 
-  // Pointer Up / Cancel (End of stroke)
+  // Pointer Up / Cancel
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
@@ -372,11 +518,11 @@ export function CroquisModal({
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
-      // Ignore if pointer capture already released
+      // ignore
     }
   };
 
-  // Helper: Draw Arrow with head
+  // Helper: Draw Arrow with arrow head
   const drawArrow = (
     ctx: CanvasRenderingContext2D,
     fromX: number,
@@ -385,7 +531,7 @@ export function CroquisModal({
     toY: number,
     width: number
   ) => {
-    const headLen = Math.max(10, width * 3);
+    const headLen = Math.max(12, width * 3.2);
     const angle = Math.atan2(toY - fromY, toX - fromX);
 
     ctx.beginPath();
@@ -407,8 +553,133 @@ export function CroquisModal({
     ctx.stroke();
   };
 
-  // Generate Composite High-Res Image with Official Construction Technical Header
-  const generateCompositeSketchImage = (): string | null => {
+  // Handling Image / PDF / Camera file selection
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>, isCamera = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLoadingFile(true);
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    try {
+      if (isPdf) {
+        showToast('Procesando archivo PDF...');
+        const result = await renderPdfPageToDataUrl(file, 1);
+        setBgDocument({
+          dataUrl: result.dataUrl,
+          name: file.name,
+          type: 'pdf',
+          page: 1,
+          totalPages: result.totalPages,
+          fileBlob: file,
+          opacity: 0.95
+        });
+        if (sketchTitle === 'Croquis en sitio') {
+          setSketchTitle(`Anotaciones: ${file.name.replace(/\.[^/.]+$/, '')}`);
+        }
+        showToast(`Plano PDF cargado (${result.totalPages} ${result.totalPages === 1 ? 'pág' : 'págs'})`);
+      } else {
+        // Image or Live Camera Photo
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          if (dataUrl) {
+            setBgDocument({
+              dataUrl,
+              name: isCamera ? `Foto de Obra (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : file.name,
+              type: isCamera ? 'camera' : 'image',
+              opacity: 0.95
+            });
+            if (sketchTitle === 'Croquis en sitio') {
+              setSketchTitle(isCamera ? 'Detalle fotográfico en sitio' : `Anotaciones: ${file.name.replace(/\.[^/.]+$/, '')}`);
+            }
+            showToast(isCamera ? 'Foto tomada y lista para dibujar encima' : 'Imagen cargada en el lienzo');
+          }
+          setIsLoadingFile(false);
+        };
+        reader.onerror = () => {
+          setIsLoadingFile(false);
+          showToast('Error al leer la imagen');
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    } catch (err: any) {
+      console.error('Error loading file onto croquis canvas:', err);
+      showToast('No se pudo procesar el archivo');
+    } finally {
+      setIsLoadingFile(false);
+      // Reset input value
+      e.target.value = '';
+    }
+  };
+
+  // Switching page of an existing PDF background document
+  const handlePdfPageChange = async (newPage: number) => {
+    if (!bgDocument || !bgDocument.fileBlob || bgDocument.type !== 'pdf') return;
+    setIsLoadingFile(true);
+    try {
+      const result = await renderPdfPageToDataUrl(bgDocument.fileBlob, newPage);
+      setBgDocument(prev => prev ? {
+        ...prev,
+        dataUrl: result.dataUrl,
+        page: newPage
+      } : null);
+      showToast(`Página ${newPage} de ${result.totalPages} cargada`);
+    } catch (err) {
+      console.error('Error changing PDF page:', err);
+      showToast('Error al cambiar de página');
+    } finally {
+      setIsLoadingFile(false);
+    }
+  };
+
+  // Load an existing blueprint from the unit into the croquis background
+  const handleLoadBlueprintAsBackground = async (bp: BlueprintDocument) => {
+    setIsBlueprintsDropdownOpen(false);
+    setIsLoadingFile(true);
+
+    try {
+      if (bp.type === 'image') {
+        setBgDocument({
+          dataUrl: bp.url,
+          name: bp.name,
+          type: 'image',
+          opacity: 0.95
+        });
+        if (sketchTitle === 'Croquis en sitio') {
+          setSketchTitle(`Sobre plano: ${bp.name}`);
+        }
+        showToast(`Plano "${bp.name}" cargado en el fondo`);
+      } else if (bp.type === 'pdf') {
+        showToast('Cargando plano PDF...');
+        const res = await fetch(bp.url);
+        const blob = await res.blob();
+        const result = await renderPdfPageToDataUrl(blob, 1);
+        setBgDocument({
+          dataUrl: result.dataUrl,
+          name: bp.name,
+          type: 'pdf',
+          page: 1,
+          totalPages: result.totalPages,
+          fileBlob: blob,
+          opacity: 0.95
+        });
+        if (sketchTitle === 'Croquis en sitio') {
+          setSketchTitle(`Sobre plano: ${bp.name}`);
+        }
+        showToast(`Plano PDF "${bp.name}" cargado`);
+      }
+    } catch (err) {
+      console.error('Error loading blueprint as background:', err);
+      showToast('No se pudo cargar el plano');
+    } finally {
+      setIsLoadingFile(false);
+    }
+  };
+
+  // Generate Composite High-Res Image with Official Technical Header & Background Image
+  const generateCompositeSketchImage = async (): Promise<string | null> => {
     const drawingCanvas = canvasRef.current;
     if (!drawingCanvas) return null;
 
@@ -441,7 +712,11 @@ export function CroquisModal({
     // Subheader: Obra & Depto
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 18px sans-serif';
-    ctx.fillText(`OBRA: ${project.name.toUpperCase()}   |   ESPACIO: ${(currentUnit?.name || 'Unidad').toUpperCase()}`, 30, 80);
+    ctx.fillText(
+      `OBRA: ${project.name.toUpperCase()}   |   ESPACIO: ${(currentUnit?.name || 'Unidad').toUpperCase()}`,
+      30,
+      80
+    );
 
     // Date & Reference
     const now = new Date();
@@ -451,48 +726,88 @@ export function CroquisModal({
 
     ctx.fillStyle = '#94a3b8'; // Slate 400
     ctx.font = '15px sans-serif';
-    ctx.fillText(`Fecha: ${timestamp}   |   Ref: ${sketchTitle || 'Relevamiento a mano alzada'}`, 30, 115);
+    const bgInfo = bgDocument ? ` [Base: ${bgDocument.name}${bgDocument.page ? ` Pág ${bgDocument.page}` : ''}]` : '';
+    ctx.fillText(`Fecha: ${timestamp}   |   Ref: ${sketchTitle || 'Relevamiento a mano alzada'}${bgInfo}`, 30, 115);
 
-    // 2. Draw Paper Background in Body
+    // 2. Draw Paper Background or Document Underlay in Body
     const bodyY = headerHeight;
-    if (paperType === 'dark') {
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, bodyY, width, bodyHeight);
-    } else {
+
+    if (bgDocument) {
+      // White container background behind document
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, bodyY, width, bodyHeight);
 
-      if (paperType === 'grid') {
-        // Architectural grid lines
-        ctx.strokeStyle = '#e2e8f0'; // Light slate grid
-        ctx.lineWidth = 1;
-        const gridSize = 30;
-        for (let gx = 0; gx <= width; gx += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(gx, bodyY);
-          ctx.lineTo(gx, bodyY + bodyHeight);
-          ctx.stroke();
-        }
-        for (let gy = bodyY; gy <= bodyY + bodyHeight; gy += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(0, gy);
-          ctx.lineTo(width, gy);
-          ctx.stroke();
-        }
-      } else if (paperType === 'lines') {
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1;
-        const lineSpacing = 35;
-        for (let ly = bodyY + lineSpacing; ly <= bodyY + bodyHeight; ly += lineSpacing) {
-          ctx.beginPath();
-          ctx.moveTo(30, ly);
-          ctx.lineTo(width - 30, ly);
-          ctx.stroke();
+      // Draw the background image fitted preserving aspect ratio
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const imgRatio = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
+          const bodyRatio = width / bodyHeight;
+          let drawW = width;
+          let drawH = bodyHeight;
+          let drawX = 0;
+          let drawY = bodyY;
+
+          if (imgRatio > bodyRatio) {
+            drawW = width;
+            drawH = width / imgRatio;
+            drawY = bodyY + (bodyHeight - drawH) / 2;
+          } else {
+            drawH = bodyHeight;
+            drawW = bodyHeight * imgRatio;
+            drawX = (width - drawW) / 2;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = bgDocument.opacity;
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          ctx.restore();
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = bgDocument.dataUrl;
+      });
+    } else {
+      // Standard paper styling
+      if (paperType === 'dark') {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, bodyY, width, bodyHeight);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, bodyY, width, bodyHeight);
+
+        if (paperType === 'grid') {
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          const gridSize = 30;
+          for (let gx = 0; gx <= width; gx += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(gx, bodyY);
+            ctx.lineTo(gx, bodyY + bodyHeight);
+            ctx.stroke();
+          }
+          for (let gy = bodyY; gy <= bodyY + bodyHeight; gy += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, gy);
+            ctx.lineTo(width, gy);
+            ctx.stroke();
+          }
+        } else if (paperType === 'lines') {
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          const lineSpacing = 35;
+          for (let ly = bodyY + lineSpacing; ly <= bodyY + bodyHeight; ly += lineSpacing) {
+            ctx.beginPath();
+            ctx.moveTo(30, ly);
+            ctx.lineTo(width - 30, ly);
+            ctx.stroke();
+          }
         }
       }
     }
 
-    // 3. Draw the User's Drawing scaled to body
+    // 3. Draw User's Annotations & Hand-Drawn Strokes scaled to body
     ctx.drawImage(drawingCanvas, 0, bodyY, width, bodyHeight);
 
     // 4. Footer Watermark
@@ -511,9 +826,9 @@ export function CroquisModal({
   };
 
   // Save to Department & Supabase Cloud
-  const handleSaveToUnit = () => {
+  const handleSaveToUnit = async () => {
     if (!currentUnit) return;
-    const finalDataUrl = generateCompositeSketchImage();
+    const finalDataUrl = await generateCompositeSketchImage();
     if (!finalDataUrl) {
       showToast('Error al generar la imagen del croquis');
       return;
@@ -540,8 +855,8 @@ export function CroquisModal({
   };
 
   // Download Image
-  const handleDownload = (dataUrl?: string, title?: string) => {
-    const targetUrl = dataUrl || generateCompositeSketchImage();
+  const handleDownload = async (dataUrl?: string, title?: string) => {
+    const targetUrl = dataUrl || (await generateCompositeSketchImage());
     if (!targetUrl) return;
 
     const cleanProject = project.name.replace(/[^a-zA-Z0-9]/g, '_');
@@ -561,7 +876,7 @@ export function CroquisModal({
 
   // Share via WhatsApp (with file on mobile/tablet, web fallback on desktop)
   const handleShareWhatsApp = async (customDataUrl?: string, customTitle?: string) => {
-    const targetUrl = customDataUrl || generateCompositeSketchImage();
+    const targetUrl = customDataUrl || (await generateCompositeSketchImage());
     if (!targetUrl) return;
 
     const unitName = currentUnit?.name || 'Unidad';
@@ -572,7 +887,8 @@ export function CroquisModal({
     const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const timestamp = `${dateStr}, ${timeStr} hs`;
 
-    const messageText = `📐 *CROQUIS TÉCNICO DE OBRA*\n` +
+    const messageText =
+      `📐 *CROQUIS TÉCNICO DE OBRA*\n` +
       `🏢 *Obra:* ${project.name}\n` +
       `🚪 *Departamento / Espacio:* ${unitName}\n` +
       `📅 *Fecha:* ${timestamp}\n` +
@@ -580,7 +896,6 @@ export function CroquisModal({
       `Adjunto registro gráfico a mano alzada realizado en sitio.`;
 
     try {
-      // Check if Web Share API supports file sharing (Android, iOS, iPadOS)
       const res = await fetch(targetUrl);
       const blob = await res.blob();
       const file = new File(
@@ -635,14 +950,43 @@ export function CroquisModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
         className={`bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300 ${
-          isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[92vh] max-h-[900px]'
+          isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[94vh] max-h-[950px]'
         }`}
       >
+        {/* Hidden Camera Input */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => handleFilePicked(e, true)}
+          className="hidden"
+        />
+
+        {/* Hidden File Picker Input (Images or PDFs) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,application/pdf"
+          onChange={(e) => handleFilePicked(e, false)}
+          className="hidden"
+        />
+
         {/* Toast Notification */}
         {toastMessage && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-xl border border-amber-500 flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top-2">
             <Check className="w-4 h-4 text-emerald-400" />
             <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Loading File Overlay */}
+        {isLoadingFile && (
+          <div className="absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-3">
+            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs font-black tracking-wide text-amber-400 uppercase">
+              Cargando documento en el lienzo...
+            </p>
           </div>
         )}
 
@@ -657,7 +1001,7 @@ export function CroquisModal({
                 <h2 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1.5 truncate">
                   <span>CROQUIS DE OBRA</span>
                   <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-black uppercase">
-                    Mano Alzada
+                    Precisión Lápiz
                   </span>
                 </h2>
               </div>
@@ -677,9 +1021,7 @@ export function CroquisModal({
               <button
                 onClick={() => setActiveTab('draw')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
-                  activeTab === 'draw'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                  activeTab === 'draw' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -688,9 +1030,7 @@ export function CroquisModal({
               <button
                 onClick={() => setActiveTab('history')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
-                  activeTab === 'history'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                  activeTab === 'history' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -732,8 +1072,12 @@ export function CroquisModal({
                     onChange={(e) => setSelectedUnitId(e.target.value)}
                     className="bg-transparent text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer pr-1"
                   >
-                    {project.units.map(u => (
-                      <option key={u.id} value={u.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                    {project.units.map((u) => (
+                      <option
+                        key={u.id}
+                        value={u.id}
+                        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                      >
                         {u.name} {u.type === 'common_area' ? '(Común)' : ''}
                       </option>
                     ))}
@@ -750,17 +1094,69 @@ export function CroquisModal({
                 />
               </div>
 
-              {/* Quick reference chips */}
-              <div className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar">
-                {PRESET_REFERENCES.slice(0, 4).map(preset => (
-                  <button
-                    key={preset}
-                    onClick={() => setSketchTitle(preset)}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
-                  >
-                    + {preset}
-                  </button>
-                ))}
+              {/* Import Actions: Camera, File/PDF, Blueprints */}
+              <div className="flex items-center gap-1.5">
+                {/* Take Live Photo Button */}
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 transition-all touch-target shadow-2xs active:scale-95"
+                  title="Tomar foto con la cámara para dibujar anotaciones encima"
+                >
+                  <Camera className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Foto</span>
+                </button>
+
+                {/* Pick Image or PDF Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 transition-all touch-target shadow-2xs active:scale-95"
+                  title="Buscar imagen o plano PDF en los archivos para escribir encima"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Imagen / PDF</span>
+                </button>
+
+                {/* Unit Blueprints Dropdown if unit has plans */}
+                {unitBlueprints.length > 0 && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsBlueprintsDropdownOpen(!isBlueprintsDropdownOpen)}
+                      className="px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-amber-500/30 transition-all touch-target shadow-2xs active:scale-95"
+                      title="Cargar uno de los planos técnicos guardados en esta unidad"
+                    >
+                      <Compass className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Planos ({unitBlueprints.length})</span>
+                    </button>
+
+                    {isBlueprintsDropdownOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-1 z-30 animate-in fade-in slide-in-from-top-2">
+                        <div className="px-2.5 py-1.5 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                          Planos de {currentUnit?.name}:
+                        </div>
+                        <div className="max-h-48 overflow-y-auto py-1">
+                          {unitBlueprints.map((bp) => (
+                            <button
+                              key={bp.id}
+                              type="button"
+                              onClick={() => handleLoadBlueprintAsBackground(bp)}
+                              className="w-full text-left px-2.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between gap-1.5 transition-colors"
+                            >
+                              <div className="truncate">
+                                <p className="truncate">{bp.name}</p>
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-black">
+                                  {bp.category} • {bp.type.toUpperCase()}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -880,7 +1276,7 @@ export function CroquisModal({
 
               {/* Stroke Width Selector */}
               <div className="flex items-center gap-1 border-l border-r border-slate-200 dark:border-slate-800 px-2">
-                {STROKE_WIDTHS.map(sw => (
+                {STROKE_WIDTHS.map((sw) => (
                   <button
                     key={sw.value}
                     onClick={() => setStrokeWidth(sw.value)}
@@ -893,7 +1289,10 @@ export function CroquisModal({
                   >
                     <div
                       className="rounded-full bg-current"
-                      style={{ width: `${Math.min(12, sw.value * 1.5 + 2)}px`, height: `${Math.min(12, sw.value * 1.5 + 2)}px` }}
+                      style={{
+                        width: `${Math.min(12, sw.value * 1.5 + 2)}px`,
+                        height: `${Math.min(12, sw.value * 1.5 + 2)}px`
+                      }}
                     />
                   </button>
                 ))}
@@ -901,7 +1300,7 @@ export function CroquisModal({
 
               {/* Color Palette */}
               <div className="flex items-center gap-1">
-                {COLOR_PALETTE.map(c => (
+                {COLOR_PALETTE.map((c) => (
                   <button
                     key={c.value}
                     onClick={() => {
@@ -930,34 +1329,36 @@ export function CroquisModal({
                 />
               </div>
 
-              {/* Paper Background Selector */}
-              <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
-                <button
-                  type="button"
-                  onClick={() => setPaperType('white')}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                    paperType === 'white'
-                      ? 'bg-amber-500 text-slate-950 border-amber-500'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                  }`}
-                  title="Hoja Blanca lisa"
-                >
-                  Blanco
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaperType('grid')}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors flex items-center gap-1 ${
-                    paperType === 'grid'
-                      ? 'bg-amber-500 text-slate-950 border-amber-500'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                  }`}
-                  title="Hoja Cuadriculada / Milimetrada (ideal arquitectura)"
-                >
-                  <Grid className="w-3 h-3" />
-                  <span className="hidden sm:inline">Cuadrícula</span>
-                </button>
-              </div>
+              {/* Paper Background Selector (when no document is loaded) */}
+              {!bgDocument && (
+                <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaperType('white')}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                      paperType === 'white'
+                        ? 'bg-amber-500 text-slate-950 border-amber-500'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                    }`}
+                    title="Hoja Blanca lisa"
+                  >
+                    Blanco
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaperType('grid')}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors flex items-center gap-1 ${
+                      paperType === 'grid'
+                        ? 'bg-amber-500 text-slate-950 border-amber-500'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                    }`}
+                    title="Hoja Cuadriculada / Milimetrada (ideal arquitectura)"
+                  >
+                    <Grid className="w-3 h-3" />
+                    <span className="hidden sm:inline">Cuadrícula</span>
+                  </button>
+                </div>
+              )}
 
               {/* Undo / Redo & Clear */}
               <div className="flex items-center gap-1 ml-auto">
@@ -990,12 +1391,15 @@ export function CroquisModal({
               </div>
             </div>
 
-            {/* Drawing Canvas Area */}
+            {/* Drawing Canvas Area with Absolute High-Precision Container */}
             <div className="flex-1 p-2 sm:p-4 flex items-center justify-center overflow-hidden min-h-0 relative">
               {/* Paper Container */}
               <div
+                ref={containerRef}
                 className={`w-full h-full rounded-2xl shadow-inner border border-slate-300 dark:border-slate-800 relative overflow-hidden flex items-center justify-center touch-none ${
-                  paperType === 'dark'
+                  bgDocument
+                    ? 'bg-slate-100 dark:bg-slate-950'
+                    : paperType === 'dark'
                     ? 'bg-slate-900'
                     : paperType === 'grid'
                     ? 'bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]'
@@ -1005,17 +1409,98 @@ export function CroquisModal({
                 }`}
               >
                 {/* Visual Stamp Indicator on Sheet */}
-                <div className="absolute top-2 left-3 pointer-events-none opacity-40 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <div className="absolute top-2 left-3 pointer-events-none opacity-40 text-[10px] font-black uppercase tracking-wider text-slate-500 z-10">
                   {project.name} • {currentUnit?.name || 'Unidad'}
                 </div>
 
+                {/* Underlay Image / Photo / PDF Page */}
+                {bgDocument && (
+                  <img
+                    src={bgDocument.dataUrl}
+                    alt={bgDocument.name}
+                    style={{ opacity: bgDocument.opacity }}
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                  />
+                )}
+
+                {/* Floating Controls Bar for Loaded Document */}
+                {bgDocument && (
+                  <div className="absolute top-2 left-2 right-2 z-20 bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-500/40 flex items-center justify-between gap-2 shadow-lg text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                      <span className="font-bold truncate text-slate-200">
+                        Fondo: <span className="text-amber-400">{bgDocument.name}</span>
+                      </span>
+
+                      {/* PDF Multi-page navigation */}
+                      {bgDocument.totalPages && bgDocument.totalPages > 1 && (
+                        <div className="flex items-center gap-1.5 bg-slate-800 px-2 py-0.5 rounded-lg text-[11px] font-bold border border-slate-700 ml-1">
+                          <button
+                            type="button"
+                            disabled={bgDocument.page! <= 1}
+                            onClick={() => handlePdfPageChange(bgDocument.page! - 1)}
+                            className="p-0.5 hover:text-amber-400 disabled:opacity-30 touch-target"
+                            title="Página anterior"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span>
+                            Pág {bgDocument.page} / {bgDocument.totalPages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={bgDocument.page! >= bgDocument.totalPages!}
+                            onClick={() => handlePdfPageChange(bgDocument.page! + 1)}
+                            className="p-0.5 hover:text-amber-400 disabled:opacity-30 touch-target"
+                            title="Página siguiente"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Opacity slider */}
+                      <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400">
+                        <Sliders className="w-3 h-3 text-amber-400" />
+                        <span>Opacidad:</span>
+                        <input
+                          type="range"
+                          min="0.2"
+                          max="1"
+                          step="0.1"
+                          value={bgDocument.opacity}
+                          onChange={(e) =>
+                            setBgDocument((prev) =>
+                              prev ? { ...prev, opacity: parseFloat(e.target.value) } : null
+                            )
+                          }
+                          className="w-16 accent-amber-500 cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Remove Background Button */}
+                      <button
+                        type="button"
+                        onClick={() => setBgDocument(null)}
+                        className="px-2 py-0.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-colors touch-target"
+                        title="Quitar documento de fondo y volver al lienzo limpio"
+                      >
+                        Quitar fondo
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* The Precision Transparent Drawing Canvas Layer */}
                 <canvas
                   ref={canvasRef}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
                   onPointerCancel={handlePointerUp}
-                  className="w-full h-full cursor-crosshair touch-none select-none block"
+                  className="cursor-crosshair touch-none select-none block relative z-10"
                   style={{ touchAction: 'none' }}
                 />
               </div>
@@ -1024,7 +1509,14 @@ export function CroquisModal({
             {/* Bottom Action Footer */}
             <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-                <span>Dibujo a mano alzada optimizado para lápiz óptico / S-Pen / touch</span>
+                {bgDocument ? (
+                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Dibujando sobre: {bgDocument.name}
+                  </span>
+                ) : (
+                  <span>Dibujo a mano alzada calibrado al 100% para S-Pen / Apple Pencil</span>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -1099,7 +1591,7 @@ export function CroquisModal({
                   No hay croquis guardados en {currentUnit?.name || 'esta unidad'}
                 </h4>
                 <p className="text-xs text-slate-500 max-w-sm mt-1 mb-4">
-                  Abre la pestaña de lienzo para hacer un dibujo a mano alzada con tu tablet y guárdalo aquí.
+                  Abre la pestaña de lienzo para hacer un dibujo a mano alzada o escribir sobre una foto o plano PDF y guárdalo aquí.
                 </p>
                 <button
                   onClick={() => setActiveTab('draw')}
@@ -1110,7 +1602,7 @@ export function CroquisModal({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {unitSketches.map(sketch => (
+                {unitSketches.map((sketch) => (
                   <div
                     key={sketch.id}
                     className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col"
