@@ -41,7 +41,11 @@ export function Header({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoClick = () => {
-    fileInputRef.current?.click();
+    if (onOpenLogoEditor) {
+      onOpenLogoEditor();
+    } else {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -40,11 +40,12 @@ import { Project, Unit, SketchDocument, BlueprintDocument } from '../types';
 
 interface CroquisModalProps {
   isOpen: boolean;
-  project: Project;
+  projects: Project[];
+  initialProjectId?: string;
   initialUnitId?: string;
   onClose: () => void;
-  onSaveSketch: (unitId: string, sketch: SketchDocument) => void;
-  onDeleteSketch?: (unitId: string, sketchId: string) => void;
+  onSaveSketch: (projectId: string, unitId: string, sketch: SketchDocument) => void;
+  onDeleteSketch?: (projectId: string, unitId: string, sketchId: string) => void;
 }
 
 type ToolType = 'pen' | 'highlighter' | 'line' | 'arrow' | 'rect' | 'circle' | 'text' | 'eraser';
@@ -152,18 +153,33 @@ async function renderPdfPageToDataUrl(
 
 export function CroquisModal({
   isOpen,
-  project,
+  projects,
+  initialProjectId,
   initialUnitId,
   onClose,
   onSaveSketch,
   onDeleteSketch
 }: CroquisModalProps) {
+  // Active selected project
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
+    if (initialProjectId && projects.some(p => p.id === initialProjectId)) {
+      return initialProjectId;
+    }
+    return projects.length > 0 ? projects[0].id : '';
+  });
+
+  const activeProject = projects.find(p => p.id === selectedProjectId) || projects[0];
+
   // Active selected unit
   const [selectedUnitId, setSelectedUnitId] = useState<string>(() => {
-    if (initialUnitId && project.units.some(u => u.id === initialUnitId)) {
-      return initialUnitId;
+    const proj = (initialProjectId && projects.find(p => p.id === initialProjectId)) || projects[0];
+    if (proj) {
+      if (initialUnitId && proj.units.some(u => u.id === initialUnitId)) {
+        return initialUnitId;
+      }
+      return proj.units.length > 0 ? proj.units[0].id : '';
     }
-    return project.units.length > 0 ? project.units[0].id : '';
+    return '';
   });
 
   const [activeTab, setActiveTab] = useState<'draw' | 'history'>('draw');
@@ -198,7 +214,7 @@ export function CroquisModal({
   const [canRedo, setCanRedo] = useState(false);
 
   // Current Unit Object
-  const currentUnit = project.units.find(u => u.id === selectedUnitId) || project.units[0];
+  const currentUnit = activeProject?.units.find(u => u.id === selectedUnitId) || activeProject?.units[0];
   const unitSketches = currentUnit?.sketches || [];
   const unitBlueprints = currentUnit?.blueprints || [];
 
@@ -207,16 +223,38 @@ export function CroquisModal({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Sync initialUnitId when prop changes or modal opens
+  // Sync initialProjectId & initialUnitId when prop changes or modal opens
   useEffect(() => {
     if (isOpen) {
-      if (initialUnitId && project.units.some(u => u.id === initialUnitId)) {
-        setSelectedUnitId(initialUnitId);
-      } else if (project.units.length > 0 && !selectedUnitId) {
-        setSelectedUnitId(project.units[0].id);
+      let targetProjId = selectedProjectId;
+      if (initialProjectId && projects.some(p => p.id === initialProjectId)) {
+        targetProjId = initialProjectId;
+        setSelectedProjectId(initialProjectId);
+      } else if (!targetProjId || !projects.some(p => p.id === targetProjId)) {
+        targetProjId = projects[0]?.id || '';
+        setSelectedProjectId(targetProjId);
+      }
+
+      const targetProj = projects.find(p => p.id === targetProjId);
+      if (targetProj) {
+        if (initialUnitId && targetProj.units.some(u => u.id === initialUnitId)) {
+          setSelectedUnitId(initialUnitId);
+        } else if (targetProj.units.length > 0 && (!selectedUnitId || !targetProj.units.some(u => u.id === selectedUnitId))) {
+          setSelectedUnitId(targetProj.units[0].id);
+        }
       }
     }
-  }, [isOpen, initialUnitId, project.units]);
+  }, [isOpen, initialProjectId, initialUnitId, projects]);
+
+  const handleSelectProject = (newProjId: string) => {
+    setSelectedProjectId(newProjId);
+    const proj = projects.find(p => p.id === newProjId);
+    if (proj && proj.units.length > 0) {
+      setSelectedUnitId(proj.units[0].id);
+    } else {
+      setSelectedUnitId('');
+    }
+  };
 
   // Update history availability flags
   const updateHistoryState = () => {
@@ -713,7 +751,7 @@ export function CroquisModal({
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 18px sans-serif';
     ctx.fillText(
-      `OBRA: ${project.name.toUpperCase()}   |   ESPACIO: ${(currentUnit?.name || 'Unidad').toUpperCase()}`,
+      `OBRA: ${(activeProject?.name || 'Obra').toUpperCase()}   |   ESPACIO: ${(currentUnit?.name || 'Unidad').toUpperCase()}`,
       30,
       80
     );
@@ -827,7 +865,10 @@ export function CroquisModal({
 
   // Save to Department & Supabase Cloud
   const handleSaveToUnit = async () => {
-    if (!currentUnit) return;
+    if (!currentUnit || !activeProject) {
+      showToast('Selecciona un proyecto y departamento válido');
+      return;
+    }
     const finalDataUrl = await generateCompositeSketchImage();
     if (!finalDataUrl) {
       showToast('Error al generar la imagen del croquis');
@@ -846,12 +887,12 @@ export function CroquisModal({
       createdAt: timestamp,
       unitId: currentUnit.id,
       unitName: currentUnit.name,
-      projectId: project.id,
-      projectName: project.name
+      projectId: activeProject.id,
+      projectName: activeProject.name
     };
 
-    onSaveSketch(currentUnit.id, newSketch);
-    showToast(`Croquis guardado en ${currentUnit.name} y en la Nube ✔`);
+    onSaveSketch(activeProject.id, currentUnit.id, newSketch);
+    showToast(`Croquis guardado en ${currentUnit.name} (${activeProject.name}) y en la Nube ✔`);
   };
 
   // Download Image
@@ -859,7 +900,8 @@ export function CroquisModal({
     const targetUrl = dataUrl || (await generateCompositeSketchImage());
     if (!targetUrl) return;
 
-    const cleanProject = project.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const projectName = activeProject?.name || 'Obra';
+    const cleanProject = projectName.replace(/[^a-zA-Z0-9]/g, '_');
     const cleanUnit = (currentUnit?.name || 'Unidad').replace(/[^a-zA-Z0-9]/g, '_');
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `Croquis_${cleanProject}_${cleanUnit}_${dateStr}.png`;
@@ -879,6 +921,7 @@ export function CroquisModal({
     const targetUrl = customDataUrl || (await generateCompositeSketchImage());
     if (!targetUrl) return;
 
+    const projectName = activeProject?.name || 'Obra';
     const unitName = currentUnit?.name || 'Unidad';
     const titleToShare = customTitle || sketchTitle || 'Relevamiento en terreno';
 
@@ -889,7 +932,7 @@ export function CroquisModal({
 
     const messageText =
       `📐 *CROQUIS TÉCNICO DE OBRA*\n` +
-      `🏢 *Obra:* ${project.name}\n` +
+      `🏢 *Obra:* ${projectName}\n` +
       `🚪 *Departamento / Espacio:* ${unitName}\n` +
       `📅 *Fecha:* ${timestamp}\n` +
       `📝 *Referencia:* ${titleToShare}\n\n` +
@@ -900,14 +943,14 @@ export function CroquisModal({
       const blob = await res.blob();
       const file = new File(
         [blob],
-        `Croquis_${project.name.replace(/\s+/g, '_')}_${unitName.replace(/\s+/g, '_')}.png`,
+        `Croquis_${projectName.replace(/\s+/g, '_')}_${unitName.replace(/\s+/g, '_')}.png`,
         { type: 'image/png' }
       );
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Croquis ${unitName} - ${project.name}`,
+          title: `Croquis ${unitName} - ${projectName}`,
           text: messageText
         });
         showToast('Compartido con éxito');
@@ -1007,7 +1050,7 @@ export function CroquisModal({
               </div>
               <p className="text-xs text-amber-400/90 font-bold truncate flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{project.name}</span>
+                <span>{activeProject?.name || 'Obra'}</span>
                 <span className="text-slate-500">•</span>
                 <DoorOpen className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{currentUnit?.name || 'Unidad'}</span>
@@ -1061,18 +1104,40 @@ export function CroquisModal({
         {/* Tab 1: Drawing Canvas & Tools */}
         {activeTab === 'draw' && (
           <div className="flex-1 flex flex-col min-h-0 bg-slate-100 dark:bg-slate-950">
-            {/* Top Config: Unit Selector & Title */}
+            {/* Top Config: Obra & Depto Selector + Title */}
             <div className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2 flex-1 min-w-[260px]">
-                {/* Unit Selector */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <DoorOpen className="w-3.5 h-3.5 text-amber-500" />
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                {/* Obra / Proyecto Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+                  <Building2 className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Obra:</span>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => handleSelectProject(e.target.value)}
+                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
+                  >
+                    {projects.map((p) => (
+                      <option
+                        key={p.id}
+                        value={p.id}
+                        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                      >
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Depto / Espacio Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+                  <DoorOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Depto:</span>
                   <select
                     value={selectedUnitId}
                     onChange={(e) => setSelectedUnitId(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer pr-1"
+                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
                   >
-                    {project.units.map((u) => (
+                    {(activeProject?.units || []).map((u) => (
                       <option
                         key={u.id}
                         value={u.id}
@@ -1090,7 +1155,7 @@ export function CroquisModal({
                   value={sketchTitle}
                   onChange={(e) => setSketchTitle(e.target.value)}
                   placeholder="Referencia del croquis (ej: Instalación sanitaria baño)"
-                  className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
               </div>
 
@@ -1410,7 +1475,7 @@ export function CroquisModal({
               >
                 {/* Visual Stamp Indicator on Sheet */}
                 <div className="absolute top-2 left-3 pointer-events-none opacity-40 text-[10px] font-black uppercase tracking-wider text-slate-500 z-10">
-                  {project.name} • {currentUnit?.name || 'Unidad'}
+                  {activeProject?.name || 'Obra'} • {currentUnit?.name || 'Unidad'}
                 </div>
 
                 {/* Underlay Image / Photo / PDF Page */}
@@ -1559,27 +1624,57 @@ export function CroquisModal({
 
         {/* Tab 2: Department Sketches History */}
         {activeTab === 'history' && (
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 p-4 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Croquis Guardados en {currentUnit?.name || 'este departamento'}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-black">
-                    {unitSketches.length}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Registro gráfico histórico del departamento guardado en la nube.
-                </p>
+          <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 overflow-y-auto">
+            {/* Obra & Depto Filter Bar for History */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Obra Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Obra:</span>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => handleSelectProject(e.target.value)}
+                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[140px] sm:max-w-[190px] truncate"
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Depto Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <DoorOpen className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Depto:</span>
+                  <select
+                    value={selectedUnitId}
+                    onChange={(e) => setSelectedUnitId(e.target.value)}
+                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
+                  >
+                    {(activeProject?.units || []).map((u) => (
+                      <option key={u.id} value={u.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                        {u.name} {u.type === 'common_area' ? '(Común)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <button
-                onClick={() => setActiveTab('draw')}
-                className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 touch-target shadow-xs"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span>Nuevo Croquis</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-black">
+                  {unitSketches.length} {unitSketches.length === 1 ? 'croquis guardado' : 'croquis guardados'}
+                </span>
+                <button
+                  onClick={() => setActiveTab('draw')}
+                  className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 touch-target shadow-xs hover:bg-amber-400 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Nuevo Croquis</span>
+                </button>
+              </div>
             </div>
 
             {unitSketches.length === 0 ? (
@@ -1588,7 +1683,7 @@ export function CroquisModal({
                   <PenTool className="w-7 h-7" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  No hay croquis guardados en {currentUnit?.name || 'esta unidad'}
+                  No hay croquis guardados en {currentUnit?.name || 'esta unidad'} ({activeProject?.name})
                 </h4>
                 <p className="text-xs text-slate-500 max-w-sm mt-1 mb-4">
                   Abre la pestaña de lienzo para hacer un dibujo a mano alzada o escribir sobre una foto o plano PDF y guárdalo aquí.
@@ -1628,7 +1723,7 @@ export function CroquisModal({
                           {sketch.title}
                         </h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {sketch.unitName || currentUnit?.name} • {sketch.projectName || project.name}
+                          {sketch.unitName || currentUnit?.name} • {sketch.projectName || activeProject?.name || 'Obra'}
                         </p>
                       </div>
 
@@ -1667,10 +1762,10 @@ export function CroquisModal({
                         </div>
 
                         {/* Delete button */}
-                        {onDeleteSketch && (
+                        {onDeleteSketch && activeProject && currentUnit && (
                           <button
                             type="button"
-                            onClick={() => onDeleteSketch(currentUnit.id, sketch.id)}
+                            onClick={() => onDeleteSketch(activeProject.id, currentUnit.id, sketch.id)}
                             className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors touch-target"
                             title="Eliminar croquis"
                           >

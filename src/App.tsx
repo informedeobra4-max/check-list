@@ -1172,12 +1172,11 @@ export default function App() {
   };
 
   // Save Croquis sketch to unit and sync to Supabase Cloud
-  const handleSaveSketch = (unitId: string, sketch: SketchDocument) => {
-    if (!selectedProjectId) return;
+  const handleSaveSketch = (projectId: string, unitId: string, sketch: SketchDocument) => {
     let updatedProjectsList: Project[] = [];
     setProjects(prev => {
       const updated = prev.map(proj => {
-        if (proj.id !== selectedProjectId) return proj;
+        if (proj.id !== projectId) return proj;
         return {
           ...proj,
           units: proj.units.map(u => {
@@ -1196,18 +1195,17 @@ export default function App() {
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
-      showToast(`Croquis guardado en ${sketch.unitName || 'la unidad'} y en la Nube`, 'Check');
+      showToast(`Croquis guardado en ${sketch.unitName || 'la unidad'} (${sketch.projectName || 'Obra'}) y en la Nube`, 'Check');
     });
   };
 
   // Delete Croquis sketch from unit and sync to Supabase Cloud
-  const handleDeleteSketch = (unitId: string, sketchId: string) => {
+  const handleDeleteSketch = (projectId: string, unitId: string, sketchId: string) => {
     if (!confirm('¿Eliminar este croquis del registro de la unidad?')) return;
-    if (!selectedProjectId) return;
     let updatedProjectsList: Project[] = [];
     setProjects(prev => {
       const updated = prev.map(proj => {
-        if (proj.id !== selectedProjectId) return proj;
+        if (proj.id !== projectId) return proj;
         return {
           ...proj,
           units: proj.units.map(u => {
@@ -1610,36 +1608,27 @@ export default function App() {
           <span>Unidades</span>
         </button>
 
+        {/* CROQUIS BUTTON (Permanente en barra de navegación inferior) */}
         <button
           onClick={() => {
-            setLogoEditorTarget('header');
-            setIsLogoEditorOpen(true);
+            setCroquisModalTargetUnitId(selectedUnitId || undefined);
+            setIsCroquisModalOpen(true);
           }}
-          className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-700 font-bold text-[11px] touch-target"
+          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target group relative transition-colors ${
+            isCroquisModalOpen
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+          title="Abrir hoja de croquis a mano alzada para este u otro depto"
         >
-          <ImageIcon className="w-5 h-5 mb-0.5" />
-          <span>Logos</span>
+          <div className="relative">
+            <PenTool className="w-5 h-5 mb-0.5 text-amber-500 group-hover:scale-110 transition-transform" />
+            <span className="absolute -top-1 -right-1.5 px-1 bg-amber-500 text-slate-950 text-[9px] font-black rounded-full leading-tight">
+              ✍️
+            </span>
+          </div>
+          <span className="text-amber-600 dark:text-amber-400 font-black">Croquis</span>
         </button>
-
-        {/* CROQUIS BUTTON (Visible when inside a project, as requested) */}
-        {selectedProjectId && (
-          <button
-            onClick={() => {
-              setCroquisModalTargetUnitId(selectedUnitId || undefined);
-              setIsCroquisModalOpen(true);
-            }}
-            className="flex flex-col items-center justify-center font-bold text-[11px] touch-target text-amber-600 dark:text-amber-400 hover:text-amber-500 group relative"
-            title="Abrir hoja de croquis a mano alzada para este depto"
-          >
-            <div className="relative">
-              <PenTool className="w-5 h-5 mb-0.5 text-amber-500 group-hover:scale-110 transition-transform" />
-              <span className="absolute -top-1 -right-1.5 px-1 bg-amber-500 text-slate-950 text-[9px] font-black rounded-full leading-tight">
-                ✍️
-              </span>
-            </div>
-            <span className="text-amber-600 dark:text-amber-400 font-black">CROQUIS</span>
-          </button>
-        )}
 
         <button
           onClick={() => handleOpenReportModal('auto')}
@@ -1763,11 +1752,12 @@ export default function App() {
         />
       )}
 
-      {isCroquisModalOpen && selectedProject && (
+      {isCroquisModalOpen && projects.length > 0 && (
         <CroquisModal
           isOpen={isCroquisModalOpen}
-          project={selectedProject}
-          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject.units.length > 0 ? selectedProject.units[0].id : undefined)}
+          projects={projects}
+          initialProjectId={selectedProjectId || projects[0]?.id}
+          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject?.units[0]?.id ?? projects[0]?.units[0]?.id)}
           onClose={() => setIsCroquisModalOpen(false)}
           onSaveSketch={handleSaveSketch}
           onDeleteSketch={handleDeleteSketch}
