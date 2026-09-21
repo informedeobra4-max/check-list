@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Layers,
   DoorOpen,
@@ -8,6 +8,8 @@ import {
   Circle,
   FileText,
   ArrowRight,
+  ArrowLeft,
+  ChevronRight,
   Wrench,
   BrickWall,
   Pipette,
@@ -25,7 +27,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
-import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
@@ -77,6 +79,13 @@ export function UnitsView({
   const [newTradeNameDraft, setNewTradeNameDraft] = useState<string>('');
   const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
   const [cardHoverTrigger, setCardHoverTrigger] = useState(0);
+  const [selectedFloorKey, setSelectedFloorKey] = useState<string | null>(null);
+  const [activeFloorCardKey, setActiveFloorCardKey] = useState<string | null>(null);
+
+  // Reset selected floor whenever project changes
+  useEffect(() => {
+    setSelectedFloorKey(null);
+  }, [project.id]);
 
   const overallProgress = calculateProjectProgress(project, tradeFilter);
 
@@ -109,8 +118,71 @@ export function UnitsView({
   const countAll = project.units.length;
   const totalProjectSketches = project.units.reduce((sum, u) => sum + (u.sketches?.length || 0), 0);
 
+  // Group all units of the project by floor
+  const floorGroups = useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      floorNumber: number;
+      label: string;
+      isCommon: boolean;
+      units: Unit[];
+    }>();
+
+    project.units.forEach(unit => {
+      const { floorNumber, label, isCommon } = parseUnitFloor(unit);
+      const key = isCommon ? 'comunes' : `piso_${floorNumber}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          floorNumber,
+          label,
+          isCommon,
+          units: []
+        });
+      }
+      map.get(key)!.units.push(unit);
+    });
+
+    const groups = Array.from(map.values()).map(grp => {
+      let completedUnits = 0;
+      let inProgressUnits = 0;
+      let pendingUnits = 0;
+      let totalPctSum = 0;
+
+      grp.units.forEach(u => {
+        const p = calculateUnitProgress(u, tradeFilter);
+        totalPctSum += p;
+        if (p >= 100) completedUnits++;
+        else if (p > 0) inProgressUnits++;
+        else pendingUnits++;
+      });
+
+      const totalUnits = grp.units.length;
+      const progress = totalUnits > 0 ? Math.round(totalPctSum / totalUnits) : 0;
+
+      return {
+        ...grp,
+        totalUnits,
+        completedUnits,
+        inProgressUnits,
+        pendingUnits,
+        progress
+      };
+    });
+
+    // Sort floors: PB (0), Piso 1 (1), Piso 2 (2), ... then Espacios Comunes (9999)
+    groups.sort((a, b) => a.floorNumber - b.floorNumber);
+    return groups;
+  }, [project.units, tradeFilter]);
+
+  const activeFloorGroup = floorGroups.find(f => f.key === selectedFloorKey);
+  const baseUnitsForDisplay = activeFloorGroup && selectedFloorKey !== 'all_units'
+    ? activeFloorGroup.units
+    : project.units;
+
   // Filter units matching active type filter (solapa: 'all' | 'unit' | 'common_area')
-  const unitsMatchingType = project.units.filter(unit => {
+  const unitsMatchingType = baseUnitsForDisplay.filter(unit => {
     const isCommon = isUnitCommonArea(unit);
     if (typeFilter === 'unit') return !isCommon;
     if (typeFilter === 'common_area') return isCommon;
@@ -478,329 +550,542 @@ export function UnitsView({
         )}
       </div>
 
-      {/* Section Header & New Space Button */}
-      <div className="flex items-center justify-between pt-1 select-none">
-        <div>
-          <h3 className="text-base font-black text-white tracking-tight flex items-center gap-2">
-            <DoorOpen className="w-4 h-4 text-[#00c2fe]" />
-            Departamentos y Espacios
-          </h3>
-          <p className="text-xs text-slate-400">
-            {tradeFilter === 'all'
-              ? `Toca cualquier espacio para abrir su checklist técnico (${tabTotalCount} ${typeFilter === 'unit' ? 'deptos' : typeFilter === 'common_area' ? 'comunes' : 'espacios'})`
-              : `Mostrando avance de ${activeTrade?.name} en ${tabTotalCount} espacios`}
-          </p>
-        </div>
+      {/* SECTION 1: FLOOR CARDS (When no floor is selected) */}
+      {selectedFloorKey === null ? (
+        <div className="space-y-3 pt-1">
+          {/* Section Header */}
+          <div className="flex items-center justify-between select-none">
+            <div>
+              <h3 className="text-base font-black text-white tracking-tight flex items-center gap-2">
+                <Layers className="w-4 h-4 text-[#00c2fe]" />
+                Pisos de la Obra
+              </h3>
+              <p className="text-xs text-slate-400">
+                Selecciona un piso para ver sus departamentos ({floorGroups.filter(f => !f.isCommon).length} pisos • {countDeptos} deptos)
+              </p>
+            </div>
 
-        <button
-          onClick={onOpenNewUnitModal}
-          className="bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 touch-target transition-all"
-        >
-          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-          <span>+ Agregar Espacio</span>
-        </button>
-      </div>
-
-      {/* Space Category Filter Tabs (Todos / Deptos / Espacios Comunes) */}
-      <div className="flex items-center gap-1.5 bg-[#151f33]/90 border border-slate-700/80 p-1.5 rounded-2xl text-xs transition-colors select-none">
-        <button
-          onClick={() => setTypeFilter('all')}
-          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center ${
-            typeFilter === 'all'
-              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
-              : 'text-slate-300 hover:text-white'
-          }`}
-        >
-          Todos ({countAll})
-        </button>
-        <button
-          onClick={() => setTypeFilter('unit')}
-          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
-            typeFilter === 'unit'
-              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
-              : 'text-slate-300 hover:text-white'
-          }`}
-        >
-          <DoorOpen className="w-3.5 h-3.5" />
-          <span>Deptos ({countDeptos})</span>
-        </button>
-        <button
-          onClick={() => setTypeFilter('common_area')}
-          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
-            typeFilter === 'common_area'
-              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
-              : 'text-slate-300 hover:text-white'
-          }`}
-        >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>Comunes ({countCommon})</span>
-        </button>
-      </div>
-
-      {/* Status Filter Chips - Exact Capsule Pills Matching Dashboard */}
-      <div className="flex items-center space-x-2 sm:space-x-2.5 overflow-x-auto no-scrollbar py-1 text-xs select-none">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-            statusFilter === 'all'
-              ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
-              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
-          }`}
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>All</span>
-          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-            {tabTotalCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('completed')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-            statusFilter === 'completed'
-              ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.45)]'
-              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
-          }`}
-        >
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Completed</span>
-          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-            {tabCompletedCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('in_progress')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-            statusFilter === 'in_progress'
-              ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.45)]'
-              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
-          }`}
-        >
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span>In-Process</span>
-          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-            {tabInProgressCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter('pending')}
-          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
-            statusFilter === 'pending'
-              ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.45)]'
-              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-          <span>Pending</span>
-          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
-            {tabPendingCount}
-          </span>
-        </button>
-      </div>
-
-      {/* Units Grid - Responsive with Interactive Neon Line on Cursor / Touch */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
-        {filteredUnits.length === 0 ? (
-          <div className="col-span-full text-center py-12 bg-[#131b2c]/80 rounded-3xl border border-dashed border-slate-800 p-4">
-            <DoorOpen className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-sm font-bold text-white">Sin unidades con este criterio</p>
-            <p className="text-xs text-slate-400 mt-0.5">Prueba cambiando el filtro de estado o espacio arriba.</p>
-            <button
-              onClick={() => {
-                setStatusFilter('all');
-                setTypeFilter('all');
-              }}
-              className="mt-3 px-4 py-2 bg-[#00c2ff] text-slate-950 font-bold rounded-xl text-xs hover:brightness-110 transition-all active:scale-95"
-            >
-              Ver Todas las Unidades
-            </button>
-          </div>
-        ) : (
-          filteredUnits.map(({ unit, progress }) => {
-            const counts = getUnitItemCounts(unit, tradeFilter);
-            const isComplete = progress === 100;
-            const isCommonArea = isUnitCommonArea(unit);
-            const isUnitActive = activeUnitId === unit.id;
-
-            return (
-              <div
-                key={unit.id}
-                onMouseEnter={() => setActiveUnitId(unit.id)}
-                onTouchStart={() => setActiveUnitId(unit.id)}
-                onClick={() => {
-                  setActiveUnitId(unit.id);
-                  onSelectUnit(unit.id);
-                }}
-                className={`rounded-2xl p-4 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between touch-target group ${
-                  isUnitActive
-                    ? 'border-2 border-[#00f2fe] shadow-[0_0_28px_rgba(0,242,254,0.38)] bg-[#162238] scale-[1.02]'
-                    : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
-                } text-white`}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedFloorKey('all_units')}
+                className="px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all touch-target"
+                title="Ver todos los departamentos juntos"
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 ${
-                      isComplete
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : isCommonArea
-                        ? 'bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30'
-                        : 'bg-slate-800 text-[#00f2fe] border border-slate-700'
-                    }`}>
-                      {isComplete ? (
-                        <CircleCheck className="w-4 h-4 text-emerald-400" />
-                      ) : isCommonArea ? (
-                        <Building2 className="w-4 h-4 text-[#00f2fe]" />
-                      ) : (
-                        <DoorOpen className="w-4 h-4 text-[#00f2fe]" />
-                      )}
-                    </span>
+                Ver Todos ({countAll})
+              </button>
 
-                    {/* Animated Circular Progress on Unit Card */}
-                    <AnimatedCircularProgress
-                      percentage={progress}
-                      size={46}
-                      strokeWidth={4.5}
-                      color={isUnitActive ? '#00f2fe' : isComplete ? '#10B981' : '#00f2fe'}
-                    />
-                  </div>
+              <button
+                onClick={onOpenNewUnitModal}
+                className="bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 touch-target transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+ Agregar Espacio</span>
+              </button>
+            </div>
+          </div>
 
-                  {/* Type & Status Badges */}
-                  <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30">
-                      {isCommonArea ? 'Común' : 'Depto'}
-                    </span>
-                    {unit.floorLabel && (
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 truncate max-w-[90px]">
-                        {unit.floorLabel}
-                      </span>
-                    )}
-                    {unit.signature && (
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                        ✔ Firmado
-                      </span>
-                    )}
-                    {unit.isLocked && (
-                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40">
-                        🔒 Bloqueado
-                      </span>
-                    )}
-                  </div>
+          {/* Grid of Floor Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+            {floorGroups.map((grp) => {
+              const isFloorActive = activeFloorCardKey === grp.key;
+              return (
+                <div
+                  key={grp.key}
+                  onMouseEnter={() => setActiveFloorCardKey(grp.key)}
+                  onTouchStart={() => setActiveFloorCardKey(grp.key)}
+                  onClick={() => setSelectedFloorKey(grp.key)}
+                  className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between group touch-target ${
+                    isFloorActive
+                      ? 'border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.35)] bg-[#162238] scale-[1.01]'
+                      : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                  } text-white`}
+                >
+                  <div className="space-y-3.5">
+                    {/* Header of Floor Card */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        {/* Floor Badge Icon */}
+                        <div className="w-12 h-12 rounded-2xl bg-[#00f2fe]/15 border border-[#00f2fe]/30 flex items-center justify-center text-[#00f2fe] font-black text-lg flex-shrink-0 shadow-[0_0_12px_rgba(0,242,254,0.2)]">
+                          {grp.isCommon ? (
+                            <Building2 className="w-6 h-6 text-[#00f2fe]" />
+                          ) : grp.floorNumber === 0 ? (
+                            'PB'
+                          ) : (
+                            `${grp.floorNumber}°`
+                          )}
+                        </div>
 
-                  <div className="flex items-center justify-between mt-2">
-                    <h4 className={`text-base font-black tracking-tight leading-snug transition-colors truncate pr-1 ${
-                      isUnitActive ? 'text-[#00f2fe]' : 'text-white group-hover:text-[#00f2fe]'
-                    }`}>
-                      {unit.name}
-                    </h4>
+                        <div className="min-w-0">
+                          <h4 className="text-xl font-black tracking-tight text-white group-hover:text-[#00f2fe] transition-colors truncate">
+                            {grp.label}
+                          </h4>
+                          <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                            {grp.totalUnits} {grp.isCommon ? 'espacios comunes' : 'departamentos'}
+                          </p>
+                        </div>
+                      </div>
 
-                    {/* Edit & Delete Action icons */}
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditUnit(unit);
-                        }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-[#00f2fe] hover:bg-slate-800 transition-colors"
-                        title="Editar denominación"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-
-                      {onRequestDeleteUnit && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRequestDeleteUnit(unit.id, unit.name);
-                          }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-                          title="Eliminar este espacio"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {/* Circular Progress */}
+                      <div className="flex-shrink-0">
+                        <AnimatedCircularProgress
+                          percentage={grp.progress}
+                          size={52}
+                          strokeWidth={5}
+                          color={grp.progress === 100 ? '#10b981' : '#00f2fe'}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems validados' : 'tareas'} ({progress}%)
-                  </p>
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-800/80">
-                  {/* Horizontal Capsule Progress Bar */}
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-2.5 flex items-center justify-between gap-1 flex-wrap">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenReportModal('unit', project.id, unit.id);
-                        }}
-                        className="text-rose-400 hover:text-rose-300 font-bold text-[10px] flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/30 transition-colors"
-                        title="Acta Técnica PDF de esta unidad"
-                      >
-                        <FileText className="w-2.5 h-2.5" /> PDF
-                      </button>
-
-                      {onOpenUnitBlueprints && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenUnitBlueprints(unit);
-                          }}
-                          className="text-[#00f2fe] hover:text-cyan-300 font-bold text-[10px] flex items-center gap-1 bg-[#00f2fe]/10 px-2 py-0.5 rounded-md border border-[#00f2fe]/30 transition-colors"
-                          title="Ver o adjuntar planos"
-                        >
-                          <Compass className="w-2.5 h-2.5" />
-                          <span>Planos ({unit.blueprints?.length || 0})</span>
-                        </button>
-                      )}
-
-                      {onExportExcel && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onExportExcel(project.id, unit.id);
-                          }}
-                          className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-bold text-[10px] flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800"
-                          title="Descargar Planilla Excel con casillas para tildar a mano"
-                        >
-                          <FileSpreadsheet className="w-2.5 h-2.5" /> XLS
-                        </button>
-                      )}
-
-                      {unit.sketches && unit.sketches.length > 0 && (
-                        <span
-                          className="text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
-                          title={`${unit.sketches.length} croquis guardados en este espacio`}
-                        >
-                          <PenTool className="w-2.5 h-2.5 text-amber-500" />
-                          <span>Croquis ({unit.sketches.length})</span>
+                    {/* Department Preview Pills */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      {grp.units.slice(0, 6).map((u) => {
+                        const uProgress = calculateUnitProgress(u, tradeFilter);
+                        const uDone = uProgress >= 100;
+                        const shortUnit = u.name.replace(/^(?:depto|departamento|unidad|dpto)\s*/i, '');
+                        return (
+                          <span
+                            key={u.id}
+                            className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-lg border truncate max-w-[110px] ${
+                              uDone
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : 'bg-slate-800/90 text-slate-300 border-slate-700'
+                            }`}
+                          >
+                            {shortUnit}
+                          </span>
+                        );
+                      })}
+                      {grp.units.length > 6 && (
+                        <span className="text-[10px] font-bold text-slate-400 self-center">
+                          +{grp.units.length - 6} más
                         </span>
                       )}
                     </div>
+                  </div>
 
-                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ml-auto">
-                      Auditar <ArrowRight className="w-3 h-3" />
-                    </span>
+                  {/* Bottom of Floor Card */}
+                  <div className="mt-5 pt-3.5 border-t border-slate-800/80 space-y-2">
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-500"
+                        style={{ width: `${grp.progress}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 font-bold text-[11px]">
+                        {grp.completedUnits} de {grp.totalUnits} terminados ({grp.progress}%)
+                      </span>
+                      <span className="text-[#00f2fe] font-black text-xs flex items-center group-hover:translate-x-1 transition-transform">
+                        Entrar al Piso <ChevronRight className="w-4 h-4 ml-0.5" />
+                      </span>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* SECTION 2: UNITS OF SELECTED FLOOR (OR ALL UNITS) */
+        <div className="space-y-4 pt-1">
+          {/* Floor Header with Back Button and Quick Switcher */}
+          <div className="bg-[#131b2c] border border-slate-700/80 rounded-2xl p-3 sm:p-4 space-y-3 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFloorKey(null)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-black flex items-center gap-1.5 border border-slate-700 transition-all active:scale-95 shadow-xs touch-target"
+                >
+                  <ArrowLeft className="w-4 h-4 text-[#00c2fe]" />
+                  <span>Volver a Pisos</span>
+                </button>
+
+                <div className="h-6 w-px bg-slate-700/80 hidden sm:block" />
+
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+                    <span className="text-[#00f2fe]">
+                      {selectedFloorKey === 'all_units' ? 'Todos los Departamentos' : activeFloorGroup?.label}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">
+                      ({tabTotalCount} {typeFilter === 'unit' ? 'deptos' : typeFilter === 'common_area' ? 'comunes' : 'unidades'})
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {tabCompletedCount} de {tabTotalCount} unidades terminadas ({tabTotalCount > 0 ? Math.round((tabCompletedCount / tabTotalCount) * 100) : 0}%)
+                  </p>
+                </div>
               </div>
-            );
-          })
-        )}
-      </div>
+
+              <button
+                onClick={onOpenNewUnitModal}
+                className="bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 touch-target transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+ Agregar Espacio</span>
+              </button>
+            </div>
+
+            {/* Quick Floor Switcher Pills */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pt-1 text-xs border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setSelectedFloorKey(null)}
+                className="px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0 bg-slate-800/80 text-slate-300 border border-slate-700 hover:border-slate-500 touch-target"
+              >
+                <ArrowLeft className="w-3 h-3 text-[#00c2fe]" />
+                <span>Pisos</span>
+              </button>
+
+              {floorGroups.map((grp) => {
+                const isSelected = selectedFloorKey === grp.key;
+                return (
+                  <button
+                    key={grp.key}
+                    type="button"
+                    onClick={() => setSelectedFloorKey(grp.key)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border touch-target ${
+                      isSelected
+                        ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                        : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    <span>{grp.label}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      isSelected ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-900 text-slate-400'
+                    }`}>
+                      {grp.totalUnits}
+                    </span>
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setSelectedFloorKey('all_units')}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border touch-target ${
+                  selectedFloorKey === 'all_units'
+                    ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                    : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-500'
+                }`}
+              >
+                <span>Todos</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                  selectedFloorKey === 'all_units' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-900 text-slate-400'
+                }`}>
+                  {countAll}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Space Category Filter Tabs only when viewing All Units */}
+          {selectedFloorKey === 'all_units' && (
+            <div className="flex items-center gap-1.5 bg-[#151f33]/90 border border-slate-700/80 p-1.5 rounded-2xl text-xs transition-colors select-none">
+              <button
+                onClick={() => setTypeFilter('all')}
+                className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center ${
+                  typeFilter === 'all'
+                    ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Todos ({countAll})
+              </button>
+              <button
+                onClick={() => setTypeFilter('unit')}
+                className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                  typeFilter === 'unit'
+                    ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <DoorOpen className="w-3.5 h-3.5" />
+                <span>Deptos ({countDeptos})</span>
+              </button>
+              <button
+                onClick={() => setTypeFilter('common_area')}
+                className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                  typeFilter === 'common_area'
+                    ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Comunes ({countCommon})</span>
+              </button>
+            </div>
+          )}
+
+          {/* Status Filter Chips */}
+          <div className="flex items-center space-x-2 sm:space-x-2.5 overflow-x-auto no-scrollbar py-1 text-xs select-none">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                statusFilter === 'all'
+                  ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
+                  : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>All</span>
+              <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                {tabTotalCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('completed')}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                statusFilter === 'completed'
+                  ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.45)]'
+                  : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Completed</span>
+              <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                {tabCompletedCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('in_progress')}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                statusFilter === 'in_progress'
+                  ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.45)]'
+                  : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>In-Process</span>
+              <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                {tabInProgressCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('pending')}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                statusFilter === 'pending'
+                  ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.45)]'
+                  : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+              <span>Pending</span>
+              <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                {tabPendingCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Units Grid - Responsive with Interactive Neon Line on Cursor / Touch */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
+            {filteredUnits.length === 0 ? (
+              <div className="col-span-full text-center py-12 bg-[#131b2c]/80 rounded-3xl border border-dashed border-slate-800 p-4">
+                <DoorOpen className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm font-bold text-white">Sin unidades con este criterio</p>
+                <p className="text-xs text-slate-400 mt-0.5">Prueba cambiando el filtro de estado o espacio arriba.</p>
+                <button
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setTypeFilter('all');
+                  }}
+                  className="mt-3 px-4 py-2 bg-[#00c2ff] text-slate-950 font-bold rounded-xl text-xs hover:brightness-110 transition-all active:scale-95"
+                >
+                  Ver Todas las Unidades
+                </button>
+              </div>
+            ) : (
+              filteredUnits.map(({ unit, progress }) => {
+                const counts = getUnitItemCounts(unit, tradeFilter);
+                const isComplete = progress === 100;
+                const isCommonArea = isUnitCommonArea(unit);
+                const isUnitActive = activeUnitId === unit.id;
+
+                return (
+                  <div
+                    key={unit.id}
+                    onMouseEnter={() => setActiveUnitId(unit.id)}
+                    onTouchStart={() => setActiveUnitId(unit.id)}
+                    onClick={() => {
+                      setActiveUnitId(unit.id);
+                      onSelectUnit(unit.id);
+                    }}
+                    className={`rounded-2xl p-4 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between touch-target group ${
+                      isUnitActive
+                        ? 'border-2 border-[#00f2fe] shadow-[0_0_28px_rgba(0,242,254,0.38)] bg-[#162238] scale-[1.02]'
+                        : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                    } text-white`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 ${
+                          isComplete
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : isCommonArea
+                            ? 'bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30'
+                            : 'bg-slate-800 text-[#00f2fe] border border-slate-700'
+                        }`}>
+                          {isComplete ? (
+                            <CircleCheck className="w-4 h-4 text-emerald-400" />
+                          ) : isCommonArea ? (
+                            <Building2 className="w-4 h-4 text-[#00f2fe]" />
+                          ) : (
+                            <DoorOpen className="w-4 h-4 text-[#00f2fe]" />
+                          )}
+                        </span>
+
+                        {/* Animated Circular Progress on Unit Card */}
+                        <AnimatedCircularProgress
+                          percentage={progress}
+                          size={46}
+                          strokeWidth={4.5}
+                          color={isUnitActive ? '#00f2fe' : isComplete ? '#10B981' : '#00f2fe'}
+                        />
+                      </div>
+
+                      {/* Type & Status Badges */}
+                      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30">
+                          {isCommonArea ? 'Común' : 'Depto'}
+                        </span>
+                        {unit.floorLabel && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 truncate max-w-[90px]">
+                            {unit.floorLabel}
+                          </span>
+                        )}
+                        {unit.signature && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                            ✔ Firmado
+                          </span>
+                        )}
+                        {unit.isLocked && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                            🔒 Bloqueado
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2">
+                        <h4 className={`text-base font-black tracking-tight leading-snug transition-colors truncate pr-1 ${
+                          isUnitActive ? 'text-[#00f2fe]' : 'text-white group-hover:text-[#00f2fe]'
+                        }`}>
+                          {unit.name}
+                        </h4>
+
+                        {/* Edit & Delete Action icons */}
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditUnit(unit);
+                            }}
+                            className="p-1 rounded-lg text-slate-400 hover:text-[#00f2fe] hover:bg-slate-800 transition-colors"
+                            title="Editar denominación"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          {onRequestDeleteUnit && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRequestDeleteUnit(unit.id, unit.name);
+                              }}
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                              title="Eliminar este espacio"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems validados' : 'tareas'} ({progress}%)
+                      </p>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-800/80">
+                      {/* Horizontal Capsule Progress Bar */}
+                      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-2.5 flex items-center justify-between gap-1 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenReportModal('unit', project.id, unit.id);
+                            }}
+                            className="text-rose-400 hover:text-rose-300 font-bold text-[10px] flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/30 transition-colors"
+                            title="Acta Técnica PDF de esta unidad"
+                          >
+                            <FileText className="w-2.5 h-2.5" /> PDF
+                          </button>
+
+                          {onOpenUnitBlueprints && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenUnitBlueprints(unit);
+                              }}
+                              className="text-[#00f2fe] hover:text-cyan-300 font-bold text-[10px] flex items-center gap-1 bg-[#00f2fe]/10 px-2 py-0.5 rounded-md border border-[#00f2fe]/30 transition-colors"
+                              title="Ver o adjuntar planos"
+                            >
+                              <Compass className="w-2.5 h-2.5" />
+                              <span>Planos ({unit.blueprints?.length || 0})</span>
+                            </button>
+                          )}
+
+                          {onExportExcel && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onExportExcel(project.id, unit.id);
+                              }}
+                              className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-bold text-[10px] flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800"
+                              title="Descargar Planilla Excel con casillas para tildar a mano"
+                            >
+                              <FileSpreadsheet className="w-2.5 h-2.5" /> XLS
+                            </button>
+                          )}
+
+                          {unit.sketches && unit.sketches.length > 0 && (
+                            <span
+                              className="text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                              title={`${unit.sketches.length} croquis guardados en este espacio`}
+                            >
+                              <PenTool className="w-2.5 h-2.5 text-amber-500" />
+                              <span>Croquis ({unit.sketches.length})</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ml-auto">
+                          Auditar <ArrowRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

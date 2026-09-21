@@ -221,3 +221,67 @@ export function compressImageFile(file: File, maxDim: number = 800, quality: num
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Determines the floor number and label of a unit based on naming patterns,
+ * such as "2-1" -> Floor 2, "Depto 1-2" -> Floor 1, "PB-1" -> Floor 0, etc.
+ */
+export function parseUnitFloor(unit: { name?: string; floorNumber?: number; floorLabel?: string; type?: 'unit' | 'common_area'; category?: string }): {
+  floorNumber: number;
+  label: string;
+  isCommon: boolean;
+} {
+  if (isUnitCommonArea(unit)) {
+    return {
+      floorNumber: 9999,
+      label: 'Espacios Comunes',
+      isCommon: true
+    };
+  }
+
+  const name = (unit.name || '').trim();
+
+  // 1. Check for hyphen/slash pattern: "2-1", "Depto 2-1", "Depto 2_1", "PB-1", "Depto 2-A"
+  const hyphenMatch = name.match(/(?:depto|departamento|unidad|dpto)?\s*(pb|\d+)\s*[-_/]\s*([a-z0-9]+)/i);
+  if (hyphenMatch) {
+    const raw = hyphenMatch[1].toLowerCase();
+    if (raw === 'pb' || raw === '0') {
+      return { floorNumber: 0, label: 'Planta Baja (PB)', isCommon: false };
+    }
+    const num = parseInt(raw, 10);
+    if (!isNaN(num)) {
+      return { floorNumber: num, label: `Piso ${num}`, isCommon: false };
+    }
+  }
+
+  // 2. Check for "Piso X" or "PisoX" in name
+  const pisoMatch = name.match(/piso\s*(\d+)/i);
+  if (pisoMatch) {
+    const num = parseInt(pisoMatch[1], 10);
+    return { floorNumber: num, label: `Piso ${num}`, isCommon: false };
+  }
+
+  // 3. Check for 3-digit or 4-digit hotel/depto style: 101, 102 -> Piso 1; 201 -> Piso 2; 1201 -> Piso 12
+  const threeDigitMatch = name.match(/(?:depto|departamento|unidad|dpto)?\s*(\d{1,2})(\d{2})\b/i);
+  if (threeDigitMatch) {
+    const num = parseInt(threeDigitMatch[1], 10);
+    return { floorNumber: num, label: num === 0 ? 'Planta Baja (PB)' : `Piso ${num}`, isCommon: false };
+  }
+
+  // 4. Check unit.floorNumber / unit.floorLabel
+  if (unit.floorNumber !== undefined) {
+    const num = unit.floorNumber;
+    const label = unit.floorLabel || (num === 0 ? 'Planta Baja (PB)' : `Piso ${num}`);
+    return { floorNumber: num, label, isCommon: false };
+  }
+
+  if (unit.floorLabel && /piso\s*\d+/i.test(unit.floorLabel)) {
+    const numMatch = unit.floorLabel.match(/\d+/);
+    const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+    return { floorNumber: num, label: unit.floorLabel, isCommon: false };
+  }
+
+  // Default fallback
+  return { floorNumber: 1, label: 'Piso 1', isCommon: false };
+}
+
