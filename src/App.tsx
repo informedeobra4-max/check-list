@@ -289,6 +289,18 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const splashJustFinishedRef = useRef(false);
+
+  const handleFinishSplash = () => {
+    setShowSplash(false);
+    setCurrentView('dashboard');
+    setSelectedProjectId(null);
+    setSelectedUnitId(null);
+    splashJustFinishedRef.current = true;
+    setTimeout(() => {
+      splashJustFinishedRef.current = false;
+    }, 600);
+  };
 
   // Modals state
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
@@ -607,6 +619,7 @@ export default function App() {
   };
 
   const handleSelectProject = (projectId: string) => {
+    if (splashJustFinishedRef.current) return;
     setSelectedProjectId(projectId);
     setSelectedUnitId(null);
     setCurrentView('units');
@@ -1474,7 +1487,7 @@ export default function App() {
       style={{ backgroundColor: localColors.appBackground || '#0e1422' }}
     >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
-      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
 
       {/* Toast Notification */}
       <Toast message={toastMessage} iconName={toastIcon} />

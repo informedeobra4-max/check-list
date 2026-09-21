@@ -78,17 +78,9 @@ export function playCheckmarkSound() {
 
 export function SplashScreen({ onFinish }: SplashScreenProps) {
   const [isExiting, setIsExiting] = useState(false);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const triggeredRef = useRef(false);
 
   useEffect(() => {
-    // Detectar si el dispositivo es táctil (celulares y tablets)
-    const hasTouch =
-      'ontouchstart' in window ||
-      navigator.maxTouchPoints > 0 ||
-      (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-    setIsTouchDevice(Boolean(hasTouch));
-
     // Permitir ingreso con teclado (Barra espaciadora o Enter)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -101,7 +93,10 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const triggerEnter = () => {
+  const triggerEnter = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (triggeredRef.current) return;
     triggeredRef.current = true;
 
@@ -114,19 +109,22 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     // Concluir transición y pasar a la pantalla principal
     setTimeout(() => {
       onFinish();
-    }, 750);
+    }, 700);
   };
 
   return (
     <div
       onClick={triggerEnter}
       onTouchStart={(e) => {
-        // Prevenir scroll accidental y disparar de inmediato
-        e.preventDefault();
-        triggerEnter();
+        e.stopPropagation();
+        triggerEnter(e);
       }}
-      className={`fixed inset-0 z-[99999] bg-black select-none overflow-hidden flex flex-col items-center justify-between py-10 px-6 cursor-pointer transition-opacity duration-700 ${
-        isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      onTouchEnd={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+      className={`fixed inset-0 z-[99999] bg-black select-none overflow-hidden flex flex-col items-center justify-between py-10 px-6 cursor-pointer transition-opacity duration-700 pointer-events-auto ${
+        isExiting ? 'opacity-0' : 'opacity-100'
       }`}
       style={{
         background: 'radial-gradient(ellipse at center, #061e12 0%, #020b06 45%, #000000 100%)',
@@ -171,43 +169,13 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
         </div>
       </div>
 
-      {/* Bottom prompt instructions */}
+      {/* Clean Minimalist Bottom - Clutter button removed */}
       <div
-        className={`flex flex-col items-center gap-3 text-center transition-all duration-300 ${
+        className={`flex flex-col items-center gap-2 text-center transition-all duration-300 ${
           isExiting ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
         }`}
       >
-        <div className="px-5 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-white shadow-2xl flex items-center gap-2.5 animate-bounce">
-          {/* Finger touch / pointer icon */}
-          <svg
-            className="w-5 h-5 text-emerald-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            {isTouchDevice ? (
-              // Touch hand icon
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"
-              />
-            ) : (
-              // Mouse pointer / tap icon
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-              />
-            )}
-          </svg>
-          <span className="text-sm sm:text-base font-bold text-white tracking-wide">
-            {isTouchDevice ? 'Toca la pantalla para ingresar' : 'Haz clic en la pantalla para ingresar'}
-          </span>
-        </div>
-
-        <p className="text-[11px] uppercase tracking-[0.25em] text-emerald-500/70 font-mono">
+        <p className="text-[11px] uppercase tracking-[0.25em] text-emerald-500/50 font-mono">
           Sistema de Inspección en Obra
         </p>
       </div>
