@@ -119,18 +119,7 @@ export function DashboardView({
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded">
-                Gestión Técnica
-              </span>
-              <button
-                onClick={onOpenLogoEditor}
-                className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded touch-target"
-              >
-                <Camera className="w-3 h-3" /> Cambiar Logo
-              </button>
-            </div>
-            <h2 className="text-lg font-black tracking-tight text-white mt-1 leading-tight">
+            <h2 className="text-lg font-black tracking-tight text-white leading-tight">
               Supervisión en Terreno
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
