@@ -41,23 +41,15 @@ export function ExecutiveTimeline({
       {/* Top Labels Row */}
       <div className="flex items-center justify-between text-[10px] font-black uppercase text-slate-400 px-1">
         <span>Inicio</span>
-        <div className="flex items-center gap-2">
-          <span className="text-white flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-            Hoy
-          </span>
-          {delayMonths > 0 && (
-            <span className="bg-rose-500/20 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1">
-              <AlertCircle className="w-2.5 h-2.5" />
-              DEMORA: +{delayMonths} meses
-            </span>
-          )}
-        </div>
+        <span className="text-white flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+          Hoy
+        </span>
         <span>Fin Estimado</span>
       </div>
 
       {/* Horizontal Bar with Nodes */}
-      <div className="relative py-2.5 flex items-center">
+      <div className="relative pt-6 pb-2.5 flex items-center">
         {/* Base Track */}
         <div className="absolute inset-x-0 h-1 bg-slate-800 rounded-full" />
 
@@ -67,35 +59,43 @@ export function ExecutiveTimeline({
           style={{ width: `${hoyPercent}%` }}
         />
 
-        {/* Delay Track (Hoy to End) in Coral/Red */}
+        {/* Delay Track (Hoy to End) in Coral/Salmon */}
         <div
-          className="absolute h-1 bg-rose-500/80 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+          className="absolute h-1 bg-[#f87171] rounded-full shadow-[0_0_8px_rgba(248,113,113,0.5)]"
           style={{ left: `${hoyPercent}%`, width: `${100 - hoyPercent}%` }}
         />
 
-        {/* Node 1: Inicio */}
-        <div className="absolute left-0 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-slate-950 border-2 border-emerald-500 flex items-center justify-center">
-          <div className="w-1 h-1 rounded-full bg-emerald-400" />
+        {/* Node 1: Inicio (Cyan ring with inner point) */}
+        <div className="absolute left-0 -translate-x-1/2 w-4 h-4 rounded-full bg-slate-950 border-2 border-[#00f2fe] shadow-[0_0_8px_rgba(0,242,254,0.5)] flex items-center justify-center">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#00f2fe]" />
         </div>
 
-        {/* Node 2: Hoy (Active Red/Coral Marker with subtle vertical indicator) */}
+        {/* Node 2: Hoy with Floating Demora Speech Bubble above it */}
         <div
           className="absolute -translate-x-1/2 flex flex-col items-center pointer-events-none"
           style={{ left: `${hoyPercent}%` }}
         >
+          {delayMonths > 0 && (
+            <div className="absolute -top-6 flex flex-col items-center">
+              <span className="bg-[#f87171] text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-black shadow-[0_0_10px_rgba(248,113,113,0.4)] whitespace-nowrap">
+                DEMORA: +{delayMonths} meses
+              </span>
+              <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-[#f87171]" />
+            </div>
+          )}
           <div className="w-4 h-4 rounded-full bg-slate-950 border-2 border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.7)] flex items-center justify-center">
             <div className="w-1.5 h-1.5 rounded-full bg-rose-400" />
           </div>
         </div>
 
-        {/* Node 3: Fin Estimado */}
-        <div className="absolute right-0 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-slate-950 border-2 border-slate-600 flex items-center justify-center">
-          <div className="w-1 h-1 rounded-full bg-slate-400" />
+        {/* Node 3: Fin Estimado (Amber Upward Triangle) */}
+        <div className="absolute right-0 translate-x-1/2 flex items-center justify-center">
+          <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-amber-400 filter drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" />
         </div>
       </div>
 
       {/* Dates Row */}
-      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 px-0.5">
+      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 px-0.5">
         <span>{startLabel}</span>
         <span className="text-slate-300 font-black">{currentYear}</span>
         <span>{endLabel}</span>

@@ -5,6 +5,7 @@ interface ExecutiveGaugeChartProps {
   label?: string;
   size?: number;
   status?: 'ok' | 'warning' | 'critical';
+  colorVariant?: 'coral_cyan' | 'amber' | 'coral';
   className?: string;
 }
 
@@ -13,6 +14,7 @@ export function ExecutiveGaugeChart({
   label,
   size = 84,
   status = 'critical',
+  colorVariant = 'coral_cyan',
   className = ''
 }: ExecutiveGaugeChartProps) {
   // Angle maps from -90deg (far left, 0%) to +90deg (far right, 100%)
@@ -24,14 +26,32 @@ export function ExecutiveGaugeChart({
   const cx = size / 2;
   const cy = size / 2 + 6;
 
+  const gradId = `gaugeGrad_${Math.random().toString(36).substring(2, 7)}`;
+
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
       <svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.7}`} className="overflow-visible">
         <defs>
-          <linearGradient id="gaugeArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="50%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#ef4444" />
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
+            {colorVariant === 'coral_cyan' ? (
+              <>
+                <stop offset="0%" stopColor="#f87171" />
+                <stop offset="50%" stopColor="#fb923c" />
+                <stop offset="100%" stopColor="#00f2fe" />
+              </>
+            ) : colorVariant === 'amber' ? (
+              <>
+                <stop offset="0%" stopColor="#f59e0b" />
+                <stop offset="70%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#334155" />
+              </>
+            ) : (
+              <>
+                <stop offset="0%" stopColor="#ef4444" />
+                <stop offset="60%" stopColor="#f97316" />
+                <stop offset="100%" stopColor="#334155" />
+              </>
+            )}
           </linearGradient>
         </defs>
 

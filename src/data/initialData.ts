@@ -115,9 +115,9 @@ export function getInitialMockData(): Project[] {
 
   return [
     {
-      id: 'proj_torre_alvear',
-      name: 'Torre Alvear',
-      location: 'Av. del Libertador 4500 • CABA',
+      id: 'proj_parque_los_andes',
+      name: 'Parque Los Andes',
+      location: 'Calle Agustín Alvarez 315',
       createdAt: '2025-01-10',
       startDate: '2026-08-01',
       estimatedEndDate: '2026-12-15',
@@ -172,9 +172,9 @@ export function getInitialMockData(): Project[] {
       ]
     },
     {
-      id: 'proj_complejo_palermo',
-      name: 'Residencias Los Laureles',
-      location: 'Calle Los Olivos 240 • Pilar',
+      id: 'proj_parque_agustin',
+      name: 'Parque Agustín',
+      location: 'Calle Agustín Alvarez 315',
       createdAt: '2025-02-01',
       startDate: '2026-08-15',
       estimatedEndDate: '2026-11-20',

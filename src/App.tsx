@@ -143,7 +143,7 @@ export default function App() {
     } catch (e) {
       console.error('Error reading theme preference:', e);
     }
-    return 'light';
+    return 'dark'; // Executive Dark Mode by default
   });
 
   useEffect(() => {
@@ -173,6 +173,14 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           // Retrocompatibility check for photos array & upgrade legacy names
           parsed.forEach((p: Project) => {
+            if (p.name === 'Torre Alvear' || p.id === 'proj_torre_alvear') {
+              p.name = 'Parque Los Andes';
+              p.location = 'Calle Agustín Alvarez 315';
+            } else if (p.name === 'Residencias Los Laureles' || p.id === 'proj_complejo_palermo') {
+              p.name = 'Parque Agustín';
+              p.location = 'Calle Agustín Alvarez 315';
+            }
+
             p.units?.forEach(u => {
               if (u.name === 'Depto 1-A') u.name = 'Depto 1-1';
               else if (u.name === 'Depto 1-B') u.name = 'Depto 1-2';
@@ -1458,12 +1466,12 @@ export default function App() {
 
   return (
     <div
-      className={`w-full min-h-screen flex flex-col relative pb-16 transition-colors duration-200 ${
+      className={`w-full min-h-screen flex flex-col relative pb-20 transition-colors duration-200 ${
         localColors.appBackground
           ? isDarkColor(localColors.appBackground) ? 'text-slate-100' : 'text-slate-900'
-          : 'bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100'
+          : 'bg-[#0e1422] text-slate-100'
       }`}
-      style={{ backgroundColor: localColors.appBackground || undefined }}
+      style={{ backgroundColor: localColors.appBackground || '#0e1422' }}
     >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
@@ -1582,15 +1590,16 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Sticky Mobile Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-lg md:max-w-xl mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 md:rounded-2xl md:mb-3 px-6 py-2 flex justify-around items-center z-30 shadow-2xl no-print transition-colors">
+      {/* Executive Floating Bottom Navigation Dock - Matches Reference Screenshot */}
+      <nav className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-[#162035]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-5 py-2 flex justify-around items-center z-40 shadow-[0_12px_40px_rgba(0,0,0,0.8)] no-print transition-all">
         <button
           onClick={() => handleNavigate('dashboard')}
-          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target ${
+          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
             currentView === 'dashboard'
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200'
+              ? 'text-[#00c2ff] filter drop-shadow-[0_0_8px_rgba(0,194,255,0.6)]'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
+          title="Ir a Obras / Proyectos"
         >
           <Building2 className="w-5 h-5 mb-0.5" />
           <span>Proyectos</span>
@@ -1598,17 +1607,18 @@ export default function App() {
 
         <button
           onClick={handleGoToUnitsView}
-          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target ${
+          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
             currentView === 'units'
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200'
+              ? 'text-[#00c2ff] filter drop-shadow-[0_0_8px_rgba(0,194,255,0.6)]'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
+          title="Ir a Departamentos y Unidades"
         >
           <DoorOpen className="w-5 h-5 mb-0.5" />
           <span>Unidades</span>
         </button>
 
-        {/* CROQUIS BUTTON (Permanente en barra de navegación inferior) */}
+        {/* CROQUIS BUTTON */}
         <button
           onClick={() => {
             setCroquisModalTargetUnitId(selectedUnitId || undefined);
@@ -1616,26 +1626,23 @@ export default function App() {
           }}
           className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target group relative transition-colors ${
             isCroquisModalOpen
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200'
+              ? 'text-[#00c2ff]'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Abrir hoja de croquis a mano alzada para este u otro depto"
         >
-          <div className="relative">
-            <PenTool className="w-5 h-5 mb-0.5 text-amber-500 group-hover:scale-110 transition-transform" />
-            <span className="absolute -top-1 -right-1.5 px-1 bg-amber-500 text-slate-950 text-[9px] font-black rounded-full leading-tight">
-              ✍️
-            </span>
-          </div>
-          <span className="text-amber-600 dark:text-amber-400 font-black">Croquis</span>
+          <PenTool className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
+          <span>Croquis</span>
         </button>
 
+        {/* EXPORTAR PDF BUTTON */}
         <button
           onClick={() => handleOpenReportModal('auto')}
-          className="flex flex-col items-center justify-center text-slate-700 hover:text-slate-950 font-black text-[11px] touch-target group"
+          className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 font-bold text-[11px] touch-target group transition-colors"
+          title="Exportar informe técnico en PDF"
         >
-          <FileText className="w-5 h-5 mb-0.5 text-rose-600 group-hover:scale-110 transition-transform" />
-          <span className="text-slate-900 dark:text-white font-black">Exportar PDF</span>
+          <FileText className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
+          <span>Exportar PDF</span>
         </button>
       </nav>
 
