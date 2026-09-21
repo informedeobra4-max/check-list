@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade } from './types';
+import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress } from './utils/calculations';
 import { Header } from './components/Header';
@@ -17,6 +17,7 @@ import { NewUnitModal } from './components/NewUnitModal';
 import { EditUnitModal } from './components/EditUnitModal';
 import { SecurityConfirmModal } from './components/SecurityConfirmModal';
 import { MilestonesModal } from './components/MilestonesModal';
+import { CroquisModal } from './components/CroquisModal';
 import { exportInspectionPlanillaToExcel } from './utils/excelExport';
 import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
@@ -291,6 +292,10 @@ export default function App() {
   const [logoEditorTarget, setLogoEditorTarget] = useState<'header' | 'banner'>('header');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportDefaultScope, setReportDefaultScope] = useState<string>('');
+
+  // Croquis a mano alzada modal state
+  const [isCroquisModalOpen, setIsCroquisModalOpen] = useState(false);
+  const [croquisModalTargetUnitId, setCroquisModalTargetUnitId] = useState<string | undefined>(undefined);
 
   // Milestones modal state
   const [isMilestonesModalOpen, setIsMilestonesModalOpen] = useState(false);
@@ -1166,6 +1171,65 @@ export default function App() {
     });
   };
 
+  // Save Croquis sketch to unit and sync to Supabase Cloud
+  const handleSaveSketch = (unitId: string, sketch: SketchDocument) => {
+    if (!selectedProjectId) return;
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== unitId) return u;
+            return {
+              ...u,
+              sketches: [sketch, ...(u.sketches || [])]
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Croquis guardado en ${sketch.unitName || 'la unidad'} y en la Nube`, 'Check');
+    });
+  };
+
+  // Delete Croquis sketch from unit and sync to Supabase Cloud
+  const handleDeleteSketch = (unitId: string, sketchId: string) => {
+    if (!confirm('¿Eliminar este croquis del registro de la unidad?')) return;
+    if (!selectedProjectId) return;
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== unitId) return u;
+            return {
+              ...u,
+              sketches: (u.sketches || []).filter(s => s.id !== sketchId)
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast('Croquis eliminado en la Nube', 'Trash2');
+    });
+  };
+
   // Trigger camera for active item
   const handleTriggerCamera = (tradeId: string, itemId: string, tradeName: string, itemName: string) => {
     setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
@@ -1481,6 +1545,10 @@ export default function App() {
             onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
             onAddTrade={handleAddTrade}
             onDeleteTrade={handleDeleteTrade}
+            onOpenCroquis={() => {
+              setCroquisModalTargetUnitId(undefined);
+              setIsCroquisModalOpen(true);
+            }}
           />
         )}
 
@@ -1508,6 +1576,10 @@ export default function App() {
             onOpenBlueprints={() => setActiveBlueprintViewerUnit(selectedUnit)}
             onAddTrade={handleAddTrade}
             onDeleteTrade={handleDeleteTrade}
+            onOpenCroquis={(unitId) => {
+              setCroquisModalTargetUnitId(unitId || selectedUnitId || undefined);
+              setIsCroquisModalOpen(true);
+            }}
           />
         )}
       </main>
@@ -1548,6 +1620,26 @@ export default function App() {
           <ImageIcon className="w-5 h-5 mb-0.5" />
           <span>Logos</span>
         </button>
+
+        {/* CROQUIS BUTTON (Visible when inside a project, as requested) */}
+        {selectedProjectId && (
+          <button
+            onClick={() => {
+              setCroquisModalTargetUnitId(selectedUnitId || undefined);
+              setIsCroquisModalOpen(true);
+            }}
+            className="flex flex-col items-center justify-center font-bold text-[11px] touch-target text-amber-600 dark:text-amber-400 hover:text-amber-500 group relative"
+            title="Abrir hoja de croquis a mano alzada para este depto"
+          >
+            <div className="relative">
+              <PenTool className="w-5 h-5 mb-0.5 text-amber-500 group-hover:scale-110 transition-transform" />
+              <span className="absolute -top-1 -right-1.5 px-1 bg-amber-500 text-slate-950 text-[9px] font-black rounded-full leading-tight">
+                ✍️
+              </span>
+            </div>
+            <span className="text-amber-600 dark:text-amber-400 font-black">CROQUIS</span>
+          </button>
+        )}
 
         <button
           onClick={() => handleOpenReportModal('auto')}
@@ -1668,6 +1760,17 @@ export default function App() {
           onSaveMilestone={handleSaveMilestone}
           onDeleteMilestone={handleDeleteMilestone}
           onToggleManualMilestone={handleToggleManualMilestone}
+        />
+      )}
+
+      {isCroquisModalOpen && selectedProject && (
+        <CroquisModal
+          isOpen={isCroquisModalOpen}
+          project={selectedProject}
+          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject.units.length > 0 ? selectedProject.units[0].id : undefined)}
+          onClose={() => setIsCroquisModalOpen(false)}
+          onSaveSketch={handleSaveSketch}
+          onDeleteSketch={handleDeleteSketch}
         />
       )}
 

@@ -18,7 +18,8 @@ import {
   Trash2,
   FileSpreadsheet,
   Compass,
-  FileCheck
+  FileCheck,
+  PenTool
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
@@ -43,6 +44,7 @@ interface UnitsViewProps {
   onOpenUnitBlueprints?: (unit: Unit) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
+  onOpenCroquis?: () => void;
 }
 
 export function UnitsView({
@@ -61,7 +63,8 @@ export function UnitsView({
   onEditProject,
   onOpenUnitBlueprints,
   onAddTrade,
-  onDeleteTrade
+  onDeleteTrade,
+  onOpenCroquis
 }: UnitsViewProps) {
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -98,6 +101,7 @@ export function UnitsView({
   const countDeptos = project.units.filter(u => !isUnitCommonArea(u)).length;
   const countCommon = project.units.filter(u => isUnitCommonArea(u)).length;
   const countAll = project.units.length;
+  const totalProjectSketches = project.units.reduce((sum, u) => sum + (u.sketches?.length || 0), 0);
 
   // Filter units matching active type filter (solapa: 'all' | 'unit' | 'common_area')
   const unitsMatchingType = project.units.filter(unit => {
@@ -260,6 +264,17 @@ export function UnitsView({
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Planilla Excel (Para tildar a mano)</span>
+            </button>
+          )}
+
+          {onOpenCroquis && (
+            <button
+              onClick={onOpenCroquis}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-[11px] font-black inline-flex items-center gap-1 transition-all shadow-2xs active:scale-95"
+              title="Abrir hoja de croquis a mano alzada para este proyecto"
+            >
+              <PenTool className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+              <span>Croquis ({totalProjectSketches})</span>
             </button>
           )}
 
@@ -791,6 +806,16 @@ export function UnitsView({
                         >
                           <FileSpreadsheet className="w-2.5 h-2.5" /> XLS
                         </button>
+                      )}
+
+                      {unit.sketches && unit.sketches.length > 0 && (
+                        <span
+                          className="text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
+                          title={`${unit.sketches.length} croquis guardados en este espacio`}
+                        >
+                          <PenTool className="w-2.5 h-2.5 text-amber-500" />
+                          <span>Croquis ({unit.sketches.length})</span>
+                        </span>
                       )}
                     </div>
 

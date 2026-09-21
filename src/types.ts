@@ -40,6 +40,18 @@ export interface FloorConfig {
   unitsCount: number; // Number of units on this floor
 }
 
+export interface SketchDocument {
+  id: string;
+  title: string;
+  dataUrl: string; // PNG Data URL of the croquis with technical header
+  createdAt: string;
+  unitId?: string;
+  unitName?: string;
+  projectId?: string;
+  projectName?: string;
+  notes?: string;
+}
+
 export interface Unit {
   id: string;
   name: string;
@@ -55,6 +67,7 @@ export interface Unit {
   signDni?: string; // ID / License
   signedAt?: string; // Timestamp
   isLocked?: boolean; // Frozen/locked state
+  sketches?: SketchDocument[]; // Registered hand-drawn croquis
 }
 
 export interface Milestone {

@@ -74,6 +74,7 @@ interface ChecklistViewProps {
   onOpenBlueprints?: () => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
+  onOpenCroquis?: (unitId?: string) => void;
 }
 
 export function ChecklistView({
@@ -98,7 +99,8 @@ export function ChecklistView({
   onUnlockUnit,
   onOpenBlueprints,
   onAddTrade,
-  onDeleteTrade
+  onDeleteTrade,
+  onOpenCroquis
 }: ChecklistViewProps) {
   const [selectedTradeFilter, setSelectedTradeFilter] = useState<string>('all');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskFilter>('all');
@@ -294,6 +296,17 @@ export function ChecklistView({
               >
                 <Compass className="w-3.5 h-3.5 text-amber-400" />
                 <span>Planos ({unit.blueprints?.length || 0})</span>
+              </button>
+            )}
+
+            {onOpenCroquis && (
+              <button
+                onClick={() => onOpenCroquis(unit.id)}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border border-amber-400"
+                title="Abrir hoja de croquis a mano alzada para este depto"
+              >
+                <PenTool className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+                <span>Croquis ({unit.sketches?.length || 0})</span>
               </button>
             )}
           </div>
