@@ -18,7 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { Project, StatusFilter } from '../types';
-import { calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
+import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 import { ExecutiveGaugeChart } from './ExecutiveGaugeChart';
 import { ExecutiveTimeline } from './ExecutiveTimeline';
@@ -60,6 +60,7 @@ export function DashboardView({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [hoverTriggers, setHoverTriggers] = useState<Record<string, number>>({});
 
   // Compute status and progress for each project
   const projectsWithProgress = projects.map(project => {
@@ -229,15 +230,41 @@ export function DashboardView({
               ? 'DEMORA CRÍTICA: +3 MESES'
               : 'ESTADO: ATENCIÓN +2 MESES';
 
-            const totalBudget = 2.6;
-            const executedBudget = 1.2;
-            const budgetPercent = Math.min(100, Math.round((executedBudget / totalBudget) * 100));
+            // Real stats for Deptos Terminados
+            const deptosList = project.units.filter(u => !isUnitCommonArea(u));
+            const totalDeptos = deptosList.length > 0 ? deptosList.length : project.units.length;
+            const completedDeptos = (deptosList.length > 0 ? deptosList : project.units).filter(u => calculateUnitProgress(u) >= 100).length;
+            const deptosPercent = totalDeptos > 0 ? Math.round((completedDeptos / totalDeptos) * 100) : 0;
+
+            // Real stats for Cronograma Speedometers
+            const stats = getProjectConsolidatedStats(project);
+            const pendingItems = stats.pendingItems;
+            const totalItems = stats.totalItems;
+            const pendingPct = totalItems > 0 ? Math.round((pendingItems / totalItems) * 100) : 0;
+
+            const projectMilestones = project.milestones || [];
+            const totalMilestones = projectMilestones.length;
+            const completedMilestones = projectMilestones.filter(m => m.manualCompleted).length;
+            const milestonesPct = totalMilestones > 0
+              ? Math.round((completedMilestones / totalMilestones) * 100)
+              : Math.min(100, Math.round(displayProgress * 0.8));
+            const milestonesDisplay = totalMilestones > 0
+              ? `${completedMilestones}/${totalMilestones}`
+              : `${milestonesPct}%`;
+
+            const triggerVal = hoverTriggers[project.id] || 0;
 
             return (
               <div
                 key={project.id}
-                onMouseEnter={() => setActiveCardId(project.id)}
-                onTouchStart={() => setActiveCardId(project.id)}
+                onMouseEnter={() => {
+                  setActiveCardId(project.id);
+                  setHoverTriggers(prev => ({ ...prev, [project.id]: (prev[project.id] || 0) + 1 }));
+                }}
+                onTouchStart={() => {
+                  setActiveCardId(project.id);
+                  setHoverTriggers(prev => ({ ...prev, [project.id]: (prev[project.id] || 0) + 1 }));
+                }}
                 onClick={() => {
                   setActiveCardId(project.id);
                   onSelectProject(project.id);
@@ -301,11 +328,12 @@ export function DashboardView({
                         size={144}
                         strokeWidth={14}
                         glowColor={isCurrentActive ? '#00f2fe' : '#06b6d4'}
+                        animationTrigger={triggerVal}
                       />
                     </div>
                   </div>
 
-                  {/* Middle Section: Estado del Cronograma (Gauges) & Presupuesto Ejecutado */}
+                  {/* Middle Section: Estado del Cronograma (Gauges) & Deptos Terminados */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {/* Left Box: Estado del Cronograma */}
                     <div className="bg-[#0f172a]/80 rounded-2xl p-3 border border-slate-800/90 flex flex-col justify-between">
@@ -316,14 +344,22 @@ export function DashboardView({
                       {/* Two Semicircle Speedometer Gauges */}
                       <div className="flex items-center justify-around py-1">
                         <ExecutiveGaugeChart
-                          value={isCurrentActive ? 72 : 65}
+                          value={milestonesPct}
+                          valueDisplay={milestonesDisplay}
+                          label="Hitos"
+                          sublabel="cumplidos"
                           size={76}
-                          colorVariant="coral_cyan"
+                          colorVariant="emerald"
+                          animationTrigger={triggerVal}
                         />
                         <ExecutiveGaugeChart
-                          value={isCurrentActive ? 62 : 55}
+                          value={pendingPct}
+                          valueDisplay={pendingItems}
+                          label="No Empezados"
+                          sublabel={`${pendingPct}% pendientes`}
                           size={76}
                           colorVariant="amber"
+                          animationTrigger={triggerVal}
                         />
                       </div>
 
@@ -340,10 +376,10 @@ export function DashboardView({
                       </div>
                     </div>
 
-                    {/* Right Box: Presupuesto Ejecutado */}
+                    {/* Right Box: Deptos Terminados */}
                     <div className="bg-[#0f172a]/80 rounded-2xl p-3 border border-slate-800/90 flex flex-col justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                        Presupuesto Ejecutado
+                        Deptos Terminados
                       </span>
 
                       <div className="flex items-center justify-between gap-3 my-auto py-1">
@@ -351,18 +387,18 @@ export function DashboardView({
                           {/* Horizontal Capsule Bar */}
                           <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe]"
-                              style={{ width: `${budgetPercent}%` }}
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-500"
+                              style={{ width: `${deptosPercent}%` }}
                             />
                           </div>
 
-                          {/* Dollar Amounts */}
-                          <div className="flex items-baseline gap-1">
+                          {/* Deptos Numbers */}
+                          <div className="flex items-baseline gap-1.5">
                             <span className="text-base font-black text-white tracking-tight">
-                              ${executedBudget}M
+                              {completedDeptos}
                             </span>
                             <span className="text-xs text-slate-400 font-bold">
-                              / ${totalBudget}M
+                              / {totalDeptos} deptos ({deptosPercent}%)
                             </span>
                           </div>
                         </div>
@@ -370,18 +406,23 @@ export function DashboardView({
                         {/* Mini Circular Distribution Graphic */}
                         <div className="w-11 h-11 flex-shrink-0 relative">
                           <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                            <circle cx="18" cy="18" r="12" fill="none" stroke="#1e293b" strokeWidth="12" />
+                            <circle cx="18" cy="18" r="12" fill="none" stroke="#1e293b" strokeWidth="6" />
                             <circle
                               cx="18"
                               cy="18"
                               r="12"
                               fill="none"
-                              stroke={isCurrentActive ? '#00f2fe' : '#fbbf24'}
-                              strokeWidth="12"
+                              stroke={deptosPercent > 0 ? '#10b981' : '#00f2fe'}
+                              strokeWidth="6"
                               strokeDasharray="75.4"
-                              strokeDashoffset={isCurrentActive ? '30' : '38'}
+                              strokeDashoffset={75.4 - (deptosPercent / 100) * 75.4}
+                              strokeLinecap="round"
+                              className="transition-all duration-500"
                             />
                           </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white">
+                            {deptosPercent}%
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -397,6 +438,8 @@ export function DashboardView({
                       estimatedEndDate={project.estimatedEndDate}
                       progress={displayProgress}
                       delayMonths={delayMonths}
+                      milestones={project.milestones || []}
+                      project={project}
                     />
                   </div>
                 </div>

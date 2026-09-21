@@ -76,6 +76,7 @@ export function UnitsView({
   const [tradeSectionTab, setTradeSectionTab] = useState<'filter' | 'manage'>('filter');
   const [newTradeNameDraft, setNewTradeNameDraft] = useState<string>('');
   const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
+  const [cardHoverTrigger, setCardHoverTrigger] = useState(0);
 
   const overallProgress = calculateProjectProgress(project, tradeFilter);
 
@@ -157,7 +158,11 @@ export function UnitsView({
   return (
     <section className="space-y-4">
       {/* Executive Project Summary Card */}
-      <div className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white transition-all relative overflow-hidden">
+      <div
+        onMouseEnter={() => setCardHoverTrigger(prev => prev + 1)}
+        onTouchStart={() => setCardHoverTrigger(prev => prev + 1)}
+        className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white transition-all relative overflow-hidden"
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 flex-1 min-w-0 pr-1">
             {/* Deptos & Comunes Tag */}
@@ -216,6 +221,7 @@ export function UnitsView({
               size={136}
               strokeWidth={13}
               glowColor="#00f2fe"
+              animationTrigger={cardHoverTrigger}
             />
           </div>
         </div>

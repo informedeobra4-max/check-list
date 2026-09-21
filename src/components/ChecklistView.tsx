@@ -118,6 +118,7 @@ export function ChecklistView({
   const [newTradeScope, setNewTradeScope] = useState<'current_unit' | 'all_units'>('current_unit');
   const [collapsedTrades, setCollapsedTrades] = useState<Record<string, boolean>>({});
   const [newTaskNames, setNewTaskNames] = useState<Record<string, string>>({});
+  const [unitCardHoverTrigger, setUnitCardHoverTrigger] = useState(0);
   const [editingCommentItemId, setEditingCommentItemId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState<string>('');
   const [observationModalItem, setObservationModalItem] = useState<{
@@ -224,7 +225,11 @@ export function ChecklistView({
   return (
     <section className="space-y-4">
       {/* Executive Unit Status Card with Glowing Cyan Donut Chart */}
-      <div className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white relative overflow-hidden">
+      <div
+        onMouseEnter={() => setUnitCardHoverTrigger(prev => prev + 1)}
+        onTouchStart={() => setUnitCardHoverTrigger(prev => prev + 1)}
+        className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white relative overflow-hidden"
+      >
         {/* Subtle background ambient light */}
         <div className="absolute -top-24 -right-24 w-60 h-60 bg-[#00f2fe]/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -337,6 +342,7 @@ export function ChecklistView({
               size={136}
               strokeWidth={13}
               glowColor="#00f2fe"
+              animationTrigger={unitCardHoverTrigger}
             />
           </div>
         </div>

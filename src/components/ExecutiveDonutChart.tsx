@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface ExecutiveDonutChartProps {
   percentage: number;
@@ -6,6 +6,7 @@ interface ExecutiveDonutChartProps {
   strokeWidth?: number;
   glowColor?: string;
   className?: string;
+  animationTrigger?: number;
 }
 
 export function ExecutiveDonutChart({
@@ -13,12 +14,46 @@ export function ExecutiveDonutChart({
   size = 136,
   strokeWidth = 14,
   glowColor = '#00f2fe',
-  className = ''
+  className = '',
+  animationTrigger
 }: ExecutiveDonutChartProps) {
   const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
+  const [displayPct, setDisplayPct] = useState(clamped);
+  const prevTriggerRef = useRef<number | undefined>(animationTrigger);
+
+  // When animationTrigger changes, count up dynamically from 0 to target percentage
+  useEffect(() => {
+    if (animationTrigger !== undefined && animationTrigger !== prevTriggerRef.current) {
+      prevTriggerRef.current = animationTrigger;
+      let startTimestamp: number | null = null;
+      const duration = 650; // ms
+      const target = clamped;
+
+      const step = (timestamp: number) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const elapsed = timestamp - startTimestamp;
+        const progress = Math.min(elapsed / duration, 1);
+        // easeOutCubic curve
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplayPct(Math.round(eased * target));
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setDisplayPct(target);
+        }
+      };
+
+      setDisplayPct(0);
+      const animId = requestAnimationFrame(step);
+      return () => cancelAnimationFrame(animId);
+    } else {
+      setDisplayPct(clamped);
+    }
+  }, [animationTrigger, clamped]);
+
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (clamped / 100) * circumference;
+  const strokeDashoffset = circumference - (displayPct / 100) * circumference;
 
   const filterId = `neonGlow_${Math.random().toString(36).substring(2, 7)}`;
   const gradId = `cyanGrad_${Math.random().toString(36).substring(2, 7)}`;
@@ -59,14 +94,14 @@ export function ExecutiveDonutChart({
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           filter={`url(#${filterId})`}
-          className="transition-all duration-700 ease-out"
+          className="transition-all duration-300 ease-out"
         />
       </svg>
 
       {/* Central Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
-        <span className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] leading-none">
-          {clamped}%
+        <span className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] leading-none font-mono">
+          {displayPct}%
         </span>
         <span className="text-[9px] font-black tracking-widest text-[#00f2fe] uppercase mt-1">
           Completado
