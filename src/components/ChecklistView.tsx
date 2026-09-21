@@ -28,7 +28,8 @@ import {
   Lock,
   Unlock,
   FileCheck2,
-  Compass
+  Compass,
+  SlidersHorizontal
 } from 'lucide-react';
 import { Project, Unit, TaskFilter, InspectionItem, Trade } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea, isTradeMatchingFilter } from '../utils/calculations';
@@ -36,6 +37,7 @@ import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ItemObservationModal } from './ItemObservationModal';
 import { AddItemScopeModal } from './AddItemScopeModal';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
+import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 
 function WhatsAppIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -58,22 +60,27 @@ interface ChecklistViewProps {
   onToggleItem: (tradeId: string, itemId: string) => void;
   onUpdateItemProgress: (tradeId: string, itemId: string, percentage: number) => void;
   onDeleteItem: (tradeId: string, itemId: string) => void;
-  onAddItem: (tradeId: string, itemName: string, scope?: 'current_unit' | 'selected_projects', targetProjectIds?: string[]) => void;
+  onAddItem: (tradeId: string, itemName: string, scopeTarget?: 'current_unit' | 'all_units') => void;
   onSaveComment: (tradeId: string, itemId: string, comment: string) => void;
-  onOpenPhotoViewer: (tradeId: string, itemId: string, tradeName: string, itemName: string) => void;
-  onTriggerQuickPhoto: (tradeId: string, itemId: string, tradeName: string, itemName: string) => void;
-  onOpenReportModal: (type?: 'auto' | 'project' | 'unit', projectId?: string, unitId?: string) => void;
-  onEditUnit: (unit: Unit) => void;
-  onRequestDeleteUnit?: (unitId: string, unitName: string) => void;
-  onExportExcel?: (projectId: string, unitId?: string) => void;
-  onOpenSignatureModal?: (unitId: string) => void;
-  onSaveObservation?: (tradeId: string, itemId: string, comment: string, severity: 'low' | 'medium' | 'high' | undefined, isExplicitDelete?: boolean) => void;
+  onSaveObservation?: (
+    tradeId: string,
+    itemId: string,
+    comment: string,
+    severity: 'low' | 'medium' | 'high' | undefined,
+    isExplicitDelete?: boolean
+  ) => void;
+  onOpenPhotoViewer: (tradeId: string, itemId: string, tradeName?: string, itemName?: string) => void;
   onAddPhoto?: (tradeId: string, itemId: string, dataUrl: string) => void;
   onDeletePhoto?: (tradeId: string, itemId: string, photoId: string) => void;
-  onUnlockUnit?: (unitId: string) => void;
-  onOpenBlueprints?: () => void;
+  onOpenReportModal: (type?: 'auto' | 'project' | 'unit', projId?: string, unitId?: string) => void;
+  onExportExcel?: (projectId: string, unitId: string) => void;
+  onEditUnit: (unit: Unit) => void;
+  onRequestDeleteUnit?: (unitId: string, unitName: string) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
+  onOpenSignatureModal?: (unitId: string) => void;
+  onUnlockUnit?: (unitId: string) => void;
+  onOpenBlueprints?: () => void;
   onOpenCroquis?: (unitId?: string) => void;
 }
 
@@ -102,6 +109,8 @@ export function ChecklistView({
   onDeleteTrade,
   onOpenCroquis
 }: ChecklistViewProps) {
+  const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [selectedTradeFilter, setSelectedTradeFilter] = useState<string>('all');
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskFilter>('all');
   const [tradeSectionTab, setTradeSectionTab] = useState<'filter' | 'manage'>('filter');
@@ -214,111 +223,122 @@ export function ChecklistView({
 
   return (
     <section className="space-y-4">
-      {/* Unit Status Banner */}
-      <div className="bg-slate-900 rounded-2xl p-4 text-white shadow-lg border-l-4 border-amber-500 flex items-center justify-between">
-        <div className="min-w-0 pr-2">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-black rounded uppercase">
-              {isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento'}
-            </span>
-            <span className="text-xs text-slate-300 font-bold truncate">
-              {project.name}
-            </span>
+      {/* Executive Unit Status Card with Glowing Cyan Donut Chart */}
+      <div className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white relative overflow-hidden">
+        {/* Subtle background ambient light */}
+        <div className="absolute -top-24 -right-24 w-60 h-60 bg-[#00f2fe]/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30 text-[10px] font-black rounded-lg uppercase tracking-wider">
+                {isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento'}
+              </span>
+              <span className="text-xs text-slate-400 font-bold truncate flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-[#00f2fe]" />
+                {project.name}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+                {unit.name}
+              </h2>
+              <button
+                onClick={() => onEditUnit(unit)}
+                className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-[#00f2fe] border border-slate-700 hover:border-[#00f2fe]/50 transition-colors"
+                title="Editar denominación"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              {onRequestDeleteUnit && (
+                <button
+                  onClick={() => onRequestDeleteUnit(unit.id, unit.name)}
+                  className="p-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/80 hover:border-rose-500 transition-colors"
+                  title="Eliminar este espacio/depto (Requiere clave 2600)"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
+              {counts.completed} de {counts.total} ítems validados ({unitPct}%)
+              {selectedTradeFilter !== 'all' && (
+                <span className="text-[#00f2fe] font-bold ml-1">
+                  • Global: {globalUnitPct}%
+                </span>
+              )}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-800/80">
+              <button
+                onClick={() => onOpenReportModal('unit', project.id, unit.id)}
+                className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+              >
+                <FileText className="w-3.5 h-3.5 text-rose-400" />
+                <span>Reporte PDF</span>
+              </button>
+
+              {onExportExcel && (
+                <button
+                  onClick={() => onExportExcel(project.id, unit.id)}
+                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+                  title="Descargar planilla en Excel con casillas para tildar a mano"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Planilla Excel</span>
+                </button>
+              )}
+
+              {onOpenCroquis && (
+                <button
+                  onClick={() => onOpenCroquis(unit.id)}
+                  className="px-3 py-1.5 bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+                  title="Abrir hoja de croquis a mano alzada para este depto"
+                >
+                  <PenTool className="w-3.5 h-3.5 text-[#00c2ff]" />
+                  <span>Croquis ({unit.sketches?.length || 0})</span>
+                </button>
+              )}
+
+              {onOpenBlueprints && (
+                <button
+                  onClick={onOpenBlueprints}
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-[#00c2ff] border border-slate-700 hover:border-[#00c2ff]/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+                  title="Abrir y verificar planos técnicos de esta unidad"
+                >
+                  <Compass className="w-3.5 h-3.5 text-[#00c2ff]" />
+                  <span>Planos ({unit.blueprints?.length || 0})</span>
+                </button>
+              )}
+
+              {onOpenSignatureModal && (
+                <button
+                  onClick={() => onOpenSignatureModal(unit.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 border ${
+                    unit.signature
+                      ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border-emerald-500/40'
+                      : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 border-amber-500/40'
+                  }`}
+                  title={unit.signature ? `Firmado por ${unit.signedBy || 'Responsable'}` : 'Firmar acta digitalmente'}
+                >
+                  {unit.signature ? <FileCheck2 className="w-3.5 h-3.5 text-emerald-400" /> : <PenTool className="w-3.5 h-3.5 text-amber-400" />}
+                  <span>{unit.signature ? 'Acta Firmada ✔' : 'Firmar Acta'}</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-1">
-            <h2 className="text-xl font-black text-white leading-tight">
-              {unit.name}
-            </h2>
-            <button
-              onClick={() => onEditUnit(unit)}
-              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 hover:border-amber-500/50 transition-colors"
-              title="Editar denominación"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            {onRequestDeleteUnit && (
-              <button
-                onClick={() => onRequestDeleteUnit(unit.id, unit.name)}
-                className="p-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/80 hover:border-rose-500 transition-colors"
-                title="Eliminar este espacio/depto (Requiere clave 2600)"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+          {/* Glowing Cyan Donut Chart */}
+          <div className="flex-shrink-0 flex items-center justify-center md:pl-4">
+            <ExecutiveDonutChart
+              percentage={unitPct}
+              size={136}
+              strokeWidth={13}
+              glowColor="#00f2fe"
+            />
           </div>
-
-          <p className="text-xs text-slate-300 mt-0.5">
-            {counts.completed} de {counts.total} ítems validados ({unitPct}%)
-            {selectedTradeFilter !== 'all' && ` • Global: ${globalUnitPct}%`}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 mt-2.5">
-            <button
-              onClick={() => onOpenReportModal('unit', project.id, unit.id)}
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95"
-            >
-              <FileText className="w-3.5 h-3.5 text-rose-700" />
-              <span>Reporte PDF</span>
-            </button>
-
-            {onExportExcel && (
-              <button
-                onClick={() => onExportExcel(project.id, unit.id)}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border border-emerald-400/40"
-                title="Descargar planilla en Excel con casillas para tildar a mano"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
-                <span>Planilla Excel (Para tildar)</span>
-              </button>
-            )}
-
-            {onOpenSignatureModal && (
-              <button
-                onClick={() => onOpenSignatureModal(unit.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border ${
-                  unit.signature
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400'
-                    : 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-amber-500/40'
-                }`}
-                title={unit.signature ? `Firmado por ${unit.signedBy || 'Responsable'}` : 'Firmar acta digitalmente'}
-              >
-                {unit.signature ? <FileCheck2 className="w-3.5 h-3.5 text-white" /> : <PenTool className="w-3.5 h-3.5 text-amber-400" />}
-                <span>{unit.signature ? 'Acta Firmada ✔' : 'Firmar Acta'}</span>
-              </button>
-            )}
-
-            {onOpenBlueprints && (
-              <button
-                onClick={onOpenBlueprints}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border border-amber-500/40"
-                title="Abrir y verificar planos técnicos de esta unidad"
-              >
-                <Compass className="w-3.5 h-3.5 text-amber-400" />
-                <span>Planos ({unit.blueprints?.length || 0})</span>
-              </button>
-            )}
-
-            {onOpenCroquis && (
-              <button
-                onClick={() => onOpenCroquis(unit.id)}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow touch-target transition-all active:scale-95 border border-amber-400"
-                title="Abrir hoja de croquis a mano alzada para este depto"
-              >
-                <PenTool className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
-                <span>Croquis ({unit.sketches?.length || 0})</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center flex-shrink-0">
-          <AnimatedCircularProgress
-            percentage={unitPct}
-            size={58}
-            strokeWidth={4.5}
-            color="#10B981"
-          />
         </div>
       </div>
 
@@ -352,20 +372,20 @@ export function ChecklistView({
       )}
 
       {/* Trade Filter & Management Section */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 transition-colors">
+      <div className="bg-[#131b2c] p-3 rounded-2xl border border-slate-700/80 shadow-md space-y-3 transition-colors">
         {/* Navigation Tabs Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex items-center gap-1.5 p-1 bg-[#151f33]/90 border border-slate-700/80 rounded-xl">
             <button
               type="button"
               onClick={() => setTradeSectionTab('filter')}
               className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
                 tradeSectionTab === 'filter'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-amber-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-amber-500" />
+              <Layers className="w-3.5 h-3.5" />
               <span>Filtrar Gremios</span>
             </button>
 
@@ -374,16 +394,16 @@ export function ChecklistView({
               onClick={() => setTradeSectionTab('manage')}
               className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
                 tradeSectionTab === 'manage'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-amber-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                  : 'text-slate-300 hover:text-white'
               }`}
             >
-              <Plus className="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+              <Plus className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
               <span>Agregar o Eliminar Gremios</span>
             </button>
           </div>
 
-          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold hidden sm:inline">
+          <span className="text-[11px] text-[#00f2fe] font-bold hidden sm:inline">
             {tradeSectionTab === 'filter'
               ? (selectedTradeFilter === 'all' ? 'Todos los gremios' : activeTradeObj?.name)
               : `${unitTradesList.length} Gremios en esta unidad`}
@@ -396,10 +416,10 @@ export function ChecklistView({
             <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
               <button
                 onClick={() => setSelectedTradeFilter('all')}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                className={`flex-shrink-0 px-3.5 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
                   selectedTradeFilter === 'all'
-                    ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+                    ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
+                    : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
                 }`}
               >
                 <span>Todos</span>
@@ -411,10 +431,10 @@ export function ChecklistView({
                   <button
                     key={trade.id}
                     onClick={() => setSelectedTradeFilter(isActive ? 'all' : trade.id)}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
+                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
                       isActive
-                        ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+                        ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
+                        : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
                     }`}
                   >
                     {getTradeIcon(trade.id)}
@@ -430,9 +450,9 @@ export function ChecklistView({
         {tradeSectionTab === 'manage' && (
           <div className="space-y-4 pt-1 animate-in fade-in duration-200">
             {/* Form to Add New Trade */}
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-              <label className="block text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <Plus className="w-3.5 h-3.5 text-emerald-500 stroke-[3]" />
+            <div className="p-3 bg-[#151f33] rounded-xl border border-slate-700 space-y-2.5">
+              <label className="block text-xs font-black text-slate-200 flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
                 Agregar Nuevo Gremio a la Inspección
               </label>
 
@@ -442,13 +462,13 @@ export function ChecklistView({
                   value={newTradeNameDraft}
                   onChange={(e) => setNewTradeNameDraft(e.target.value)}
                   placeholder="Ej: Pintura, Instalación de Gas, Herrería..."
-                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-700 bg-[#0e1422] text-slate-100 font-medium placeholder-slate-500 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe]"
                 />
 
                 <select
                   value={newTradeScope}
                   onChange={(e) => setNewTradeScope(e.target.value as 'current_unit' | 'all_units')}
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="px-3 py-2 text-xs rounded-xl border border-slate-700 bg-[#0e1422] text-slate-100 font-bold focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe]"
                 >
                   <option value="current_unit">Solo en este depto ({unit.name})</option>
                   <option value="all_units">En todo el complejo ({project.name})</option>
@@ -472,7 +492,7 @@ export function ChecklistView({
 
               {/* Quick Preset Badges */}
               <div className="pt-1">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
                   Sugerencias rápidas de gremios:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -489,7 +509,7 @@ export function ChecklistView({
                       key={preset}
                       type="button"
                       onClick={() => setNewTradeNameDraft(preset)}
-                      className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors active:scale-95"
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-[#162238] hover:bg-[#1c2d4a] text-slate-300 hover:text-white border border-slate-700 hover:border-[#00f2fe]/40 transition-colors active:scale-95"
                     >
                       + {preset}
                     </button>
@@ -500,24 +520,24 @@ export function ChecklistView({
 
             {/* List of Current Trades for Deletion / Management */}
             <div>
-              <span className="text-xs font-black text-slate-800 dark:text-slate-200 block mb-2">
+              <span className="text-xs font-black text-slate-200 block mb-2">
                 Gremios Actuales ({unitTradesList.length}):
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {unitTradesList.map(trade => (
                   <div
                     key={trade.id}
-                    className="p-2.5 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-2xs"
+                    className="p-2.5 bg-[#162238] rounded-xl border border-slate-700/80 flex items-center justify-between shadow-2xs"
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-[#00f2fe]/15 text-[#00f2fe] flex items-center justify-center flex-shrink-0">
                         {getTradeIcon(trade.id)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        <p className="text-xs font-bold text-slate-100 truncate">
                           {trade.name}
                         </p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <p className="text-[10px] text-slate-400">
                           {trade.items.length} {trade.items.length === 1 ? 'tarea' : 'tareas'}
                         </p>
                       </div>
@@ -532,7 +552,7 @@ export function ChecklistView({
                             setSelectedTradeFilter('all');
                           }
                         }}
-                        className="px-2.5 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 transition-colors active:scale-95 touch-target flex-shrink-0"
+                        className="px-2.5 py-1 text-[11px] font-bold text-rose-400 hover:bg-rose-950/50 rounded-lg border border-rose-900/50 flex items-center gap-1 transition-colors active:scale-95 touch-target flex-shrink-0"
                         title={`Eliminar gremio ${trade.name}`}
                       >
                         <Trash2 className="w-3 h-3" />
@@ -547,77 +567,78 @@ export function ChecklistView({
         )}
       </div>
 
-      {/* Task Status Filters */}
-      <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 transition-colors">
+      {/* Task Status Filters - Executive Capsule Pills */}
+      <div className="bg-[#131b2c] p-2.5 rounded-2xl border border-slate-700/80 shadow-md space-y-2 transition-colors select-none">
         <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+          <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
             Estado de Tareas:
           </span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+          <span className="text-[10px] text-slate-400 font-medium">
             {taskStatusFilter === 'all' ? 'Todas las tareas' : (taskStatusFilter === 'pending' ? 'Solo pendientes' : 'Solo completadas')}
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 text-xs">
+        <div className="grid grid-cols-3 gap-2 text-xs">
           <button
             onClick={() => setTaskStatusFilter('all')}
-            className={`py-1.5 px-2 rounded-xl font-bold border transition-all flex items-center justify-center gap-1.5 touch-target ${
+            className={`py-1.5 px-3 rounded-full font-bold border transition-all flex items-center justify-center gap-1.5 touch-target ${
               taskStatusFilter === 'all'
-                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
+                : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
             }`}
           >
-            <span>Todas</span>
-            <span className="bg-slate-950/15 dark:bg-slate-100/15 text-[10px] px-1.5 rounded-full font-black">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>All</span>
+            <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {counts.total}
             </span>
           </button>
 
           <button
-            onClick={() => setTaskStatusFilter('pending')}
-            className={`py-1.5 px-2 rounded-xl font-medium border transition-all flex items-center justify-center gap-1.5 touch-target ${
-              taskStatusFilter === 'pending'
-                ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-sm'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            onClick={() => setTaskStatusFilter('completed')}
+            className={`py-1.5 px-3 rounded-full font-bold border transition-all flex items-center justify-center gap-1.5 touch-target ${
+              taskStatusFilter === 'completed'
+                ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.45)]'
+                : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
             }`}
           >
-            <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-            <span>Pendientes</span>
-            <span className="bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] px-1.5 rounded-full font-black">
-              {counts.total - counts.completed}
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Completed</span>
+            <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+              {counts.completed}
             </span>
           </button>
 
           <button
-            onClick={() => setTaskStatusFilter('completed')}
-            className={`py-1.5 px-2 rounded-xl font-medium border transition-all flex items-center justify-center gap-1.5 touch-target ${
-              taskStatusFilter === 'completed'
-                ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-sm'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            onClick={() => setTaskStatusFilter('pending')}
+            className={`py-1.5 px-3 rounded-full font-bold border transition-all flex items-center justify-center gap-1.5 touch-target ${
+              taskStatusFilter === 'pending'
+                ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.45)]'
+                : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
             }`}
           >
-            <CircleCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-            <span>Listas</span>
-            <span className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] px-1.5 rounded-full font-black">
-              {counts.completed}
+            <Clock className="w-3.5 h-3.5 text-rose-400" />
+            <span>Pending</span>
+            <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+              {counts.total - counts.completed}
             </span>
           </button>
         </div>
       </div>
 
       {/* Expand / Collapse Controls */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 select-none">
         <button
           onClick={() => toggleAll(true)}
-          className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+          className="flex-1 bg-[#131b2c] border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
         >
-          <ChevronsDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Expandir Todo
+          <ChevronsDown className="w-3.5 h-3.5 text-[#00f2fe]" /> Expandir Todo
         </button>
         <button
           onClick={() => toggleAll(false)}
-          className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+          className="flex-1 bg-[#131b2c] border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
         >
-          <ChevronsUp className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Colapsar
+          <ChevronsUp className="w-3.5 h-3.5 text-[#00f2fe]" /> Colapsar
         </button>
       </div>
 
@@ -644,6 +665,7 @@ export function ChecklistView({
           }, 0);
           const tradePct = totalTradeItems === 0 ? 0 : Math.round(totalTradeProgress / totalTradeItems);
           const isCollapsed = collapsedTrades[trade.id] === true;
+          const isTradeActive = activeTradeId === trade.id;
 
           // If filtering by status and no tasks match in this trade (when showing all trades)
           if (taskStatusFilter !== 'all' && filteredItems.length === 0 && selectedTradeFilter === 'all') {
@@ -653,24 +675,30 @@ export function ChecklistView({
           return (
             <div
               key={trade.id}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors"
+              onMouseEnter={() => setActiveTradeId(trade.id)}
+              onTouchStart={() => setActiveTradeId(trade.id)}
+              className={`rounded-2xl shadow-md overflow-hidden transition-all duration-300 ${
+                isTradeActive
+                  ? 'border-2 border-[#00f2fe] shadow-[0_0_24px_rgba(0,242,254,0.32)] bg-[#131b2c]'
+                  : 'border border-slate-700/80 hover:border-[#00f2fe]/60 bg-[#131b2c]'
+              }`}
             >
               {/* Accordion Header */}
               <div
                 onClick={() => toggleTrade(trade.id)}
-                className="px-4 py-3.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer active:bg-slate-100 dark:active:bg-slate-800 touch-target select-none"
+                className="px-4 py-3.5 bg-[#162238] border-b border-slate-700/80 flex items-center justify-between cursor-pointer select-none"
               >
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center text-amber-700 dark:text-amber-400 text-sm flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#0e1422] border border-slate-700 shadow-xs flex items-center justify-center text-[#00f2fe] text-sm flex-shrink-0">
                     {getTradeIcon(trade.id)}
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
+                    <h4 className="text-sm font-black text-white leading-tight">
                       {trade.name}
                     </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-[11px] text-slate-400">
                       {completedTradeItems}/{totalTradeItems} verificados •{' '}
-                      <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{tradePct}%</span>
+                      <span className="font-bold text-[#00f2fe] font-mono">{tradePct}%</span>
                     </p>
                   </div>
                 </div>
@@ -688,14 +716,14 @@ export function ChecklistView({
                     <span className="text-[11px] font-bold hidden sm:inline">WhatsApp</span>
                   </button>
 
-                  <div className="w-14 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden hidden sm:block">
+                  <div className="w-14 bg-slate-800 h-2 rounded-full overflow-hidden hidden sm:block">
                     <div
-                      className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                      className="bg-[#00f2fe] shadow-[0_0_8px_rgba(0,242,254,0.5)] h-full rounded-full transition-all duration-300"
                       style={{ width: `${tradePct}%` }}
                     />
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
                       isCollapsed ? '-rotate-90' : ''
                     }`}
                   />
@@ -704,9 +732,9 @@ export function ChecklistView({
 
               {/* Accordion Content */}
               {!isCollapsed && (
-                <div className="p-3 space-y-2 bg-white dark:bg-slate-900 transition-colors">
+                <div className="p-3 space-y-2.5 bg-[#131b2c] transition-colors">
                   {filteredItems.length === 0 ? (
-                    <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2 text-center">
+                    <p className="text-xs text-slate-400 italic py-2 text-center">
                       No hay tareas con este criterio en {trade.name}
                     </p>
                   ) : (
@@ -716,19 +744,24 @@ export function ChecklistView({
                       const currentPct = item.progressPercentage !== undefined ? item.progressPercentage : (item.completed ? 100 : 0);
                       const isComplete = item.completed || currentPct === 100;
                       const isPartial = !isComplete && currentPct > 0;
+                      const isItemActive = activeItemId === item.id;
 
                       return (
                         <div
                           key={item.id}
-                          className={`p-3 rounded-xl border transition-all ${
-                            isComplete
-                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 shadow-2xs'
+                          onMouseEnter={() => setActiveItemId(item.id)}
+                          onTouchStart={() => setActiveItemId(item.id)}
+                          className={`p-3 rounded-xl transition-all duration-200 ${
+                            isItemActive
+                              ? 'border-2 border-[#00f2fe] shadow-[0_0_18px_rgba(0,242,254,0.32)] bg-[#19263e]'
+                              : isComplete
+                              ? 'bg-emerald-950/20 border border-emerald-500/40 text-white'
                               : isPartial
-                              ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800 shadow-2xs'
-                              : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 shadow-2xs'
+                              ? 'bg-cyan-950/20 border border-[#00c2ff]/40 text-white'
+                              : 'bg-[#151f33] border border-slate-700/80 text-white hover:border-[#00f2fe]/60'
                           }`}
                         >
-                          {/* Fila Horizontal Principal con Flexbox Estricto */}
+                          {/* Fila Horizontal Principal */}
                           <div
                             style={{
                               display: 'flex',
@@ -746,10 +779,10 @@ export function ChecklistView({
                                   style={{ whiteSpace: 'normal', wordBreak: 'normal' }}
                                   className={`text-xs sm:text-sm font-bold leading-snug text-left ${
                                     isComplete
-                                      ? 'text-emerald-800 dark:text-emerald-300'
+                                      ? 'text-emerald-300'
                                       : isPartial
-                                      ? 'text-slate-900 dark:text-slate-100'
-                                      : 'text-slate-800 dark:text-slate-200'
+                                      ? 'text-white'
+                                      : 'text-slate-200'
                                   }`}
                                 >
                                   {item.name}
@@ -757,25 +790,25 @@ export function ChecklistView({
 
                                 {/* Severity Badges */}
                                 {item.severity === 'high' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
-                                    <Flame className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" />
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-rose-950/60 text-rose-300 border border-rose-800 animate-pulse">
+                                    <Flame className="w-2.5 h-2.5 text-rose-400" />
                                     Crítico
                                   </span>
                                 )}
                                 {item.severity === 'medium' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-950/60 text-amber-300 border border-amber-800">
+                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
                                     Medio
                                   </span>
                                 )}
                                 {item.severity === 'low' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950/60 text-emerald-300 border border-emerald-800">
                                     Leve
                                   </span>
                                 )}
                               </div>
 
-                              {/* Si tiene notas u observaciones, mostrar debajo del nombre en texto más pequeño (color gris suave) */}
+                              {/* Si tiene notas u observaciones */}
                               {item.comment && (
                                 <div
                                   onClick={(e) => {
@@ -783,11 +816,11 @@ export function ChecklistView({
                                     setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
                                   }}
                                   style={{ whiteSpace: 'normal', wordBreak: 'normal' }}
-                                  className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer group/note"
+                                  className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-400 hover:text-[#00f2fe] cursor-pointer group/note"
                                   title="Tocar para editar nota, severidad o fotos"
                                 >
-                                  <MessageSquareText className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                  <span className="text-slate-500 dark:text-slate-400 group-hover/note:text-slate-700 dark:group-hover/note:text-slate-200 leading-tight">
+                                  <MessageSquareText className="w-3.5 h-3.5 text-[#00f2fe] mt-0.5 flex-shrink-0" />
+                                  <span className="text-slate-400 group-hover/note:text-slate-200 leading-tight">
                                     {item.comment}
                                   </span>
                                 </div>
@@ -796,20 +829,20 @@ export function ChecklistView({
                               {/* Barra de avance en curso */}
                               {isPartial && (
                                 <div className="mt-1.5 flex items-center gap-1.5">
-                                  <div className="w-16 sm:w-24 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden flex-shrink-0">
+                                  <div className="w-16 sm:w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden flex-shrink-0">
                                     <div
-                                      className="h-full bg-amber-500 rounded-full transition-all duration-200"
+                                      className="h-full bg-[#00c2ff] rounded-full transition-all duration-200"
                                       style={{ width: `${currentPct}%` }}
                                     />
                                   </div>
-                                  <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-400">
+                                  <span className="text-[10px] font-mono font-bold text-[#00f2fe]">
                                     {currentPct}% en curso
                                   </span>
                                 </div>
                               )}
                               {isComplete && (
                                 <div className="mt-0.5">
-                                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  <span className="text-[10px] font-bold text-emerald-400">
                                     ✓ 100% completado
                                   </span>
                                 </div>
@@ -830,28 +863,28 @@ export function ChecklistView({
                                 }}
                                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${
                                   item.comment || item.severity
-                                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900 shadow-2xs'
-                                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700'
+                                    ? 'bg-[#1a2942] text-[#00f2fe] border border-[#00f2fe]/60 shadow-[0_0_10px_rgba(0,242,254,0.2)]'
+                                    : 'bg-[#162238] text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500'
                                 }`}
                                 title={item.comment ? 'Ver o editar observación técnica y fotos' : 'Agregar observación o foto'}
                               >
                                 <MessageSquare
                                   className={`w-3.5 h-3.5 ${
-                                    item.comment || item.severity ? 'text-amber-700 dark:text-amber-400 fill-amber-500/20' : 'text-slate-400 dark:text-slate-500'
+                                    item.comment || item.severity ? 'text-[#00f2fe]' : 'text-slate-400'
                                   }`}
                                 />
                               </button>
 
-                              {/* Control de porcentaje: Cuadro numérico compacto (con botones - y + o input numérico) */}
+                              {/* Control de porcentaje: Cuadro numérico compacto */}
                               <div
                                 onClick={(e) => e.stopPropagation()}
                                 className={`flex items-center rounded-lg border h-8 px-1 transition-all shadow-2xs flex-shrink-0 ${
-                                  unit.isLocked ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' :
+                                  unit.isLocked ? 'opacity-40 cursor-not-allowed bg-slate-800 border-slate-700' :
                                   isComplete
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'
+                                    ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300'
                                     : isPartial
-                                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 ring-1 ring-amber-300/80 dark:ring-amber-500/30'
-                                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600'
+                                    ? 'bg-[#1a2942] border-[#00c2ff]/60 text-[#00f2fe] ring-1 ring-[#00c2ff]/30'
+                                    : 'bg-[#162238] border-slate-700 text-slate-300 hover:border-slate-500'
                                 }`}
                                 title={unit.isLocked ? "Inspección bloqueada por acta" : "Porcentaje de avance del ítem (0% a 100%)"}
                               >
@@ -859,7 +892,7 @@ export function ChecklistView({
                                   type="button"
                                   disabled={unit.isLocked}
                                   onClick={() => onUpdateItemProgress(trade.id, item.id, Math.max(0, currentPct - 10))}
-                                  className={`w-4 h-6 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-black text-xs flex items-center justify-center select-none active:scale-90 ${unit.isLocked ? 'cursor-not-allowed' : ''}`}
+                                  className={`w-4 h-6 text-slate-400 hover:text-white font-black text-xs flex items-center justify-center select-none active:scale-90 ${unit.isLocked ? 'cursor-not-allowed' : ''}`}
                                   title="Restar 10%"
                                 >
                                   -
@@ -875,22 +908,22 @@ export function ChecklistView({
                                     onUpdateItemProgress(trade.id, item.id, val);
                                   }}
                                   className={`w-7 text-center font-mono font-black text-xs bg-transparent focus:outline-none p-0 ${
-                                    isComplete ? 'text-emerald-700 dark:text-emerald-400' : isPartial ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-200'
+                                    isComplete ? 'text-emerald-400' : isPartial ? 'text-[#00f2fe]' : 'text-slate-200'
                                   } ${unit.isLocked ? 'cursor-not-allowed' : ''}`}
                                 />
-                                <span className="text-[10px] font-black text-slate-400 select-none mr-0.5">%</span>
+                                <span className="text-[10px] font-black text-slate-500 select-none mr-0.5">%</span>
                                 <button
                                   type="button"
                                   disabled={unit.isLocked}
                                   onClick={() => onUpdateItemProgress(trade.id, item.id, Math.min(100, currentPct + 10))}
-                                  className={`w-4 h-6 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-black text-xs flex items-center justify-center select-none active:scale-90 ${unit.isLocked ? 'cursor-not-allowed' : ''}`}
+                                  className={`w-4 h-6 text-slate-400 hover:text-white font-black text-xs flex items-center justify-center select-none active:scale-90 ${unit.isLocked ? 'cursor-not-allowed' : ''}`}
                                   title="Sumar 10%"
                                 >
                                   +
                                 </button>
                               </div>
 
-                              {/* Checkbox/Tilde de completado: Casilla amplia táctil (mínimo 28x28px) */}
+                              {/* Checkbox/Tilde de completado */}
                               <button
                                 type="button"
                                 disabled={unit.isLocked}
@@ -900,12 +933,12 @@ export function ChecklistView({
                                 }}
                                 className={`w-8 h-8 min-w-[28px] min-h-[28px] rounded-lg border-2 flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${
                                   unit.isLocked
-                                    ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+                                    ? 'opacity-40 cursor-not-allowed bg-slate-800 border-slate-700'
                                     : isComplete
-                                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs cursor-pointer'
+                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer'
                                     : isPartial
-                                    ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:border-amber-500 cursor-pointer'
-                                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 cursor-pointer'
+                                    ? 'border-[#00c2ff] bg-[#162238] text-[#00c2ff] hover:border-[#00f2fe] cursor-pointer'
+                                    : 'border-slate-600 bg-[#162238] hover:border-[#00f2fe] cursor-pointer'
                                 }`}
                                 title={
                                   unit.isLocked
@@ -918,7 +951,7 @@ export function ChecklistView({
                                 {isComplete && <Check className="w-5 h-5 stroke-[3]" />}
                               </button>
 
-                              {/* Ícono de cámara/foto (abre modal de observación y fotos) */}
+                              {/* Ícono de cámara/foto */}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -927,12 +960,12 @@ export function ChecklistView({
                                 }}
                                 className={`h-8 px-2 rounded-lg flex items-center gap-1 text-xs font-bold transition-all active:scale-95 flex-shrink-0 ${
                                   photoCount > 0
-                                    ? 'bg-slate-900 text-amber-400 border border-amber-500/60 shadow-xs'
-                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                    ? 'bg-[#0e1422] text-[#00f2fe] border border-[#00f2fe]/60 shadow-[0_0_8px_rgba(0,242,254,0.3)]'
+                                    : 'bg-[#162238] text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500'
                                 }`}
                                 title={photoCount > 0 ? `${photoCount} foto(s) registrada(s)` : 'Tomar o adjuntar foto'}
                               >
-                                <Camera className={`w-3.5 h-3.5 ${photoCount > 0 ? 'text-amber-400' : 'text-slate-500 dark:text-slate-400'}`} />
+                                <Camera className={`w-3.5 h-3.5 ${photoCount > 0 ? 'text-[#00f2fe]' : 'text-slate-400'}`} />
                                 {photoCount > 0 && (
                                   <span className="text-[11px] font-mono font-black">{photoCount}</span>
                                 )}
@@ -946,7 +979,7 @@ export function ChecklistView({
                                     e.stopPropagation();
                                     onDeleteItem(trade.id, item.id);
                                   }}
-                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center flex-shrink-0 active:scale-90 transition-colors"
+                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 flex items-center justify-center flex-shrink-0 active:scale-90 transition-colors"
                                   title="Eliminar tarea"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -959,11 +992,11 @@ export function ChecklistView({
                           {editingCommentItemId === item.id && (
                             <div
                               onClick={(e) => e.stopPropagation()}
-                              className="mt-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 shadow-sm space-y-2 animate-in fade-in duration-150"
+                              className="mt-2.5 p-3 rounded-xl bg-[#162238] border-2 border-[#00f2fe]/40 shadow-sm space-y-2 animate-in fade-in duration-150"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                  <MessageSquare className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                                <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                  <MessageSquare className="w-3.5 h-3.5 text-[#00f2fe]" />
                                   {item.comment ? 'Editar Observación' : 'Nueva Observación / Comentario'}
                                 </span>
                                 {item.comment && (
@@ -974,7 +1007,7 @@ export function ChecklistView({
                                       setEditingCommentItemId(null);
                                       setCommentDraft('');
                                     }}
-                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1"
+                                    className="text-[10px] font-bold text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                     Borrar
@@ -988,12 +1021,12 @@ export function ChecklistView({
                                 value={commentDraft}
                                 onChange={(e) => setCommentDraft(e.target.value)}
                                 placeholder="Escribe detalles, tareas pendientes o notas técnicas..."
-                                className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-medium leading-relaxed shadow-2xs"
+                                className="w-full text-xs p-2.5 rounded-lg border border-slate-700 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] bg-[#0e1422] text-white font-medium leading-relaxed shadow-2xs placeholder-slate-500"
                               />
 
                               {/* Quick suggestion chips */}
                               <div className="flex flex-wrap gap-1 items-center pt-0.5">
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mr-0.5">Sugerencias:</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase mr-0.5">Sugerencias:</span>
                                 {[
                                   'Falta terminación',
                                   'Pendiente de material',
@@ -1007,7 +1040,7 @@ export function ChecklistView({
                                     onClick={() => {
                                       setCommentDraft(prev => prev ? `${prev}. ${preset}` : preset);
                                     }}
-                                    className="text-[10px] px-2 py-0.5 bg-white dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-950 border border-amber-200 dark:border-amber-800/80 text-slate-700 dark:text-slate-300 rounded-md font-semibold transition-colors shadow-2xs"
+                                    className="text-[10px] px-2 py-0.5 bg-[#131b2c] hover:bg-[#1c2d4a] border border-slate-700 hover:border-[#00f2fe]/40 text-slate-300 rounded-md font-semibold transition-colors shadow-2xs"
                                   >
                                     + {preset}
                                   </button>
@@ -1021,7 +1054,7 @@ export function ChecklistView({
                                     setEditingCommentItemId(null);
                                     setCommentDraft('');
                                   }}
-                                  className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg touch-target"
+                                  className="px-3 py-1.5 text-xs font-bold text-slate-300 hover:text-white bg-[#151f33] border border-slate-700 rounded-lg touch-target"
                                 >
                                   Cancelar
                                 </button>
@@ -1032,7 +1065,7 @@ export function ChecklistView({
                                     setEditingCommentItemId(null);
                                     setCommentDraft('');
                                   }}
-                                  className="px-3.5 py-1.5 text-xs font-black text-slate-950 bg-amber-500 hover:bg-amber-400 rounded-lg shadow-sm flex items-center gap-1.5 touch-target active:scale-95 transition-all"
+                                  className="px-3.5 py-1.5 text-xs font-black text-slate-950 bg-[#00c2ff] hover:brightness-110 rounded-lg shadow-sm flex items-center gap-1.5 touch-target active:scale-95 transition-all"
                                 >
                                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                                   Guardar
@@ -1043,12 +1076,12 @@ export function ChecklistView({
 
                           {/* Photo Evidence Thumbnails Strip */}
                           {photoCount > 0 && (
-                            <div className="mt-2 pt-2 border-t border-slate-200/70 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                            <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
                               {photoList.map((photo, pIdx) => (
                                 <div
                                   key={photo.id}
                                   onClick={() => onOpenPhotoViewer(trade.id, item.id, trade.name, item.name)}
-                                  className="relative w-11 h-11 rounded-lg overflow-hidden border border-amber-500/50 flex-shrink-0 cursor-pointer shadow-xs active:scale-95 bg-slate-900 group"
+                                  className="relative w-11 h-11 rounded-lg overflow-hidden border border-[#00f2fe]/40 flex-shrink-0 cursor-pointer shadow-xs active:scale-95 bg-[#0e1422] group hover:border-[#00f2fe]"
                                   title={`Ver foto ${pIdx + 1}`}
                                 >
                                   <img
@@ -1056,7 +1089,7 @@ export function ChecklistView({
                                     alt={`Evidencia ${pIdx + 1}`}
                                     className="w-full h-full object-cover"
                                   />
-                                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] text-center font-mono py-0.2">
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[8px] text-center font-mono py-0.2">
                                     #{pIdx + 1}
                                   </span>
                                 </div>
@@ -1068,7 +1101,7 @@ export function ChecklistView({
                                   e.stopPropagation();
                                   setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
                                 }}
-                                className="w-11 h-11 rounded-lg border border-dashed border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-500/10 flex flex-col items-center justify-center flex-shrink-0 hover:bg-amber-500/20 active:scale-95 text-[10px] font-bold"
+                                className="w-11 h-11 rounded-lg border border-dashed border-[#00f2fe]/60 text-[#00f2fe] bg-[#00f2fe]/10 flex flex-col items-center justify-center flex-shrink-0 hover:bg-[#00f2fe]/20 active:scale-95 text-[10px] font-bold"
                                 title="Agregar o tomar foto"
                               >
                                 <Plus className="w-3.5 h-3.5" />
@@ -1084,18 +1117,18 @@ export function ChecklistView({
                   {/* Add New Task Form in this Trade */}
                   <form
                     onSubmit={(e) => handleAddTaskSubmit(e, trade.id, trade.name)}
-                    className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2"
+                    className="mt-3 pt-2.5 border-t border-slate-700/80 flex items-center gap-2"
                   >
                     <input
                       type="text"
                       placeholder={`+ Añadir tarea a ${trade.name}...`}
                       value={newTaskNames[trade.id] || ''}
                       onChange={(e) => setNewTaskNames(prev => ({ ...prev, [trade.id]: e.target.value }))}
-                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 dark:bg-slate-800 font-medium text-slate-800 dark:text-slate-100"
+                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-700 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] bg-[#151f33] font-medium text-white placeholder-slate-500"
                     />
                     <button
                       type="submit"
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-xs touch-target active:scale-95 flex-shrink-0 transition-all"
+                      className="bg-[#00c2ff] hover:bg-[#00b0e8] text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 shadow-sm touch-target active:scale-95 flex-shrink-0 transition-all"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[3]" /> Añadir
                     </button>
@@ -1159,10 +1192,10 @@ export function ChecklistView({
           <button
             type="button"
             onClick={onOpenBlueprints}
-            className="px-4 py-2.5 rounded-full bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 font-black text-xs flex items-center gap-2 shadow-2xl border-2 border-amber-500 dark:border-slate-900 active:scale-95 hover:scale-105 transition-all touch-target"
+            className="px-4 py-2.5 rounded-full bg-[#131b2c] text-[#00f2fe] font-black text-xs flex items-center gap-2 shadow-2xl border-2 border-[#00f2fe] shadow-[0_0_20px_rgba(0,242,254,0.35)] active:scale-95 hover:scale-105 transition-all touch-target"
             title="Cotejar tareas contra el plano técnico"
           >
-            <Compass className="w-4 h-4 text-amber-400 dark:text-slate-950" />
+            <Compass className="w-4 h-4 text-[#00f2fe]" />
             <span>📐 Ver Planos ({unit.blueprints?.length || 0})</span>
           </button>
         </div>

@@ -19,13 +19,17 @@ import {
   FileSpreadsheet,
   Compass,
   FileCheck,
-  PenTool
+  PenTool,
+  SlidersHorizontal,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
+import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 
 interface UnitsViewProps {
   project: Project;
@@ -71,6 +75,7 @@ export function UnitsView({
   const [typeFilter, setTypeFilter] = useState<'all' | 'unit' | 'common_area'>('all');
   const [tradeSectionTab, setTradeSectionTab] = useState<'filter' | 'manage'>('filter');
   const [newTradeNameDraft, setNewTradeNameDraft] = useState<string>('');
+  const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
 
   const overallProgress = calculateProjectProgress(project, tradeFilter);
 
@@ -151,161 +156,133 @@ export function UnitsView({
 
   return (
     <section className="space-y-4">
-      {/* Project Summary Card */}
-      <div
-        className={`rounded-2xl p-4 shadow-sm border transition-colors ${
-          presentationBg
-            ? 'text-white border-slate-700/60 shadow-lg'
-            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-        }`}
-        style={presentationBg ? (presentationBg.startsWith('linear') ? { background: presentationBg } : { backgroundColor: presentationBg }) : undefined}
-      >
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${presentationBg ? 'text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}>
-              Obra Activa
-            </span>
-            <h2 className={`text-lg font-black leading-tight ${presentationBg ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+      {/* Executive Project Summary Card */}
+      <div className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white transition-all relative overflow-hidden">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1.5 flex-1 min-w-0 pr-1">
+            {/* Deptos & Comunes Tag */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                {countDeptos} DEPTOS - {countCommon} COMUNES
+              </span>
+              <span className="text-[11px] text-[#00f2fe]/90 font-bold">Comunadas</span>
+            </div>
+
+            {/* Project Name */}
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight truncate">
               {project.name}
             </h2>
-            <p className={`text-xs ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
-              {project.location} • {project.units.length} Espacios ({countDeptos} deptos, {countCommon} comunes)
+
+            {/* Location with Pin */}
+            <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
+              <Building2 className="w-3.5 h-3.5 text-[#00f2fe] flex-shrink-0" />
+              <span>{project.location || 'Calle Agustín Alvarez 315'}</span>
               {typeFilter !== 'all' && (
-                <span className={`font-bold block sm:inline sm:ml-1 ${presentationBg ? 'text-amber-300' : 'text-amber-600 dark:text-amber-400'}`}>
+                <span className="text-[#00f2fe] font-bold ml-1">
                   • Viendo {typeFilter === 'unit' ? `${countDeptos} Deptos` : `${countCommon} Espacios Comunes`}
                 </span>
               )}
             </p>
+
+            {/* Separator */}
+            <div className="w-full h-px bg-slate-800/80 my-2" />
+
+            {/* Avance General Technical Details */}
+            <div className="pt-0.5 text-xs text-slate-300 space-y-1">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">
+                Avance General
+              </p>
+              <div className="flex items-center gap-2 truncate text-slate-300">
+                <FileCheck className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <span className="truncate">{project.technicalNotes || 'Toda la información del Expediente'}</span>
+              </div>
+              <div className="flex items-center gap-2 truncate text-slate-300">
+                <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <span className="truncate">Msc. Arq. Agustín Arrieta</span>
+              </div>
+              {project.expedienteMunicipal && (
+                <div className="flex items-center gap-2 truncate text-slate-300">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Exp:</span>
+                  <span className="truncate">{project.expedienteMunicipal}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-center flex-shrink-0">
-            <AnimatedCircularProgress
+
+          {/* Glowing Cyan Donut Chart */}
+          <div className="flex-shrink-0 flex items-center justify-center pl-2">
+            <ExecutiveDonutChart
               percentage={typeFilter === 'all' ? overallProgress : tabProgress}
-              size={56}
-              strokeWidth={4.5}
-              color="#10B981"
+              size={136}
+              strokeWidth={13}
+              glowColor="#00f2fe"
             />
-            <p className={`text-[9px] uppercase font-bold mt-0.5 text-center ${presentationBg ? 'text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
-              {typeFilter === 'all'
-                ? (tradeFilter === 'all' ? 'Avance General' : activeTrade?.shortName)
-                : typeFilter === 'unit'
-                ? (tradeFilter === 'all' ? 'Avance Deptos' : `${activeTrade?.shortName} Deptos`)
-                : (tradeFilter === 'all' ? 'Avance Comunes' : `${activeTrade?.shortName} Comunes`)}
-            </p>
-          </div>
-        </div>
-
-        {/* Ficha Técnica y Administrativa Collapsible/Card */}
-        <div className={`mt-3 p-2.5 rounded-xl border text-xs space-y-1 ${
-          presentationBg
-            ? 'bg-black/30 border-white/10 text-slate-200'
-            : 'bg-slate-50 dark:bg-slate-850 border-slate-200/80 dark:border-slate-800'
-        }`}>
-          <div className={`flex items-center justify-between text-[11px] font-bold ${presentationBg ? 'text-slate-200' : 'text-slate-700 dark:text-slate-300'}`}>
-            <span className={`flex items-center gap-1 ${presentationBg ? 'text-amber-300' : 'text-amber-700 dark:text-amber-400'}`}>
-              <FileCheck className="w-3.5 h-3.5 text-amber-500" />
-              Ficha Técnica y Administrativa de la Obra
-            </span>
-            {onEditProject && (
-              <button
-                type="button"
-                onClick={() => onEditProject(project)}
-                className="text-[10px] font-black text-amber-500 hover:underline flex items-center gap-0.5 px-2 py-0.5 rounded bg-amber-500/10"
-              >
-                <Pencil className="w-2.5 h-2.5" /> Editar Datos
-              </button>
-            )}
-          </div>
-
-          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] pt-0.5 ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
-            <div>
-              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>Exp. Municipal:</strong>{' '}
-              {project.expedienteMunicipal || <span className="text-slate-400 italic">Sin cargar</span>}
-            </div>
-            <div>
-              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>EDEMSA:</strong>{' '}
-              {project.expedienteEdemsa || <span className="text-slate-400 italic">Sin cargar</span>}
-            </div>
-            <div>
-              <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>AYSAM:</strong>{' '}
-              {project.expedienteAysam || <span className="text-slate-400 italic">Sin cargar</span>}
-            </div>
-            {project.customServices && project.customServices.map(srv => (
-              <div key={srv.id}>
-                <strong className={presentationBg ? 'text-slate-100' : 'text-slate-700 dark:text-slate-300'}>{srv.name.split('(')[0].trim()}:</strong>{' '}
-                {srv.number}
-              </div>
-            ))}
-            {project.technicalNotes && (
-              <div className={`sm:col-span-3 text-[11px] italic pt-0.5 ${presentationBg ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
-                Memoria: &ldquo;{project.technicalNotes}&rdquo;
-              </div>
-            )}
           </div>
         </div>
 
         {/* Action buttons inside project summary */}
-        <div className={`flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t ${
-          presentationBg ? 'border-white/10' : 'border-slate-100 dark:border-slate-800'
-        }`}>
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-800/80">
           <button
             onClick={() => onOpenReportModal('project', project.id)}
-            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors shadow-2xs"
+            className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
             title="Acta Técnica PDF de toda la obra"
           >
-            <FileText className="w-3 h-3 text-rose-600" />
+            <FileText className="w-3.5 h-3.5 text-rose-400" />
             <span>Reporte PDF</span>
           </button>
 
           {onExportExcel && (
             <button
               onClick={() => onExportExcel(project.id)}
-              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors shadow-2xs"
-              title="Descargar planilla completa en Excel para tildar a mano en terreno"
+              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+              title="Descargar planilla completa en Excel"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Planilla Excel (Para tildar a mano)</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Planilla Excel</span>
             </button>
           )}
 
           {onOpenCroquis && (
             <button
               onClick={onOpenCroquis}
-              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-[11px] font-black inline-flex items-center gap-1 transition-all shadow-2xs active:scale-95"
-              title="Abrir hoja de croquis a mano alzada para este proyecto"
+              className="px-3 py-1.5 bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
+              title="Abrir hoja de croquis para este proyecto"
             >
-              <PenTool className="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
+              <PenTool className="w-3.5 h-3.5 text-[#00c2ff]" />
               <span>Croquis ({totalProjectSketches})</span>
+            </button>
+          )}
+
+          {onEditProject && (
+            <button
+              type="button"
+              onClick={() => onEditProject(project)}
+              className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5 text-[#00c2fe]" />
+              <span>Editar Datos</span>
             </button>
           )}
 
           {onRequestDeleteProject && (
             <button
               onClick={() => onRequestDeleteProject(project.id, project.name)}
-              className="ml-auto px-2 py-1 bg-rose-50/70 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
-              title="Eliminar esta obra (requiere clave 2600)"
+              className="ml-auto px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-colors"
+              title="Eliminar esta obra"
             >
-              <Trash2 className="w-3 h-3 text-rose-600" />
-              <span>Eliminar Obra</span>
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden sm:inline">Eliminar Obra</span>
             </button>
           )}
         </div>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden mt-3 p-0.5 border border-slate-200 dark:border-slate-700">
-          <div
-            className="h-full bg-gradient-to-r from-amber-500 to-emerald-600 rounded-full transition-all duration-300"
-            style={{ width: `${typeFilter === 'all' ? overallProgress : tabProgress}%` }}
-          />
-        </div>
-
         {/* Línea de Tiempo e Hitos Críticos de la Obra */}
-        <div className="mt-3.5">
+        <div className="mt-3.5 pt-2 border-t border-slate-800/80">
           <ProjectTimeline
             project={project}
             compact={false}
             onOpenMilestonesConfig={onOpenMilestonesConfig}
             onToggleManualMilestone={onToggleManualMilestone}
-            onSelectUnit={onSelectUnit}
             onUpdateProjectDates={onUpdateProjectDates}
           />
         </div>
@@ -495,152 +472,141 @@ export function UnitsView({
         )}
       </div>
 
-      {/* Subheader and Add Unit button */}
-      <div className="flex items-center justify-between pt-1">
+      {/* Section Header & New Space Button */}
+      <div className="flex items-center justify-between pt-1 select-none">
         <div>
-          <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-            {typeFilter === 'unit' ? (
-              <>
-                <DoorOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>Departamentos ({countDeptos})</span>
-              </>
-            ) : typeFilter === 'common_area' ? (
-              <>
-                <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Espacios Comunes y de Servicio ({countCommon})</span>
-              </>
-            ) : (
-              <>
-                <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>Unidades y Espacios Comunes ({countAll})</span>
-              </>
-            )}
+          <h3 className="text-base font-black text-white tracking-tight flex items-center gap-2">
+            <DoorOpen className="w-4 h-4 text-[#00c2fe]" />
+            Departamentos y Espacios
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-400">
             {tradeFilter === 'all'
-              ? `Toca para abrir checklist técnico (${tabTotalCount} ${typeFilter === 'unit' ? 'deptos' : typeFilter === 'common_area' ? 'comunes' : 'espacios'})`
+              ? `Toca cualquier espacio para abrir su checklist técnico (${tabTotalCount} ${typeFilter === 'unit' ? 'deptos' : typeFilter === 'common_area' ? 'comunes' : 'espacios'})`
               : `Mostrando avance de ${activeTrade?.name} en ${tabTotalCount} espacios`}
           </p>
         </div>
 
         <button
           onClick={onOpenNewUnitModal}
-          className="bg-slate-900 dark:bg-amber-500 hover:bg-slate-800 dark:hover:bg-amber-400 active:scale-95 text-amber-400 dark:text-slate-950 font-bold px-3 py-2 rounded-xl text-xs flex items-center shadow border border-amber-500/40 touch-target transition-all"
+          className="bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 px-3.5 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 touch-target transition-all"
         >
-          <Plus className="w-3.5 h-3.5 mr-1 stroke-[3]" /> + Agregar Espacio
+          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+          <span>+ Agregar Espacio</span>
         </button>
       </div>
 
       {/* Space Category Filter Tabs (Todos / Deptos / Espacios Comunes) */}
-      <div className="flex items-center gap-1 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs transition-colors">
+      <div className="flex items-center gap-1.5 bg-[#151f33]/90 border border-slate-700/80 p-1.5 rounded-2xl text-xs transition-colors select-none">
         <button
           onClick={() => setTypeFilter('all')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center ${
+          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center ${
             typeFilter === 'all'
-              ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+              : 'text-slate-300 hover:text-white'
           }`}
         >
           Todos ({countAll})
         </button>
         <button
           onClick={() => setTypeFilter('unit')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
             typeFilter === 'unit'
-              ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+              : 'text-slate-300 hover:text-white'
           }`}
         >
-          <DoorOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <DoorOpen className="w-3.5 h-3.5" />
           <span>Deptos ({countDeptos})</span>
         </button>
         <button
           onClick={() => setTypeFilter('common_area')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+          className={`flex-1 py-1.5 px-3 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
             typeFilter === 'common_area'
-              ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'bg-[#00c2ff] text-slate-950 font-black shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+              : 'text-slate-300 hover:text-white'
           }`}
         >
-          <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <Building2 className="w-3.5 h-3.5" />
           <span>Comunes ({countCommon})</span>
         </button>
       </div>
 
-      {/* Status Filter Chips */}
-      <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1 text-xs">
+      {/* Status Filter Chips - Exact Capsule Pills Matching Dashboard */}
+      <div className="flex items-center space-x-2 sm:space-x-2.5 overflow-x-auto no-scrollbar py-1 text-xs select-none">
         <button
           onClick={() => setStatusFilter('all')}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 shadow-sm touch-target ${
+          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
             statusFilter === 'all'
-              ? 'bg-amber-500 text-slate-950 border-amber-500'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+              ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_15px_rgba(0,194,255,0.45)]'
+              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
           }`}
         >
-          <span>Todos</span>
-          <span className="bg-slate-950/15 dark:bg-slate-100/15 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>All</span>
+          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
             {tabTotalCount}
           </span>
         </button>
 
         <button
           onClick={() => setStatusFilter('completed')}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full font-medium transition-all border text-xs flex items-center gap-1.5 touch-target ${
+          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
             statusFilter === 'completed'
-              ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+              ? 'bg-emerald-500 text-slate-950 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.45)]'
+              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
           }`}
         >
-          <CircleCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>Completado</span>
-          <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
+          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Completed</span>
+          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
             {tabCompletedCount}
           </span>
         </button>
 
         <button
           onClick={() => setStatusFilter('in_progress')}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full font-medium transition-all border text-xs flex items-center gap-1.5 touch-target ${
+          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
             statusFilter === 'in_progress'
-              ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+              ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.45)]'
+              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
           }`}
         >
-          <Clock className="w-3.5 h-3.5 text-amber-500" />
-          <span>En curso</span>
-          <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
+          <Zap className="w-3.5 h-3.5 text-amber-400" />
+          <span>In-Process</span>
+          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
             {tabInProgressCount}
           </span>
         </button>
 
         <button
           onClick={() => setStatusFilter('pending')}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full font-medium transition-all border text-xs flex items-center gap-1.5 touch-target ${
+          className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
             statusFilter === 'pending'
-              ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold'
-              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
+              ? 'bg-rose-500 text-white border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.45)]'
+              : 'bg-[#151f33]/90 text-slate-300 border-slate-700/80 hover:border-slate-500'
           }`}
         >
-          <Circle className="w-3.5 h-3.5 text-slate-400" />
-          <span>Pendiente</span>
-          <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded-full font-black text-slate-700 dark:text-slate-300">
+          <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+          <span>Pending</span>
+          <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
             {tabPendingCount}
           </span>
         </button>
       </div>
 
-      {/* Units Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+      {/* Units Grid - Responsive with Interactive Neon Line on Cursor / Touch */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-1">
         {filteredUnits.length === 0 ? (
-          <div className="col-span-full text-center py-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
-            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Sin unidades con este filtro</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Prueba cambiando el filtro de estado o tipo arriba.</p>
+          <div className="col-span-full text-center py-12 bg-[#131b2c]/80 rounded-3xl border border-dashed border-slate-800 p-4">
+            <DoorOpen className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+            <p className="text-sm font-bold text-white">Sin unidades con este criterio</p>
+            <p className="text-xs text-slate-400 mt-0.5">Prueba cambiando el filtro de estado o espacio arriba.</p>
             <button
               onClick={() => {
                 setStatusFilter('all');
                 setTypeFilter('all');
               }}
-              className="mt-3 px-3 py-1.5 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-amber-400 transition-colors"
+              className="mt-3 px-4 py-2 bg-[#00c2ff] text-slate-950 font-bold rounded-xl text-xs hover:brightness-110 transition-all active:scale-95"
             >
               Ver Todas las Unidades
             </button>
@@ -650,75 +616,76 @@ export function UnitsView({
             const counts = getUnitItemCounts(unit, tradeFilter);
             const isComplete = progress === 100;
             const isCommonArea = isUnitCommonArea(unit);
-
-            let badgeBg = 'bg-slate-900 text-amber-400';
-            if (isComplete) {
-              badgeBg = 'bg-emerald-600 text-white';
-            } else if (progress > 0) {
-              badgeBg = 'bg-amber-600 text-white';
-            }
+            const isUnitActive = activeUnitId === unit.id;
 
             return (
               <div
                 key={unit.id}
-                onClick={() => onSelectUnit(unit.id)}
-                className={`bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border ${
-                  isComplete
-                    ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/15 dark:bg-emerald-950/20'
-                    : isCommonArea
-                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/5 dark:bg-emerald-950/10'
-                    : 'border-slate-200 dark:border-slate-800'
-                } hover:border-amber-400 dark:hover:border-amber-500 active:scale-95 transition-all cursor-pointer flex flex-col justify-between touch-target group`}
+                onMouseEnter={() => setActiveUnitId(unit.id)}
+                onTouchStart={() => setActiveUnitId(unit.id)}
+                onClick={() => {
+                  setActiveUnitId(unit.id);
+                  onSelectUnit(unit.id);
+                }}
+                className={`rounded-2xl p-4 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between touch-target group ${
+                  isUnitActive
+                    ? 'border-2 border-[#00f2fe] shadow-[0_0_28px_rgba(0,242,254,0.38)] bg-[#162238] scale-[1.02]'
+                    : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                } text-white`}
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className={`w-7 h-7 rounded-lg ${badgeBg} flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0`}>
+                    <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 ${
+                      isComplete
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : isCommonArea
+                        ? 'bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30'
+                        : 'bg-slate-800 text-[#00f2fe] border border-slate-700'
+                    }`}>
                       {isComplete ? (
-                        <CircleCheck className="w-4 h-4" />
+                        <CircleCheck className="w-4 h-4 text-emerald-400" />
                       ) : isCommonArea ? (
-                        <Building2 className="w-4 h-4" />
+                        <Building2 className="w-4 h-4 text-[#00f2fe]" />
                       ) : (
-                        <DoorOpen className="w-4 h-4" />
+                        <DoorOpen className="w-4 h-4 text-[#00f2fe]" />
                       )}
                     </span>
 
                     {/* Animated Circular Progress on Unit Card */}
                     <AnimatedCircularProgress
                       percentage={progress}
-                      size={44}
-                      strokeWidth={4}
-                      color="#10B981"
+                      size={46}
+                      strokeWidth={4.5}
+                      color={isUnitActive ? '#00f2fe' : isComplete ? '#10B981' : '#00f2fe'}
                     />
                   </div>
 
                   {/* Type & Status Badges */}
-                  <div className="mt-2 flex items-center gap-1 flex-wrap">
-                    <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      isCommonArea
-                        ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                    }`}>
+                  <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30">
                       {isCommonArea ? 'Común' : 'Depto'}
                     </span>
                     {unit.floorLabel && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100/70 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 truncate max-w-[85px]">
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 truncate max-w-[90px]">
                         {unit.floorLabel}
                       </span>
                     )}
                     {unit.signature && (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                        ✔
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                        ✔ Firmado
                       </span>
                     )}
                     {unit.isLocked && (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
-                        🔒
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                        🔒 Bloqueado
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between mt-1">
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate pr-1">
+                  <div className="flex items-center justify-between mt-2">
+                    <h4 className={`text-base font-black tracking-tight leading-snug transition-colors truncate pr-1 ${
+                      isUnitActive ? 'text-[#00f2fe]' : 'text-white group-hover:text-[#00f2fe]'
+                    }`}>
                       {unit.name}
                     </h4>
 
@@ -730,7 +697,7 @@ export function UnitsView({
                           e.stopPropagation();
                           onEditUnit(unit);
                         }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-100/60 dark:hover:bg-amber-950/40 active:scale-95 transition-all"
+                        className="p-1 rounded-lg text-slate-400 hover:text-[#00f2fe] hover:bg-slate-800 transition-colors"
                         title="Editar denominación"
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -743,8 +710,8 @@ export function UnitsView({
                             e.stopPropagation();
                             onRequestDeleteUnit(unit.id, unit.name);
                           }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 active:scale-95 transition-all"
-                          title="Eliminar este espacio (Clave 2600)"
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                          title="Eliminar este espacio"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -752,29 +719,28 @@ export function UnitsView({
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems' : 'tareas'}
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {counts.completed}/{counts.total} {tradeFilter === 'all' ? 'ítems validados' : 'tareas'} ({progress}%)
                   </p>
                 </div>
 
-                <div className="mt-2.5">
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
+                <div className="mt-3 pt-2 border-t border-slate-800/80">
+                  {/* Horizontal Capsule Progress Bar */}
+                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        isComplete ? 'bg-emerald-500' : 'bg-amber-500'
-                      }`}
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
 
-                  <div className="mt-2 flex items-center justify-between gap-1 flex-wrap">
+                  <div className="mt-2.5 flex items-center justify-between gap-1 flex-wrap">
                     <div className="flex items-center gap-1 flex-wrap">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpenReportModal('unit', project.id, unit.id);
                         }}
-                        className="text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-bold text-[10px] flex items-center gap-0.5 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800"
+                        className="text-rose-400 hover:text-rose-300 font-bold text-[10px] flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/30 transition-colors"
                         title="Acta Técnica PDF de esta unidad"
                       >
                         <FileText className="w-2.5 h-2.5" /> PDF
@@ -787,10 +753,10 @@ export function UnitsView({
                             e.stopPropagation();
                             onOpenUnitBlueprints(unit);
                           }}
-                          className="text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
-                          title="Ver o adjuntar planos de esta unidad"
+                          className="text-[#00f2fe] hover:text-cyan-300 font-bold text-[10px] flex items-center gap-1 bg-[#00f2fe]/10 px-2 py-0.5 rounded-md border border-[#00f2fe]/30 transition-colors"
+                          title="Ver o adjuntar planos"
                         >
-                          <Compass className="w-2.5 h-2.5 text-amber-500" />
+                          <Compass className="w-2.5 h-2.5" />
                           <span>Planos ({unit.blueprints?.length || 0})</span>
                         </button>
                       )}

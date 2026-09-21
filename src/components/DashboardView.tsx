@@ -59,6 +59,7 @@ export function DashboardView({
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   // Compute status and progress for each project
   const projectsWithProgress = projects.map(project => {
@@ -219,12 +220,12 @@ export function DashboardView({
             const deptosCount = project.units.filter(u => !isUnitCommonArea(u)).length;
             const commonCount = project.units.filter(u => isUnitCommonArea(u)).length;
 
-            const isFirst = idx === 0;
-            const displayProgress = progress > 0 ? progress : isFirst ? 7 : 5;
+            const isCurrentActive = activeCardId ? activeCardId === project.id : idx === 0;
+            const displayProgress = progress > 0 ? progress : (idx === 0 ? 7 : 5);
 
             const isCritical = displayProgress < 30;
-            const delayMonths = isFirst ? 3 : 2;
-            const delayBadgeLabel = isFirst
+            const delayMonths = idx === 0 ? 3 : 2;
+            const delayBadgeLabel = isCritical
               ? 'DEMORA CRÍTICA: +3 MESES'
               : 'ESTADO: ATENCIÓN +2 MESES';
 
@@ -235,11 +236,16 @@ export function DashboardView({
             return (
               <div
                 key={project.id}
-                onClick={() => onSelectProject(project.id)}
+                onMouseEnter={() => setActiveCardId(project.id)}
+                onTouchStart={() => setActiveCardId(project.id)}
+                onClick={() => {
+                  setActiveCardId(project.id);
+                  onSelectProject(project.id);
+                }}
                 className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
-                  isFirst
-                    ? 'border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.3)] bg-[#131b2c]'
-                    : 'border border-slate-700/80 hover:border-[#00f2fe]/60 hover:shadow-[0_0_24px_rgba(0,242,254,0.18)] bg-[#131b2c]'
+                  isCurrentActive
+                    ? 'border-2 border-[#00f2fe] shadow-[0_0_35px_rgba(0,242,254,0.38)] bg-[#131b2c] scale-[1.01]'
+                    : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_25px_rgba(0,242,254,0.25)] bg-[#131b2c]'
                 } text-white`}
               >
                 <div className="space-y-4">
@@ -255,7 +261,7 @@ export function DashboardView({
                       </div>
 
                       {/* Project Name */}
-                      <h4 className="text-2xl font-black tracking-tight text-white group-hover:text-[#00f2fe] transition-colors truncate">
+                      <h4 className={`text-2xl font-black tracking-tight text-white transition-colors truncate ${isCurrentActive ? 'text-[#00f2fe]' : 'group-hover:text-[#00f2fe]'}`}>
                         {project.name}
                       </h4>
 
@@ -294,7 +300,7 @@ export function DashboardView({
                         percentage={displayProgress}
                         size={144}
                         strokeWidth={14}
-                        glowColor={isFirst ? '#00f2fe' : '#06b6d4'}
+                        glowColor={isCurrentActive ? '#00f2fe' : '#06b6d4'}
                       />
                     </div>
                   </div>
@@ -310,12 +316,12 @@ export function DashboardView({
                       {/* Two Semicircle Speedometer Gauges */}
                       <div className="flex items-center justify-around py-1">
                         <ExecutiveGaugeChart
-                          value={isFirst ? 72 : 65}
+                          value={isCurrentActive ? 72 : 65}
                           size={76}
                           colorVariant="coral_cyan"
                         />
                         <ExecutiveGaugeChart
-                          value={isFirst ? 62 : 55}
+                          value={isCurrentActive ? 62 : 55}
                           size={76}
                           colorVariant="amber"
                         />
@@ -324,7 +330,7 @@ export function DashboardView({
                       {/* Alert Status Pill */}
                       <div
                         className={`mt-2 py-1 px-3 rounded-full text-[10.5px] font-black flex items-center justify-center gap-1.5 border text-center ${
-                          isFirst
+                          isCurrentActive
                             ? 'bg-[#f87171]/20 text-[#f87171] border-[#f87171]/40 shadow-[0_0_12px_rgba(248,113,113,0.25)]'
                             : 'bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/40'
                         }`}
@@ -370,10 +376,10 @@ export function DashboardView({
                               cy="18"
                               r="12"
                               fill="none"
-                              stroke={isFirst ? '#00f2fe' : '#fbbf24'}
+                              stroke={isCurrentActive ? '#00f2fe' : '#fbbf24'}
                               strokeWidth="12"
                               strokeDasharray="75.4"
-                              strokeDashoffset={isFirst ? '30' : '38'}
+                              strokeDashoffset={isCurrentActive ? '30' : '38'}
                             />
                           </svg>
                         </div>
