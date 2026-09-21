@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FileText,
   Check,
@@ -31,7 +31,7 @@ import {
   Compass
 } from 'lucide-react';
 import { Project, Unit, TaskFilter, InspectionItem, Trade } from '../types';
-import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea, isTradeMatchingFilter } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ItemObservationModal } from './ItemObservationModal';
 import { AddItemScopeModal } from './AddItemScopeModal';
@@ -120,10 +120,30 @@ export function ChecklistView({
     itemName: string;
   } | null>(null);
 
+  const unitTradesList = useMemo(() => {
+    const map = new Map<string, Trade>();
+    unit.trades.forEach(t => {
+      const key = t.name.toLowerCase().trim();
+      if (!map.has(key)) {
+        map.set(key, { ...t, items: [...(t.items || [])] });
+      } else {
+        const existing = map.get(key)!;
+        const existingItemIds = new Set(existing.items.map(i => i.id));
+        (t.items || []).forEach(item => {
+          if (!existingItemIds.has(item.id)) {
+            existing.items.push(item);
+            existingItemIds.add(item.id);
+          }
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [unit.trades]);
+
   const unitPct = calculateUnitProgress(unit, selectedTradeFilter);
   const globalUnitPct = calculateUnitProgress(unit, 'all');
   const counts = getUnitItemCounts(unit, selectedTradeFilter);
-  const activeTradeObj = unit.trades.find(t => t.id === selectedTradeFilter) || MASTER_TRADES_TEMPLATE.find(t => t.id === selectedTradeFilter);
+  const activeTradeObj = unitTradesList.find(t => isTradeMatchingFilter(t, selectedTradeFilter)) || MASTER_TRADES_TEMPLATE.find(t => isTradeMatchingFilter(t, selectedTradeFilter));
 
   const toggleTrade = (tradeId: string) => {
     setCollapsedTrades(prev => ({ ...prev, [tradeId]: !prev[tradeId] }));
@@ -131,7 +151,7 @@ export function ChecklistView({
 
   const toggleAll = (expand: boolean) => {
     const nextState: Record<string, boolean> = {};
-    unit.trades.forEach(t => {
+    unitTradesList.forEach(t => {
       nextState[t.id] = !expand;
     });
     setCollapsedTrades(nextState);
@@ -353,7 +373,7 @@ export function ChecklistView({
           <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold hidden sm:inline">
             {tradeSectionTab === 'filter'
               ? (selectedTradeFilter === 'all' ? 'Todos los gremios' : activeTradeObj?.name)
-              : `${unit.trades.length} Gremios en esta unidad`}
+              : `${unitTradesList.length} Gremios en esta unidad`}
           </span>
         </div>
 
@@ -372,12 +392,12 @@ export function ChecklistView({
                 <span>Todos</span>
               </button>
 
-              {unit.trades.map(trade => {
-                const isActive = selectedTradeFilter === trade.id;
+              {unitTradesList.map(trade => {
+                const isActive = isTradeMatchingFilter(trade, selectedTradeFilter) && selectedTradeFilter !== 'all';
                 return (
                   <button
                     key={trade.id}
-                    onClick={() => setSelectedTradeFilter(trade.id)}
+                    onClick={() => setSelectedTradeFilter(isActive ? 'all' : trade.id)}
                     className={`flex-shrink-0 px-3 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
                       isActive
                         ? 'bg-slate-900 dark:bg-amber-500 text-amber-400 dark:text-slate-950 border-amber-500 shadow-sm ring-1 ring-amber-500'
@@ -468,10 +488,10 @@ export function ChecklistView({
             {/* List of Current Trades for Deletion / Management */}
             <div>
               <span className="text-xs font-black text-slate-800 dark:text-slate-200 block mb-2">
-                Gremios Actuales ({unit.trades.length}):
+                Gremios Actuales ({unitTradesList.length}):
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {unit.trades.map(trade => (
+                {unitTradesList.map(trade => (
                   <div
                     key={trade.id}
                     className="p-2.5 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-2xs"
@@ -590,8 +610,8 @@ export function ChecklistView({
 
       {/* Trades Accordion */}
       <div className="space-y-3">
-        {unit.trades.map(trade => {
-          if (selectedTradeFilter !== 'all' && trade.id !== selectedTradeFilter) {
+        {unitTradesList.map(trade => {
+          if (!isTradeMatchingFilter(trade, selectedTradeFilter)) {
             return null;
           }
 
@@ -1096,8 +1116,8 @@ export function ChecklistView({
           tradeId={observationModalItem.tradeId}
           tradeName={observationModalItem.tradeName}
           item={
-            unit.trades
-              .find(t => t.id === observationModalItem.tradeId)
+            unitTradesList
+              .find(t => isTradeMatchingFilter(t, observationModalItem.tradeId))
               ?.items.find(i => i.id === observationModalItem.item.id) || observationModalItem.item
           }
           onClose={() => setObservationModalItem(null)}

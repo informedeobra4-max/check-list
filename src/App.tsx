@@ -75,6 +75,61 @@ const createLightweightProjectsForLocal = (projs: Project[]): any[] => {
   }));
 };
 
+export function normalizeTradeId(tradeName: string): string {
+  const clean = tradeName
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return clean ? `trade_${clean}` : `trade_${Date.now()}`;
+}
+
+export function sanitizeProjectTrades(project: Project): Project {
+  if (!project || !project.units) return project;
+  return {
+    ...project,
+    units: project.units.map(unit => {
+      if (!unit || !unit.trades) return unit;
+      const seen = new Map<string, Trade>();
+      unit.trades.forEach(trade => {
+        const key = trade.name.toLowerCase().trim();
+        const masterTrade = MASTER_TRADES_TEMPLATE.find(m => m.name.toLowerCase().trim() === key || m.id === trade.id);
+        const canonicalId = masterTrade
+          ? masterTrade.id
+          : (trade.id.startsWith('trade_') && !trade.id.includes('_unit_') && !trade.id.includes('_proj_')
+              ? trade.id
+              : normalizeTradeId(trade.name));
+
+        if (!seen.has(key)) {
+          seen.set(key, {
+            ...trade,
+            id: canonicalId,
+            name: masterTrade ? masterTrade.name : trade.name.trim(),
+            shortName: trade.shortName || (masterTrade ? masterTrade.shortName : trade.name.trim()),
+            items: [...(trade.items || [])]
+          });
+        } else {
+          // If duplicate trade exists in this unit, merge items avoiding duplicates
+          const existing = seen.get(key)!;
+          const existingItemNames = new Set((existing.items || []).map(i => i.name.toLowerCase().trim()));
+          (trade.items || []).forEach(item => {
+            if (!existingItemNames.has(item.name.toLowerCase().trim())) {
+              existing.items.push(item);
+              existingItemNames.add(item.name.toLowerCase().trim());
+            }
+          });
+        }
+      });
+      return {
+        ...unit,
+        trades: Array.from(seen.values())
+      };
+    })
+  };
+}
+
 export default function App() {
   // Theme state: Dark & Light Mode support with persistence in localStorage 'theme_preference'
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -143,13 +198,13 @@ export default function App() {
               }
             }
           });
-          return parsed;
+          return parsed.map(sanitizeProjectTrades);
         }
       }
     } catch (e) {
       console.error('Error loading projects from storage:', e);
     }
-    return getInitialMockData();
+    return getInitialMockData().map(sanitizeProjectTrades);
   });
 
   const [showSplash, setShowSplash] = useState(true);
@@ -348,7 +403,7 @@ export default function App() {
         if (res.status === 'synced') {
           if (res.projects && res.projects.length > 0) {
             isRemoteUpdateRef.current = true;
-            setProjects(res.projects);
+            setProjects(res.projects.map(sanitizeProjectTrades));
             showToast('Conectado a la Nube Supabase', 'Cloud');
           } else {
             // Seed cloud if empty
@@ -366,7 +421,7 @@ export default function App() {
           unsubscribe = subscribeToCloudData(
             (cloudProjects) => {
               isRemoteUpdateRef.current = true;
-              setProjects(cloudProjects);
+              setProjects(cloudProjects.map(sanitizeProjectTrades));
             },
             (cloudLogos) => {
               isRemoteUpdateRef.current = true;
@@ -391,10 +446,11 @@ export default function App() {
           const res = await loadCloudData();
           if (res.status === 'synced') {
             if (res.projects && res.projects.length > 0) {
+              const sanitizedCloudProjects = res.projects.map(sanitizeProjectTrades);
               setProjects(prev => {
-                if (JSON.stringify(prev) !== JSON.stringify(res.projects)) {
+                if (JSON.stringify(prev) !== JSON.stringify(sanitizedCloudProjects)) {
                   isRemoteUpdateRef.current = true;
-                  return res.projects!;
+                  return sanitizedCloudProjects;
                 }
                 return prev;
               });
@@ -503,7 +559,7 @@ export default function App() {
       setCloudStatus(res.status);
       if (res.status === 'synced') {
         if (res.projects && res.projects.length > 0) {
-          setProjects(res.projects);
+          setProjects(res.projects.map(sanitizeProjectTrades));
         } else {
           await saveProjectsToCloud(projects);
         }
@@ -828,9 +884,9 @@ export default function App() {
     const trimmed = tradeName.trim();
     if (!trimmed || !selectedProjectId) return;
 
-    const newTradeId = `trade_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const canonicalTradeId = normalizeTradeId(trimmed);
     const newTrade: Trade = {
-      id: newTradeId,
+      id: canonicalTradeId,
       name: trimmed,
       shortName: trimmed,
       icon: 'Wrench',
@@ -855,17 +911,18 @@ export default function App() {
           ...proj,
           units: proj.units.map(u => {
             if (scope === 'current_unit' && u.id !== selectedUnitId) return u;
-            const exists = u.trades.some(t => t.name.toLowerCase() === trimmed.toLowerCase());
+            const exists = u.trades.some(t => t.name.toLowerCase().trim() === trimmed.toLowerCase() || t.id === canonicalTradeId);
             if (exists) return u;
             return {
               ...u,
-              trades: [...u.trades, { ...newTrade, id: `${newTradeId}_${u.id}` }]
+              trades: [...u.trades, { ...newTrade }]
             };
           })
         };
       });
-      updatedProjectsList = updated;
-      return updated;
+      const sanitized = updated.map(sanitizeProjectTrades);
+      updatedProjectsList = sanitized;
+      return sanitized;
     });
 
     setCloudStatus('syncing');
@@ -880,6 +937,8 @@ export default function App() {
     if (!confirm(`¿Eliminar el gremio "${tradeName}" y todas sus tareas asociadas?`)) return;
     if (!selectedProjectId) return;
 
+    const normalizedName = tradeName.toLowerCase().trim();
+
     let updatedProjectsList: Project[] = [];
 
     setProjects(prev => {
@@ -891,13 +950,14 @@ export default function App() {
             if (scope === 'current_unit' && u.id !== selectedUnitId) return u;
             return {
               ...u,
-              trades: u.trades.filter(t => t.id !== tradeId && t.name.toLowerCase() !== tradeName.toLowerCase())
+              trades: u.trades.filter(t => t.id !== tradeId && t.name.toLowerCase().trim() !== normalizedName)
             };
           })
         };
       });
-      updatedProjectsList = updated;
-      return updated;
+      const sanitized = updated.map(sanitizeProjectTrades);
+      updatedProjectsList = sanitized;
+      return sanitized;
     });
 
     setCloudStatus('syncing');

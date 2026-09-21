@@ -1,12 +1,18 @@
 import { Unit, Project } from '../types';
 
+export function isTradeMatchingFilter(trade: { id: string; name: string }, tradeFilter: string): boolean {
+  if (!tradeFilter || tradeFilter === 'all') return true;
+  const f = tradeFilter.toLowerCase().trim();
+  return trade.id.toLowerCase().trim() === f || trade.name.toLowerCase().trim() === f;
+}
+
 export function calculateUnitProgress(unit: Unit, tradeFilter: string = 'all'): number {
   if (!unit || !unit.trades || unit.trades.length === 0) return 0;
   let totalItems = 0;
   let totalProgress = 0;
 
   unit.trades.forEach(trade => {
-    if (tradeFilter === 'all' || trade.id === tradeFilter) {
+    if (isTradeMatchingFilter(trade, tradeFilter)) {
       trade.items.forEach(item => {
         totalItems++;
         const pct = item.progressPercentage !== undefined
@@ -28,7 +34,7 @@ export function getUnitItemCounts(unit: Unit, tradeFilter: string = 'all'): { to
 
   if (unit && unit.trades) {
     unit.trades.forEach(trade => {
-      if (tradeFilter === 'all' || trade.id === tradeFilter) {
+      if (isTradeMatchingFilter(trade, tradeFilter)) {
         trade.items.forEach(item => {
           total++;
           const pct = item.progressPercentage !== undefined
@@ -102,7 +108,7 @@ export function calculateProjectProgress(
     if (typeFilter === 'common_area' && !isCommon) return;
 
     unit.trades.forEach(trade => {
-      if (tradeFilter === 'all' || trade.id === tradeFilter) {
+      if (isTradeMatchingFilter(trade, tradeFilter)) {
         trade.items.forEach(item => {
           totalItemsCount++;
           const pct = item.progressPercentage !== undefined
@@ -137,7 +143,7 @@ export function getProjectConsolidatedStats(project: Project, tradeFilter: strin
     project.units.forEach(unit => {
       if (!unit || !unit.trades) return;
       unit.trades.forEach(trade => {
-        if (tradeFilter === 'all' || trade.id === tradeFilter) {
+        if (isTradeMatchingFilter(trade, tradeFilter)) {
           trade.items.forEach(item => {
             totalItems++;
             const pct = item.progressPercentage !== undefined

@@ -75,20 +75,24 @@ export function UnitsView({
     const map = new Map<string, { id: string; name: string; shortName?: string; icon: string }>();
     project.units.forEach(u => {
       u.trades.forEach(t => {
-        if (!map.has(t.id)) {
-          map.set(t.id, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
+        const key = t.name.toLowerCase().trim();
+        if (!map.has(key)) {
+          map.set(key, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
         }
       });
     });
     if (map.size === 0) {
       MASTER_TRADES_TEMPLATE.forEach(t => {
-        map.set(t.id, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
+        const key = t.name.toLowerCase().trim();
+        if (!map.has(key)) {
+          map.set(key, { id: t.id, name: t.name, shortName: t.shortName, icon: t.icon });
+        }
       });
     }
     return Array.from(map.values());
   })();
 
-  const activeTrade = availableTrades.find(t => t.id === tradeFilter) || MASTER_TRADES_TEMPLATE.find(t => t.id === tradeFilter);
+  const activeTrade = availableTrades.find(t => t.id === tradeFilter || t.name.toLowerCase().trim() === tradeFilter.toLowerCase().trim()) || MASTER_TRADES_TEMPLATE.find(t => t.id === tradeFilter);
 
   // Global counts by space type
   const countDeptos = project.units.filter(u => !isUnitCommonArea(u)).length;
