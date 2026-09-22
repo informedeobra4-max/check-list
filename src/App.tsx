@@ -1802,7 +1802,7 @@ export default function App() {
           isOpen={isCroquisModalOpen}
           projects={projects}
           initialProjectId={selectedProjectId || projects[0]?.id}
-          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject?.units[0]?.id ?? projects[0]?.units[0]?.id)}
+          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject?.units?.[0]?.id ?? projects[0]?.units?.[0]?.id)}
           onClose={() => setIsCroquisModalOpen(false)}
           onSaveSketch={handleSaveSketch}
           onDeleteSketch={handleDeleteSketch}

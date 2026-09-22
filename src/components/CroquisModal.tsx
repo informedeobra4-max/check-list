@@ -179,11 +179,11 @@ export function CroquisModal({
   // Active selected unit
   const [selectedUnitId, setSelectedUnitId] = useState<string>(() => {
     const proj = (initialProjectId && projects.find(p => p.id === initialProjectId)) || projects[0];
-    if (proj) {
+    if (proj && Array.isArray(proj.units) && proj.units.length > 0) {
       if (initialUnitId && proj.units.some(u => u.id === initialUnitId)) {
         return initialUnitId;
       }
-      return proj.units.length > 0 ? proj.units[0].id : '';
+      return proj.units[0].id;
     }
     return '';
   });
@@ -201,6 +201,9 @@ export function CroquisModal({
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanMode, setIsPanMode] = useState<boolean>(false);
   const [imageFit, setImageFit] = useState<'contain' | 'cover'>('contain');
+
+  // Track if user has touched/started drawing so the empty-state welcome card fades away
+  const [hasStartedDrawing, setHasStartedDrawing] = useState<boolean>(false);
 
   // The 3-Dots Menu Drawer State
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState<boolean>(false);
@@ -239,8 +242,8 @@ export function CroquisModal({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  // Current Unit Object
-  const currentUnit = activeProject?.units.find(u => u.id === selectedUnitId) || activeProject?.units[0];
+  // Current Unit Object (guaranteed safe)
+  const currentUnit = activeProject?.units?.find(u => u.id === selectedUnitId) || activeProject?.units?.[0];
   const unitSketches = currentUnit?.sketches || [];
   const unitBlueprints = currentUnit?.blueprints || [];
 
@@ -262,7 +265,7 @@ export function CroquisModal({
       }
 
       const targetProj = projects.find(p => p.id === targetProjId);
-      if (targetProj) {
+      if (targetProj && Array.isArray(targetProj.units)) {
         if (initialUnitId && targetProj.units.some(u => u.id === initialUnitId)) {
           setSelectedUnitId(initialUnitId);
         } else if (targetProj.units.length > 0 && (!selectedUnitId || !targetProj.units.some(u => u.id === selectedUnitId))) {
@@ -275,7 +278,7 @@ export function CroquisModal({
   const handleSelectProject = (newProjId: string) => {
     setSelectedProjectId(newProjId);
     const proj = projects.find(p => p.id === newProjId);
-    if (proj && proj.units.length > 0) {
+    if (proj && Array.isArray(proj.units) && proj.units.length > 0) {
       setSelectedUnitId(proj.units[0].id);
     } else {
       setSelectedUnitId('');
@@ -433,6 +436,7 @@ export function CroquisModal({
     pushUndoState();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setIsToolsMenuOpen(false);
+    setHasStartedDrawing(false);
   };
 
   // Zoom Controls
@@ -601,6 +605,7 @@ export function CroquisModal({
     const { x, y, pressure } = getCanvasPoint(e);
     isDrawingRef.current = true;
     startPointRef.current = { x, y };
+    setHasStartedDrawing(true);
 
     pushUndoState();
 
@@ -782,6 +787,7 @@ export function CroquisModal({
             setPan({ x: 0, y: 0 });
             setIsPanMode(false);
             setIsToolsMenuOpen(false);
+            setHasStartedDrawing(true);
             showToast(isCamera ? 'Foto en pantalla completa lista para croquizar y hacer zoom' : 'Imagen a pantalla completa lista');
           }
           setIsLoadingFile(false);
@@ -843,6 +849,7 @@ export function CroquisModal({
         setPan({ x: 0, y: 0 });
         setIsPanMode(false);
         setIsToolsMenuOpen(false);
+        setHasStartedDrawing(true);
         showToast(`Plano "${bp.name}" cargado a pantalla completa`);
       } else if (bp.type === 'pdf') {
         showToast('Cargando plano PDF...');
@@ -865,6 +872,7 @@ export function CroquisModal({
         setPan({ x: 0, y: 0 });
         setIsPanMode(false);
         setIsToolsMenuOpen(false);
+        setHasStartedDrawing(true);
         showToast(`Plano PDF "${bp.name}" cargado`);
       }
     } catch (err) {
@@ -1167,7 +1175,7 @@ export function CroquisModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col w-screen h-screen bg-slate-950 overflow-hidden select-none animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex flex-col w-full h-full bg-slate-950 overflow-hidden select-none animate-in fade-in duration-150">
       {/* Hidden Camera Input */}
       <input
         ref={cameraInputRef}
@@ -1189,7 +1197,7 @@ export function CroquisModal({
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-2xl shadow-2xl border border-amber-500/80 flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top-2 backdrop-blur-md">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-2xl shadow-2xl border border-amber-500/80 flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top-2 backdrop-blur-md">
           <Check className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
@@ -1208,9 +1216,9 @@ export function CroquisModal({
       {/* TAB 1: DRAWING FULL SCREEN CANVAS */}
       {activeTab === 'draw' && (
         <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 relative overflow-hidden">
-          {/* ULTRA-MINIMAL TOP FLOATING BAR (Takes minimal space: 48px) */}
-          <div className="h-12 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-2 sm:px-4 flex items-center justify-between z-30 shrink-0 select-none">
-            {/* Left: Close & Obra/Depto stamp */}
+          {/* HEADER BAR: HIGH-CONTRAST WITH DIRECT ACCESS TO CAMERA, IMAGES & 3-DOTS */}
+          <div className="min-h-[52px] sm:min-h-[56px] py-1.5 px-2 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 z-30 shrink-0 select-none">
+            {/* Left: Close & Obra/Depto info */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
               <button
                 type="button"
@@ -1222,24 +1230,65 @@ export function CroquisModal({
               </button>
 
               <div className="min-w-0 flex items-center gap-1.5 text-xs">
-                <span className="font-black text-white truncate max-w-[90px] sm:max-w-[150px]">
+                <span className="font-black text-white truncate max-w-[95px] sm:max-w-[150px]">
                   {activeProject?.name || 'Obra'}
                 </span>
                 <span className="text-amber-400 font-bold truncate max-w-[85px] sm:max-w-[130px]">
                   • {currentUnit?.name || 'Unidad'}
                 </span>
-                {bgDocument && (
-                  <span className="hidden md:inline text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-700/50 px-1.5 py-0.5 rounded-md truncate max-w-[140px]">
-                    📷 {bgDocument.name}
-                  </span>
-                )}
+                {bgDocument ? (
+                  <button
+                    type="button"
+                    onClick={() => setBgDocument(null)}
+                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-rose-300 font-bold bg-emerald-950/80 hover:bg-rose-950/80 border border-emerald-600/50 hover:border-rose-600/50 px-2 py-0.5 rounded-lg transition-colors truncate max-w-[140px]"
+                    title="Foto cargada en pantalla completa. Toca para quitar fondo."
+                  >
+                    <Camera className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span className="truncate">Foto activa ✕</span>
+                  </button>
+                ) : null}
               </div>
             </div>
 
-            {/* Center: Quick Undo/Redo & Zoom Pill */}
+            {/* Center: DIRECT ACTION BUTTONS (Foto & Imagen) + Zoom & Undo */}
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* Direct Access: Camera */}
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-emerald-500"
+                title="Tomar foto con la cámara para croquizar encima a pantalla completa"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Foto</span>
+              </button>
+
+              {/* Direct Access: Image / PDF */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-blue-500"
+                title="Cargar foto o plano PDF desde tus archivos"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Imagen</span>
+              </button>
+
+              {/* If unit has blueprints */}
+              {unitBlueprints.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsBlueprintsDropdownOpen(true)}
+                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all touch-target"
+                  title="Cargar plano técnico de la unidad"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Planos</span>
+                </button>
+              )}
+
               {/* Quick Undo / Redo */}
-              <div className="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/80 p-0.5">
+              <div className="flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5">
                 <button
                   type="button"
                   disabled={!canUndo}
@@ -1247,7 +1296,7 @@ export function CroquisModal({
                   className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg disabled:opacity-25 transition-colors touch-target"
                   title="Deshacer trazo"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
@@ -1256,7 +1305,7 @@ export function CroquisModal({
                   className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg disabled:opacity-25 transition-colors touch-target"
                   title="Rehacer trazo"
                 >
-                  <RotateCw className="w-4 h-4" />
+                  <RotateCw className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -1270,12 +1319,12 @@ export function CroquisModal({
                 className={`p-1.5 rounded-xl border flex items-center gap-1 text-xs font-bold transition-all touch-target ${
                   tool === 'eraser'
                     ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
-                    : 'bg-slate-800/90 text-slate-200 border-slate-700/80'
+                    : 'bg-slate-800 text-slate-200 border-slate-700'
                 }`}
                 title={tool === 'eraser' ? 'Borrador activo (toca para volver a dibujar)' : 'Alternar a borrador'}
               >
                 {tool === 'eraser' ? (
-                  <Eraser className="w-4 h-4 text-rose-400" />
+                  <Eraser className="w-3.5 h-3.5 text-rose-400" />
                 ) : (
                   <div className="flex items-center gap-1">
                     <Pencil className="w-3.5 h-3.5 text-amber-400" />
@@ -1288,7 +1337,7 @@ export function CroquisModal({
               </button>
 
               {/* Quick Zoom Pill */}
-              <div className="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/80 p-0.5 text-xs font-bold">
+              <div className="flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5 text-xs font-bold">
                 <button
                   type="button"
                   onClick={handleZoomOut}
@@ -1338,7 +1387,7 @@ export function CroquisModal({
               <button
                 type="button"
                 onClick={handleSaveToUnit}
-                className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 touch-target"
+                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 touch-target border border-emerald-500"
                 title="Guardar croquis en la unidad"
               >
                 <Save className="w-3.5 h-3.5" />
@@ -1349,7 +1398,7 @@ export function CroquisModal({
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(true)}
-                className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 touch-target border border-amber-400"
+                className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 touch-target border border-amber-400"
                 title="Abrir menú de herramientas, colores, formas y ajustes de croquis"
               >
                 <MoreVertical className="w-4 h-4 stroke-[3]" />
@@ -1360,7 +1409,7 @@ export function CroquisModal({
 
           {/* MAIN CANVAS AREA: OCCUPIES 100% OF REMAINING SCREEN */}
           <div
-            className="flex-1 w-full h-[calc(100vh-48px)] relative overflow-hidden flex items-center justify-center bg-slate-950"
+            className="flex-1 min-h-0 w-full relative overflow-hidden flex items-center justify-center bg-slate-950 p-1.5 sm:p-3"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -1368,19 +1417,32 @@ export function CroquisModal({
           >
             <div
               ref={containerRef}
-              className={`w-full h-full relative overflow-hidden flex items-center justify-center touch-none select-none ${
+              className={`w-full h-full relative overflow-hidden flex items-center justify-center touch-none select-none transition-all ${
                 isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
               } ${
                 bgDocument
                   ? 'bg-slate-950'
-                  : paperType === 'dark'
-                  ? 'bg-slate-900'
-                  : paperType === 'grid'
-                  ? 'bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]'
-                  : paperType === 'lines'
-                  ? 'bg-white bg-[linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:100%_28px]'
-                  : 'bg-white'
+                  : 'max-w-5xl rounded-2xl shadow-2xl border border-slate-700/60'
               }`}
+              style={{
+                backgroundColor: bgDocument
+                  ? '#020617'
+                  : paperType === 'dark'
+                  ? '#0f172a'
+                  : '#ffffff',
+                backgroundImage:
+                  !bgDocument && paperType === 'grid'
+                    ? 'radial-gradient(#94a3b8 1.5px, transparent 1.5px)'
+                    : !bgDocument && paperType === 'lines'
+                    ? 'linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)'
+                    : undefined,
+                backgroundSize:
+                  !bgDocument && paperType === 'grid'
+                    ? '24px 24px'
+                    : !bgDocument && paperType === 'lines'
+                    ? '100% 28px'
+                    : undefined
+              }}
             >
               {/* Transformed Content Wrapper (Synchronizes Zoom & Pan for both Photo and Canvas) */}
               <div
@@ -1426,8 +1488,125 @@ export function CroquisModal({
                   <span>Modo Mover: Arrastra la pantalla • Toca la mano para dibujar</span>
                 </div>
               )}
+
+              {/* EMPTY STATE WELCOME CARD: If no photo loaded and no drawing yet */}
+              {!bgDocument && !hasStartedDrawing && undoStackRef.current.length === 0 && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-4 pointer-events-none">
+                  <div className="bg-slate-900/95 backdrop-blur-md border border-amber-500/50 rounded-3xl p-5 sm:p-7 max-w-sm sm:max-w-md w-full shadow-2xl text-center text-white pointer-events-auto space-y-4 animate-in fade-in zoom-in-95">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shadow-lg">
+                      <PenTool className="w-7 h-7 stroke-[2.5]" />
+                    </div>
+
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
+                        Croquis de Obra en Sitio
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-1">
+                        {activeProject?.name || 'Obra'} • {currentUnit?.name || 'Unidad'}
+                      </p>
+                      <p className="text-[11px] text-amber-400 font-bold mt-1">
+                        Toma una foto de la obra para croquizar a pantalla completa, o dibuja sobre esta hoja:
+                      </p>
+                    </div>
+
+                    <div className="space-y-2.5 pt-1">
+                      {/* Live Camera Button */}
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg active:scale-95 transition-all touch-target border border-emerald-500"
+                      >
+                        <Camera className="w-5 h-5" />
+                        <span>Tomar Foto de la Obra</span>
+                      </button>
+
+                      {/* File Upload Button */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg active:scale-95 transition-all touch-target border border-blue-500"
+                      >
+                        <Upload className="w-5 h-5" />
+                        <span>Cargar Imagen o PDF</span>
+                      </button>
+
+                      {/* Blueprints Button if available */}
+                      {unitBlueprints.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsBlueprintsDropdownOpen(true)}
+                          className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all touch-target"
+                        >
+                          <Compass className="w-4 h-4" />
+                          <span>Usar Plano de la Unidad ({unitBlueprints.length})</span>
+                        </button>
+                      )}
+
+                      {/* Freehand Blank Sheet Button */}
+                      <button
+                        type="button"
+                        onClick={() => setHasStartedDrawing(true)}
+                        className="w-full py-2.5 px-4 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all touch-target border border-slate-700"
+                      >
+                        <Pencil className="w-4 h-4 text-amber-400" />
+                        <span>Dibujar a mano alzada en blanco</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* UNIT BLUEPRINTS PICKER MODAL */}
+          {isBlueprintsDropdownOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-md w-full shadow-2xl text-white space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Compass className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white">Planos de la Unidad</h3>
+                      <p className="text-[11px] text-slate-400">{currentUnit?.name || 'Unidad'} • {activeProject?.name}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsBlueprintsDropdownOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {unitBlueprints.map((bp) => (
+                    <button
+                      key={bp.id}
+                      type="button"
+                      onClick={() => handleLoadBlueprintAsBackground(bp)}
+                      className="w-full text-left p-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-white flex items-center justify-between transition-colors active:scale-95"
+                    >
+                      <span className="truncate">{bp.name}</span>
+                      <span className="text-[10px] text-amber-400 font-mono uppercase bg-slate-900 px-2 py-0.5 rounded-md border border-slate-700">
+                        {bp.type}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBlueprintsDropdownOpen(false)}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* THE 3-DOTS SETTINGS & TOOLS DRAWER / MODAL */}
           {isToolsMenuOpen && (
