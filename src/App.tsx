@@ -18,6 +18,7 @@ import { EditUnitModal } from './components/EditUnitModal';
 import { SecurityConfirmModal } from './components/SecurityConfirmModal';
 import { MilestonesModal } from './components/MilestonesModal';
 import { CroquisModal } from './components/CroquisModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { exportInspectionPlanillaToExcel } from './utils/excelExport';
 import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
@@ -1798,15 +1799,20 @@ export default function App() {
       )}
 
       {isCroquisModalOpen && projects.length > 0 && (
-        <CroquisModal
-          isOpen={isCroquisModalOpen}
-          projects={projects}
-          initialProjectId={selectedProjectId || projects[0]?.id}
-          initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject?.units?.[0]?.id ?? projects[0]?.units?.[0]?.id)}
-          onClose={() => setIsCroquisModalOpen(false)}
-          onSaveSketch={handleSaveSketch}
-          onDeleteSketch={handleDeleteSketch}
-        />
+        <ErrorBoundary
+          fallbackTitle="Error al cargar el módulo de croquis"
+          onReset={() => setIsCroquisModalOpen(false)}
+        >
+          <CroquisModal
+            isOpen={isCroquisModalOpen}
+            projects={projects}
+            initialProjectId={selectedProjectId || projects[0]?.id}
+            initialUnitId={croquisModalTargetUnitId || selectedUnitId || (selectedProject?.units?.[0]?.id ?? projects[0]?.units?.[0]?.id)}
+            onClose={() => setIsCroquisModalOpen(false)}
+            onSaveSketch={handleSaveSketch}
+            onDeleteSketch={handleDeleteSketch}
+          />
+        </ErrorBoundary>
       )}
 
       <CloudSetupModal

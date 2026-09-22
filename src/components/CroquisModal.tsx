@@ -389,7 +389,7 @@ export function CroquisModal({
       clearTimeout(resizeTimer);
       observer.disconnect();
     };
-  }, [isOpen, activeTab, initCanvas, isFullscreen]);
+  }, [isOpen, activeTab, initCanvas]);
 
   // Undo Handler
   const handleUndo = () => {
