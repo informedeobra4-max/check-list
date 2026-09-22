@@ -1217,61 +1217,72 @@ export function CroquisModal({
       {activeTab === 'draw' && (
         <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 relative overflow-hidden">
           {/* HEADER BAR: HIGH-CONTRAST WITH DIRECT ACCESS TO CAMERA, IMAGES & 3-DOTS */}
-          <div className="min-h-[52px] sm:min-h-[56px] py-1.5 px-2 sm:px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 z-30 shrink-0 select-none">
-            {/* Left: Close & Obra/Depto info */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          {/* HEADER BAR: PINNED LEFT (X) & RIGHT (3-DOTS) WITH TOUCH-SLIDING HORIZONTAL CENTER */}
+          <div className="h-14 sm:h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-30 shrink-0 select-none px-2 sm:px-3 overflow-hidden">
+            {/* Left: PINNED Close & Obra/Depto Info - NEVER SHRUNK, ALWAYS VISIBLE */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-20 bg-slate-900 pr-1.5 border-r border-slate-800">
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-rose-600/30 rounded-xl transition-colors touch-target"
+                className="p-2 bg-slate-800 hover:bg-rose-600 text-white rounded-xl border border-slate-700 transition-all touch-target active:scale-95 shadow-xs shrink-0 flex items-center justify-center"
                 title="Cerrar croquis"
+                aria-label="Cerrar croquis"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 stroke-[2.5]" />
               </button>
 
-              <div className="min-w-0 flex items-center gap-1.5 text-xs">
-                <span className="font-black text-white truncate max-w-[95px] sm:max-w-[150px]">
+              <div className="flex flex-col min-w-0 max-w-[70px] xs:max-w-[95px] sm:max-w-[150px] leading-tight">
+                <span className="font-black text-white text-xs truncate">
                   {activeProject?.name || 'Obra'}
                 </span>
-                <span className="text-amber-400 font-bold truncate max-w-[85px] sm:max-w-[130px]">
+                <span className="text-amber-400 font-bold text-[10px] truncate">
                   • {currentUnit?.name || 'Unidad'}
                 </span>
-                {bgDocument ? (
-                  <button
-                    type="button"
-                    onClick={() => setBgDocument(null)}
-                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-rose-300 font-bold bg-emerald-950/80 hover:bg-rose-950/80 border border-emerald-600/50 hover:border-rose-600/50 px-2 py-0.5 rounded-lg transition-colors truncate max-w-[140px]"
-                    title="Foto cargada en pantalla completa. Toca para quitar fondo."
-                  >
-                    <Camera className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span className="truncate">Foto activa ✕</span>
-                  </button>
-                ) : null}
               </div>
             </div>
 
-            {/* Center: DIRECT ACTION BUTTONS (Foto & Imagen) + Zoom & Undo */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            {/* Center: HORIZONTALLY SCROLLABLE TOOLBAR (Allows sliding smoothly with finger on mobile) */}
+            <div
+              className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-pan-x scrollbar-none py-1 px-1.5 scroll-smooth"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {/* Active Background Photo Indicator Pill */}
+              {bgDocument && (
+                <button
+                  type="button"
+                  onClick={() => setBgDocument(null)}
+                  className="shrink-0 inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-rose-300 font-bold bg-emerald-950/80 hover:bg-rose-950/80 border border-emerald-600/50 hover:border-rose-600/50 px-2 py-1 rounded-xl transition-colors"
+                  title="Foto en pantalla completa. Toca para quitar fondo."
+                >
+                  <Camera className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="whitespace-nowrap">Foto activa ✕</span>
+                </button>
+              )}
+
               {/* Direct Access: Camera */}
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-emerald-500"
+                className="shrink-0 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-emerald-500 whitespace-nowrap"
                 title="Tomar foto con la cámara para croquizar encima a pantalla completa"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Foto</span>
+                <span>Foto</span>
               </button>
 
               {/* Direct Access: Image / PDF */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-blue-500"
+                className="shrink-0 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all touch-target border border-blue-500 whitespace-nowrap"
                 title="Cargar foto o plano PDF desde tus archivos"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Imagen</span>
+                <span>Imagen</span>
               </button>
 
               {/* If unit has blueprints */}
@@ -1279,16 +1290,16 @@ export function CroquisModal({
                 <button
                   type="button"
                   onClick={() => setIsBlueprintsDropdownOpen(true)}
-                  className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all touch-target"
+                  className="shrink-0 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all touch-target whitespace-nowrap"
                   title="Cargar plano técnico de la unidad"
                 >
                   <Compass className="w-3.5 h-3.5" />
-                  <span className="hidden md:inline">Planos</span>
+                  <span>Planos ({unitBlueprints.length})</span>
                 </button>
               )}
 
               {/* Quick Undo / Redo */}
-              <div className="flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5">
+              <div className="shrink-0 flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5">
                 <button
                   type="button"
                   disabled={!canUndo}
@@ -1316,7 +1327,7 @@ export function CroquisModal({
                   if (tool === 'eraser') setTool('pen');
                   else setTool('eraser');
                 }}
-                className={`p-1.5 rounded-xl border flex items-center gap-1 text-xs font-bold transition-all touch-target ${
+                className={`shrink-0 p-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all touch-target ${
                   tool === 'eraser'
                     ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
                     : 'bg-slate-800 text-slate-200 border-slate-700'
@@ -1337,7 +1348,7 @@ export function CroquisModal({
               </button>
 
               {/* Quick Zoom Pill */}
-              <div className="flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5 text-xs font-bold">
+              <div className="shrink-0 flex items-center bg-slate-800 rounded-xl border border-slate-700 p-0.5 text-xs font-bold">
                 <button
                   type="button"
                   onClick={handleZoomOut}
@@ -1350,7 +1361,7 @@ export function CroquisModal({
                 <button
                   type="button"
                   onClick={handleResetZoom}
-                  className="px-1.5 py-1 text-[11px] font-mono text-amber-400 hover:text-amber-300 transition-colors"
+                  className="px-1.5 py-1 text-[11px] font-mono text-amber-400 hover:text-amber-300 transition-colors whitespace-nowrap"
                   title="Restablecer zoom al 100% y centrar"
                 >
                   {Math.round(zoom * 100)}%
@@ -1381,24 +1392,24 @@ export function CroquisModal({
               </div>
             </div>
 
-            {/* Right: Quick Save & THE 3-DOTS BUTTON (⋮) */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Right: PINNED Guardar + 3-DOTS (⋮) BUTTON - NEVER SHRUNK, ALWAYS VISIBLE */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0 z-20 bg-slate-900 pl-1.5 border-l border-slate-800">
               {/* Quick Save */}
               <button
                 type="button"
                 onClick={handleSaveToUnit}
-                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 touch-target border border-emerald-500"
+                className="p-2 sm:px-3 sm:py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 touch-target border border-emerald-500 flex items-center gap-1 shrink-0"
                 title="Guardar croquis en la unidad"
               >
-                <Save className="w-3.5 h-3.5" />
-                <span>Guardar</span>
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">Guardar</span>
               </button>
 
               {/* 3-DOTS MENU BUTTON (⋮) */}
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(true)}
-                className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 touch-target border border-amber-400"
+                className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 touch-target border border-amber-400 shrink-0"
                 title="Abrir menú de herramientas, colores, formas y ajustes de croquis"
               >
                 <MoreVertical className="w-4 h-4 stroke-[3]" />
