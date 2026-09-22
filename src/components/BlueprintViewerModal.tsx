@@ -122,61 +122,68 @@ export function BlueprintViewerModal({
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 no-print animate-fade-in">
       <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col h-[92vh] max-h-[95vh] overflow-hidden">
-        {/* Header */}
-        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
-              <Compass className="w-5 h-5" />
+        {/* Header with PINNED [X] and flexible title */}
+        <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between flex-shrink-0 gap-2 select-none">
+          <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">
+              <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-slate-900 dark:text-white text-base leading-tight">
-                  Planos y Documentación Técnica
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                <h3 className="font-black text-white text-sm sm:text-base leading-tight truncate">
+                  Planos y Documentación
                 </h3>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/40 text-amber-300 truncate max-w-[120px] xs:max-w-[180px]">
                   {unitName}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-400 truncate">
                 {projectName} • Cotejo de planos e instalaciones en terreno
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-20">
             <button
               onClick={() => setIsAddingDoc(prev => !prev)}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all touch-target"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 sm:gap-1.5 shadow-sm active:scale-95 transition-all touch-target shrink-0"
+              title={isAddingDoc ? 'Ver Documentos' : 'Cargar nuevo plano'}
             >
-              <Plus className="w-4 h-4" />
-              <span>{isAddingDoc ? 'Ver Documentos' : 'Agregar Plano'}</span>
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+              <span className="hidden xs:inline">{isAddingDoc ? 'Ver Planos' : 'Agregar Plano'}</span>
+              <span className="xs:hidden">{isAddingDoc ? 'Ver' : 'Plano'}</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors touch-target"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-white border border-slate-700 transition-all touch-target shrink-0 z-20 flex items-center justify-center active:scale-95 shadow-xs"
+              title="Cerrar ventana de planos"
+              aria-label="Cerrar planos"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        {/* Categories Bar */}
-        <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
+        {/* Categories Bar: HORIZONTALLY SCROLLABLE WITH TOUCH (Allows finger sliding smoothly) */}
+        <div
+          className="px-3 sm:px-4 py-2 border-b border-slate-800 bg-slate-900/90 flex items-center gap-1.5 overflow-x-auto touch-pan-x scrollbar-none flex-shrink-0 scroll-smooth"
+          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+              className={`shrink-0 px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                 activeCategory === cat.id
                   ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
               {cat.label}
             </button>
           ))}
-          <span className="ml-auto text-[11px] font-bold text-slate-400 dark:text-slate-500 flex-shrink-0">
-            {blueprints.length} {blueprints.length === 1 ? 'documento' : 'documentos'}
+          <span className="ml-auto text-[11px] font-bold text-slate-500 flex-shrink-0 pl-2">
+            {blueprints.length} {blueprints.length === 1 ? 'doc' : 'docs'}
           </span>
         </div>
 
@@ -299,22 +306,25 @@ export function BlueprintViewerModal({
               /* Active Document Display */
               <div className="w-full h-full flex flex-col">
                 {/* Floating controls for active doc */}
-                <div className="flex items-center justify-between pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                <div
+                  className="flex items-center justify-between gap-1.5 pb-2 overflow-x-auto touch-pan-x scrollbar-none flex-shrink-0"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 truncate">
                       {activeDoc.name}
                     </span>
-                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
                       {activeDoc.category}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     {activeDoc.type === 'image' && (
-                      <div className="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 shadow-xs mr-2">
+                      <div className="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 shadow-xs mr-1 shrink-0">
                         <button
                           onClick={handleZoomIn}
-                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500"
+                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500 touch-target"
                           title="Acercar (+)"
                         >
                           <ZoomIn className="w-4 h-4" />
@@ -324,14 +334,14 @@ export function BlueprintViewerModal({
                         </span>
                         <button
                           onClick={handleZoomOut}
-                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500"
+                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500 touch-target"
                           title="Alejar (-)"
                         >
                           <ZoomOut className="w-4 h-4" />
                         </button>
                         <button
                           onClick={handleResetZoom}
-                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500"
+                          className="p-1 text-slate-600 dark:text-slate-300 hover:text-amber-500 touch-target"
                           title="Restablecer (100%)"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
@@ -343,16 +353,16 @@ export function BlueprintViewerModal({
                       href={activeDoc.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 hover:text-amber-500 shadow-xs"
+                      className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 hover:text-amber-500 shadow-xs shrink-0 touch-target"
                       title="Abrir en pantalla completa o visor externo"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir</span>
+                      <span className="hidden xs:inline">Abrir</span>
                     </a>
 
                     <button
                       onClick={() => onDeleteBlueprint(activeDoc.id)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors ml-1"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors shrink-0 touch-target"
                       title="Eliminar este plano"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -425,7 +435,7 @@ export function BlueprintViewerModal({
           </div>
 
           {/* Lateral Document List / Thumbnails */}
-          <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 overflow-y-auto flex-shrink-0">
+          <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 max-h-44 md:max-h-none overflow-y-auto flex-shrink-0 touch-pan-y">
             <h5 className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
               Índice de Planos ({filteredDocs.length})
             </h5>

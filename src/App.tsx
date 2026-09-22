@@ -66,6 +66,24 @@ const createLightweightProjectsForLocal = (projs: Project[]): any[] => {
     ...p,
     units: p.units?.map(u => ({
       ...u,
+      sketches: u.sketches?.map(s => ({
+        id: s.id,
+        title: s.title,
+        createdAt: s.createdAt,
+        unitId: s.unitId,
+        unitName: s.unitName,
+        projectId: s.projectId,
+        projectName: s.projectName
+      })) || [],
+      blueprints: u.blueprints?.map(b => ({
+        id: b.id,
+        name: b.name,
+        category: b.category,
+        type: b.type,
+        uploadedAt: b.uploadedAt,
+        url: b.type === 'image' && b.url?.startsWith('data:') ? '' : b.url,
+        cadViewerUrl: b.cadViewerUrl
+      })) || [],
       trades: u.trades?.map(t => ({
         ...t,
         items: t.items?.map(i => ({
@@ -424,6 +442,7 @@ export default function App() {
   const isInitialCloudLoadRef = useRef(true);
   const isRemoteUpdateRef = useRef(false);
   const cloudSaveTimerRef = useRef<any>(null);
+  const lastLocalEditTimeRef = useRef<number>(0);
 
   // Initial cloud fetch from Supabase and active listeners
   useEffect(() => {
@@ -455,6 +474,8 @@ export default function App() {
           // Realtime push subscription
           unsubscribe = subscribeToCloudData(
             (cloudProjects) => {
+              // Protect recently edited local data from being overwritten by delayed push events
+              if (Date.now() - lastLocalEditTimeRef.current < 4000) return;
               isRemoteUpdateRef.current = true;
               setProjects(cloudProjects.map(sanitizeProjectTrades));
             },
@@ -476,6 +497,9 @@ export default function App() {
 
     // Auto-refresh when tab is focused / unlocked on mobile or notebook
     const handleVisibilityOrFocus = async () => {
+      // If user recently made a change (within 4s), do NOT pull and overwrite local unsaved changes
+      if (Date.now() - lastLocalEditTimeRef.current < 4000) return;
+
       if (document.visibilityState === 'visible') {
         try {
           const res = await loadCloudData();
@@ -725,96 +749,134 @@ export default function App() {
 
   // Checklist Item Toggle
   const handleToggleItem = (tradeId: string, itemId: string) => {
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  const newCompleted = !item.completed;
-                  const newPct = newCompleted ? 100 : 0;
-                  showToast(
-                    newCompleted ? 'Ítem completado (100%)' : 'Ítem marcado como pendiente (0%)',
-                    newCompleted ? 'Check' : 'Clock'
-                  );
-                  return {
-                    ...item,
-                    completed: newCompleted,
-                    progressPercentage: newPct
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
-    }));
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    const newCompleted = !item.completed;
+                    const newPct = newCompleted ? 100 : 0;
+                    showToast(
+                      newCompleted ? 'Ítem completado (100%)' : 'Ítem marcado como pendiente (0%)',
+                      newCompleted ? 'Check' : 'Clock'
+                    );
+                    return {
+                      ...item,
+                      completed: newCompleted,
+                      progressPercentage: newPct
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+    });
   };
 
   // Checklist Item Progress Percentage Update (0 to 100)
   const handleUpdateItemProgress = (tradeId: string, itemId: string, percentage: number) => {
+    lastLocalEditTimeRef.current = Date.now();
     const clamped = Math.max(0, Math.min(100, isNaN(percentage) ? 0 : Math.round(percentage)));
     const isCompleted = clamped === 100;
+    let updatedProjectsList: Project[] = [];
 
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  return {
-                    ...item,
-                    completed: isCompleted,
-                    progressPercentage: clamped
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
-    }));
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    return {
+                      ...item,
+                      completed: isCompleted,
+                      progressPercentage: clamped
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+    });
   };
 
   // Delete checklist item
   const handleDeleteItem = (tradeId: string, itemId: string) => {
     if (!confirm('¿Eliminar esta tarea del checklist de la unidad?')) return;
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.filter(item => item.id !== itemId)
-              };
-            })
-          };
-        })
-      };
-    }));
-    showToast('Tarea eliminada', 'Trash2');
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
+                return {
+                  ...t,
+                  items: t.items.filter(item => item.id !== itemId)
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast('Tarea eliminada y sincronizada', 'Trash2');
+    });
   };
 
   // Add custom checklist item to trade (smart selector: current unit or replicated across selected active projects)
@@ -1005,38 +1067,50 @@ export default function App() {
 
   // Save or remove technical comment / observation on checklist item
   const handleSaveItemComment = (tradeId: string, itemId: string, comment: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     const trimmed = comment.trim();
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== selectedUnitId) return u;
-          return {
-            ...u,
-            trades: u.trades.map(t => {
-              if (t.id !== tradeId) return t;
-              return {
-                ...t,
-                items: t.items.map(item => {
-                  if (item.id !== itemId) return item;
-                  return {
-                    ...item,
-                    comment: trimmed ? trimmed : undefined
-                  };
-                })
-              };
-            })
-          };
-        })
-      };
-    }));
+    let updatedProjectsList: Project[] = [];
 
-    if (trimmed) {
-      showToast('Observación técnica guardada', 'Check');
-    } else {
-      showToast('Observación eliminada', 'Trash2');
-    }
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    return {
+                      ...item,
+                      comment: trimmed ? trimmed : undefined
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      if (trimmed) {
+        showToast('Observación guardada en la Nube', 'Check');
+      } else {
+        showToast('Observación eliminada en la Nube', 'Trash2');
+      }
+    });
   };
 
   // Add photo to item (from camera, file picker or modal) and persist directly to Supabase Cloud
@@ -1066,7 +1140,8 @@ export default function App() {
             return {
               ...u,
               trades: u.trades.map(t => {
-                if (t.id !== tradeId) return t;
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
                 return {
                   ...t,
                   items: t.items.map(item => {
@@ -1115,7 +1190,8 @@ export default function App() {
             return {
               ...u,
               trades: u.trades.map(t => {
-                if (t.id !== tradeId) return t;
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
                 return {
                   ...t,
                   items: t.items.map(item => {
@@ -1152,6 +1228,7 @@ export default function App() {
     isExplicitDelete: boolean = false
   ) => {
     if (!selectedProjectId || !selectedUnitId) return;
+    lastLocalEditTimeRef.current = Date.now();
     const trimmed = comment.trim();
 
     let updatedProjectsList: Project[] = [];
@@ -1167,7 +1244,8 @@ export default function App() {
             return {
               ...u,
               trades: u.trades.map(t => {
-                if (t.id !== tradeId) return t;
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
                 return {
                   ...t,
                   items: t.items.map(item => {

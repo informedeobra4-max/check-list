@@ -895,7 +895,7 @@ export function CroquisModal({
 
     const width = 1200;
     const headerHeight = 140;
-    const bodyHeight = Math.max(600, Math.round(width / containerRatio));
+    const bodyHeight = Math.min(1800, Math.max(600, Math.round(width / containerRatio)));
     const footerHeight = 40;
     const totalHeight = headerHeight + bodyHeight + footerHeight;
 
@@ -1045,7 +1045,7 @@ export function CroquisModal({
     ctx.font = 'bold 13px sans-serif';
     ctx.fillText('SUPERVISIÓN EN OBRA', width - 200, totalHeight - 16);
 
-    return outCanvas.toDataURL('image/png', 0.95);
+    return outCanvas.toDataURL('image/jpeg', 0.82);
   };
 
   // Save to Department & Supabase Cloud

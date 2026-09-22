@@ -223,6 +223,54 @@ export function compressImageFile(file: File, maxDim: number = 800, quality: num
 }
 
 /**
+ * Compresses an existing base64 dataUrl (PNG or heavy JPEG) to an optimized JPEG.
+ * Ensures huge canvas exports or camera snapshots don't saturate Supabase or localStorage.
+ */
+export function compressDataUrl(dataUrl: string, maxDim: number = 1200, quality: number = 0.80): Promise<string> {
+  return new Promise((resolve) => {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+      resolve(dataUrl);
+      return;
+    }
+    // If it's already a lightweight JPEG (< 350 KB), skip compression
+    if (dataUrl.startsWith('data:image/jpeg') && dataUrl.length < 350 * 1024) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressed = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressed);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+
+/**
  * Determines the floor number and label of a unit based on naming patterns,
  * such as "2-1" -> Floor 2, "Depto 1-2" -> Floor 1, "PB-1" -> Floor 0, etc.
  */
