@@ -66,8 +66,8 @@ export function ExecutiveDonutChart({
             <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor={glowColor} floodOpacity="0.6" />
           </filter>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#00f2fe" />
-            <stop offset="100%" stopColor="#0ea5e9" />
+            <stop offset="0%" stopColor={glowColor} />
+            <stop offset="100%" stopColor={glowColor} stopOpacity="0.85" />
           </linearGradient>
         </defs>
 
@@ -103,7 +103,10 @@ export function ExecutiveDonutChart({
         <span className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] leading-none font-mono">
           {displayPct}%
         </span>
-        <span className="text-[9px] font-black tracking-widest text-[#00f2fe] uppercase mt-1">
+        <span
+          className="text-[9px] font-black tracking-widest uppercase mt-1 transition-colors"
+          style={{ color: glowColor }}
+        >
           Completado
         </span>
       </div>

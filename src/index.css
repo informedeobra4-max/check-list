@@ -2,6 +2,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  --neon-color: #00f2fe;
+  --neon-glow: rgba(0, 242, 254, 0.38);
+  --neon-glow-soft: rgba(0, 242, 254, 0.15);
+}
+
 @theme {
   --color-brand-dark: #111827;
   --color-brand-navy: #1e293b;
@@ -9,6 +15,22 @@
   --color-brand-gold-light: #eab308;
   --color-brand-gold-bg: #fef9c3;
   --color-brand-accent: #b48316;
+}
+
+.border-neon {
+  border-color: var(--neon-color) !important;
+}
+
+.text-neon {
+  color: var(--neon-color) !important;
+}
+
+.bg-neon-soft {
+  background-color: var(--neon-glow-soft) !important;
+}
+
+.shadow-neon {
+  box-shadow: 0 0 30px var(--neon-glow) !important;
 }
 
 /* Touch targets optimization for job site mobile devices */

@@ -27,7 +27,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
-import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor, hexToRgba } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
@@ -36,6 +36,7 @@ import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 interface UnitsViewProps {
   project: Project;
   presentationBg?: string;
+  neonColor?: string;
   onSelectUnit: (unitId: string) => void;
   onOpenNewUnitModal: () => void;
   onOpenReportModal: (type?: 'auto' | 'project' | 'unit', projectId?: string, unitId?: string) => void;
@@ -56,6 +57,7 @@ interface UnitsViewProps {
 export function UnitsView({
   project,
   presentationBg,
+  neonColor = '#00f2fe',
   onSelectUnit,
   onOpenNewUnitModal,
   onOpenReportModal,
@@ -233,7 +235,11 @@ export function UnitsView({
       <div
         onMouseEnter={() => setCardHoverTrigger(prev => prev + 1)}
         onTouchStart={() => setCardHoverTrigger(prev => prev + 1)}
-        className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white transition-all relative overflow-hidden"
+        style={{
+          borderColor: neonColor,
+          boxShadow: `0 0 30px ${hexToRgba(neonColor, 0.28)}`
+        }}
+        className="rounded-3xl p-5 sm:p-6 border-2 bg-[#131b2c] text-white transition-all relative overflow-hidden"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 flex-1 min-w-0 pr-1">
@@ -242,7 +248,9 @@ export function UnitsView({
               <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
                 {countDeptos} DEPTOS - {countCommon} COMUNES
               </span>
-              <span className="text-[11px] text-[#00f2fe]/90 font-bold">Comunadas</span>
+              <span className="text-[11px] font-bold" style={{ color: neonColor }}>
+                Comunadas
+              </span>
             </div>
 
             {/* Project Name */}
@@ -252,10 +260,10 @@ export function UnitsView({
 
             {/* Location with Pin */}
             <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
-              <Building2 className="w-3.5 h-3.5 text-[#00f2fe] flex-shrink-0" />
+              <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: neonColor }} />
               <span>{project.location || 'Calle Agustín Alvarez 315'}</span>
               {typeFilter !== 'all' && (
-                <span className="text-[#00f2fe] font-bold ml-1">
+                <span className="font-bold ml-1" style={{ color: neonColor }}>
                   • Viendo {typeFilter === 'unit' ? `${countDeptos} Deptos` : `${countCommon} Espacios Comunes`}
                 </span>
               )}
@@ -266,19 +274,36 @@ export function UnitsView({
 
             {/* Avance General Technical Details */}
             <div className="pt-0.5 text-xs text-slate-300 space-y-1">
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">
-                Avance General
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  Avance General
+                </p>
+                {onEditProject && (
+                  <button
+                    type="button"
+                    onClick={() => onEditProject(project)}
+                    className="px-1.5 py-0.5 -mr-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1 text-[10px] font-bold border border-transparent hover:border-slate-700"
+                    title="Editar datos de Avance General"
+                  >
+                    <Pencil className="w-3 h-3" style={{ color: neonColor }} />
+                    <span>Editar</span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-2 truncate text-slate-300">
                 <FileCheck className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                 <span className="truncate">{project.technicalNotes || 'Toda la información del Expediente'}</span>
               </div>
               <div className="flex items-center gap-2 truncate text-slate-300">
                 <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                <span className="truncate">Msc. Arq. Agustín Arrieta</span>
+                <span className="truncate">{project.director || 'Msc. Arq. Agustín Arrieta'}</span>
+              </div>
+              <div className="flex items-center gap-2 truncate text-slate-300">
+                <Zap className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <span className="truncate">{project.computoSubtitle || 'Cómputo, Certificaciones y Rubros'}</span>
               </div>
               {project.expedienteMunicipal && (
-                <div className="flex items-center gap-2 truncate text-slate-300">
+                <div className="flex items-center gap-2 truncate text-slate-400 text-[11px]">
                   <span className="text-[10px] font-bold text-slate-500 uppercase">Exp:</span>
                   <span className="truncate">{project.expedienteMunicipal}</span>
                 </div>
@@ -286,13 +311,13 @@ export function UnitsView({
             </div>
           </div>
 
-          {/* Glowing Cyan Donut Chart */}
+          {/* Glowing Donut Chart */}
           <div className="flex-shrink-0 flex items-center justify-center pl-2">
             <ExecutiveDonutChart
               percentage={typeFilter === 'all' ? overallProgress : tabProgress}
               size={136}
               strokeWidth={13}
-              glowColor="#00f2fe"
+              glowColor={neonColor}
               animationTrigger={cardHoverTrigger}
             />
           </div>
@@ -595,10 +620,14 @@ export function UnitsView({
                   onMouseEnter={() => setActiveFloorCardKey(grp.key)}
                   onTouchStart={() => setActiveFloorCardKey(grp.key)}
                   onClick={() => setSelectedFloorKey(grp.key)}
+                  style={isFloorActive ? {
+                    borderColor: neonColor,
+                    boxShadow: `0 0 30px ${hexToRgba(neonColor, 0.35)}`
+                  } : undefined}
                   className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between group touch-target ${
                     isFloorActive
-                      ? 'border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.35)] bg-[#162238] scale-[1.01]'
-                      : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                      ? 'border-2 scale-[1.01] bg-[#162238]'
+                      : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'
                   } text-white`}
                 >
                   <div className="space-y-3.5">
@@ -606,9 +635,17 @@ export function UnitsView({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3.5 min-w-0">
                         {/* Floor Badge Icon */}
-                        <div className="w-12 h-12 rounded-2xl bg-[#00f2fe]/15 border border-[#00f2fe]/30 flex items-center justify-center text-[#00f2fe] font-black text-lg flex-shrink-0 shadow-[0_0_12px_rgba(0,242,254,0.2)]">
+                        <div
+                          className="w-12 h-12 rounded-2xl border flex items-center justify-center font-black text-lg flex-shrink-0"
+                          style={{
+                            backgroundColor: hexToRgba(neonColor, 0.15),
+                            borderColor: hexToRgba(neonColor, 0.3),
+                            color: neonColor,
+                            boxShadow: `0 0 12px ${hexToRgba(neonColor, 0.2)}`
+                          }}
+                        >
                           {grp.isCommon ? (
-                            <Building2 className="w-6 h-6 text-[#00f2fe]" />
+                            <Building2 className="w-6 h-6" style={{ color: neonColor }} />
                           ) : grp.floorNumber === 0 ? (
                             'PB'
                           ) : (
@@ -617,7 +654,10 @@ export function UnitsView({
                         </div>
 
                         <div className="min-w-0">
-                          <h4 className="text-xl font-black tracking-tight text-white group-hover:text-[#00f2fe] transition-colors truncate">
+                          <h4
+                            style={isFloorActive ? { color: neonColor } : undefined}
+                            className="text-xl font-black tracking-tight text-white group-hover:text-slate-100 transition-colors truncate"
+                          >
                             {grp.label}
                           </h4>
                           <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
@@ -632,7 +672,7 @@ export function UnitsView({
                           percentage={grp.progress}
                           size={52}
                           strokeWidth={5}
-                          color={grp.progress === 100 ? '#10b981' : '#00f2fe'}
+                          color={grp.progress === 100 ? '#10b981' : neonColor}
                         />
                       </div>
                     </div>
@@ -668,8 +708,11 @@ export function UnitsView({
                   <div className="mt-5 pt-3.5 border-t border-slate-800/80 space-y-2">
                     <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-500"
-                        style={{ width: `${grp.progress}%` }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${grp.progress}%`,
+                          background: `linear-gradient(to right, #34d399, ${neonColor})`
+                        }}
                       />
                     </div>
 
@@ -677,7 +720,10 @@ export function UnitsView({
                       <span className="text-slate-400 font-bold text-[11px]">
                         {grp.completedUnits} de {grp.totalUnits} terminados ({grp.progress}%)
                       </span>
-                      <span className="text-[#00f2fe] font-black text-xs flex items-center group-hover:translate-x-1 transition-transform">
+                      <span
+                        className="font-black text-xs flex items-center group-hover:translate-x-1 transition-transform"
+                        style={{ color: neonColor }}
+                      >
                         Entrar al Piso <ChevronRight className="w-4 h-4 ml-0.5" />
                       </span>
                     </div>
@@ -707,7 +753,7 @@ export function UnitsView({
 
                 <div>
                   <h3 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                    <span className="text-[#00f2fe]">
+                    <span style={{ color: neonColor }}>
                       {selectedFloorKey === 'all_units' ? 'Todos los Departamentos' : activeFloorGroup?.label}
                     </span>
                     <span className="text-xs font-bold text-slate-400">
@@ -736,7 +782,7 @@ export function UnitsView({
                 onClick={() => setSelectedFloorKey(null)}
                 className="px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0 bg-slate-800/80 text-slate-300 border border-slate-700 hover:border-slate-500 touch-target"
               >
-                <ArrowLeft className="w-3 h-3 text-[#00c2fe]" />
+                <ArrowLeft className="w-3 h-3" style={{ color: neonColor }} />
                 <span>Pisos</span>
               </button>
 
@@ -747,9 +793,15 @@ export function UnitsView({
                     key={grp.key}
                     type="button"
                     onClick={() => setSelectedFloorKey(grp.key)}
+                    style={isSelected ? {
+                      backgroundColor: neonColor,
+                      borderColor: neonColor,
+                      boxShadow: `0 0 12px ${hexToRgba(neonColor, 0.4)}`,
+                      color: '#020617'
+                    } : undefined}
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border touch-target ${
                       isSelected
-                        ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                        ? 'font-black'
                         : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-500'
                     }`}
                   >
@@ -766,9 +818,15 @@ export function UnitsView({
               <button
                 type="button"
                 onClick={() => setSelectedFloorKey('all_units')}
+                style={selectedFloorKey === 'all_units' ? {
+                  backgroundColor: neonColor,
+                  borderColor: neonColor,
+                  boxShadow: `0 0 12px ${hexToRgba(neonColor, 0.4)}`,
+                  color: '#020617'
+                } : undefined}
                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border touch-target ${
                   selectedFloorKey === 'all_units'
-                    ? 'bg-[#00c2ff] text-slate-950 border-[#00c2ff] shadow-[0_0_12px_rgba(0,194,255,0.4)]'
+                    ? 'font-black'
                     : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-500'
                 }`}
               >
@@ -916,27 +974,36 @@ export function UnitsView({
                       setActiveUnitId(unit.id);
                       onSelectUnit(unit.id);
                     }}
+                    style={isUnitActive ? {
+                      borderColor: neonColor,
+                      boxShadow: `0 0 28px ${hexToRgba(neonColor, 0.38)}`
+                    } : undefined}
                     className={`rounded-2xl p-4 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between touch-target group ${
                       isUnitActive
-                        ? 'border-2 border-[#00f2fe] shadow-[0_0_28px_rgba(0,242,254,0.38)] bg-[#162238] scale-[1.02]'
-                        : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_20px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                        ? 'border-2 scale-[1.02] bg-[#162238]'
+                        : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'
                     } text-white`}
                   >
                     <div>
                       <div className="flex items-center justify-between">
-                        <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 ${
-                          isComplete
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                            : isCommonArea
-                            ? 'bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30'
-                            : 'bg-slate-800 text-[#00f2fe] border border-slate-700'
-                        }`}>
+                        <span
+                          className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0"
+                          style={isComplete ? undefined : isCommonArea ? {
+                            backgroundColor: hexToRgba(neonColor, 0.15),
+                            borderColor: hexToRgba(neonColor, 0.3),
+                            color: neonColor
+                          } : {
+                            backgroundColor: '#1e293b',
+                            borderColor: '#334155',
+                            color: neonColor
+                          }}
+                        >
                           {isComplete ? (
                             <CircleCheck className="w-4 h-4 text-emerald-400" />
                           ) : isCommonArea ? (
-                            <Building2 className="w-4 h-4 text-[#00f2fe]" />
+                            <Building2 className="w-4 h-4" style={{ color: neonColor }} />
                           ) : (
-                            <DoorOpen className="w-4 h-4 text-[#00f2fe]" />
+                            <DoorOpen className="w-4 h-4" style={{ color: neonColor }} />
                           )}
                         </span>
 
@@ -945,13 +1012,20 @@ export function UnitsView({
                           percentage={progress}
                           size={46}
                           strokeWidth={4.5}
-                          color={isUnitActive ? '#00f2fe' : isComplete ? '#10B981' : '#00f2fe'}
+                          color={isUnitActive ? neonColor : isComplete ? '#10B981' : neonColor}
                         />
                       </div>
 
                       {/* Type & Status Badges */}
                       <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30">
+                        <span
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                          style={{
+                            backgroundColor: hexToRgba(neonColor, 0.15),
+                            color: neonColor,
+                            borderColor: hexToRgba(neonColor, 0.3)
+                          }}
+                        >
                           {isCommonArea ? 'Común' : 'Depto'}
                         </span>
                         {unit.floorLabel && (
@@ -972,9 +1046,10 @@ export function UnitsView({
                       </div>
 
                       <div className="flex items-center justify-between mt-2">
-                        <h4 className={`text-base font-black tracking-tight leading-snug transition-colors truncate pr-1 ${
-                          isUnitActive ? 'text-[#00f2fe]' : 'text-white group-hover:text-[#00f2fe]'
-                        }`}>
+                        <h4
+                          style={isUnitActive ? { color: neonColor } : undefined}
+                          className="text-base font-black tracking-tight leading-snug transition-colors truncate pr-1 text-white group-hover:text-slate-100"
+                        >
                           {unit.name}
                         </h4>
 
@@ -986,10 +1061,10 @@ export function UnitsView({
                               e.stopPropagation();
                               onEditUnit(unit);
                             }}
-                            className="p-1 rounded-lg text-slate-400 hover:text-[#00f2fe] hover:bg-slate-800 transition-colors"
+                            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                             title="Editar denominación"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" style={{ color: neonColor }} />
                           </button>
 
                           {onRequestDeleteUnit && (
@@ -1017,8 +1092,11 @@ export function UnitsView({
                       {/* Horizontal Capsule Progress Bar */}
                       <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden border border-slate-700/60">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-300"
-                          style={{ width: `${progress}%` }}
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${progress}%`,
+                            background: `linear-gradient(to right, #34d399, ${neonColor})`
+                          }}
                         />
                       </div>
 

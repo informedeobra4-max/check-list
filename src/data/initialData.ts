@@ -121,6 +121,9 @@ export function getInitialMockData(): Project[] {
       createdAt: '2025-01-10',
       startDate: '2026-08-01',
       estimatedEndDate: '2026-12-15',
+      director: 'Msc. Arq. Agustín Arrieta',
+      computoSubtitle: 'Cómputo, Certificaciones y Rubros',
+      technicalNotes: 'Toda la información del Expediente',
       milestones: [
         {
           id: 'ms_1',
@@ -178,6 +181,9 @@ export function getInitialMockData(): Project[] {
       createdAt: '2025-02-01',
       startDate: '2026-08-15',
       estimatedEndDate: '2026-11-20',
+      director: 'Msc. Arq. Agustín Arrieta',
+      computoSubtitle: 'Cómputo, Certificaciones y Rubros',
+      technicalNotes: 'Toda la información del Expediente',
       milestones: [
         {
           id: 'ms_p1',

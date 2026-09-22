@@ -32,7 +32,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { Project, Unit, TaskFilter, InspectionItem, Trade } from '../types';
-import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea, isTradeMatchingFilter } from '../utils/calculations';
+import { calculateUnitProgress, getUnitItemCounts, isUnitCommonArea, isTradeMatchingFilter, hexToRgba } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ItemObservationModal } from './ItemObservationModal';
 import { AddItemScopeModal } from './AddItemScopeModal';
@@ -57,6 +57,7 @@ interface ChecklistViewProps {
   project: Project;
   unit: Unit;
   allProjects?: Project[];
+  neonColor?: string;
   onToggleItem: (tradeId: string, itemId: string) => void;
   onUpdateItemProgress: (tradeId: string, itemId: string, percentage: number) => void;
   onDeleteItem: (tradeId: string, itemId: string) => void;
@@ -107,7 +108,8 @@ export function ChecklistView({
   onOpenBlueprints,
   onAddTrade,
   onDeleteTrade,
-  onOpenCroquis
+  onOpenCroquis,
+  neonColor = '#00f2fe'
 }: ChecklistViewProps) {
   const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
@@ -228,19 +230,33 @@ export function ChecklistView({
       <div
         onMouseEnter={() => setUnitCardHoverTrigger(prev => prev + 1)}
         onTouchStart={() => setUnitCardHoverTrigger(prev => prev + 1)}
-        className="rounded-3xl p-5 sm:p-6 border-2 border-[#00f2fe] shadow-[0_0_30px_rgba(0,242,254,0.28)] bg-[#131b2c] text-white relative overflow-hidden"
+        style={{
+          borderColor: neonColor,
+          boxShadow: `0 0 30px ${hexToRgba(neonColor, 0.28)}`
+        }}
+        className="rounded-3xl p-5 sm:p-6 border-2 bg-[#131b2c] text-white relative overflow-hidden"
       >
         {/* Subtle background ambient light */}
-        <div className="absolute -top-24 -right-24 w-60 h-60 bg-[#00f2fe]/10 rounded-full blur-3xl pointer-events-none" />
+        <div
+          className="absolute -top-24 -right-24 w-60 h-60 rounded-full blur-3xl pointer-events-none"
+          style={{ backgroundColor: hexToRgba(neonColor, 0.1) }}
+        />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 bg-[#00f2fe]/15 text-[#00f2fe] border border-[#00f2fe]/30 text-[10px] font-black rounded-lg uppercase tracking-wider">
+              <span
+                className="px-2.5 py-0.5 border text-[10px] font-black rounded-lg uppercase tracking-wider"
+                style={{
+                  backgroundColor: hexToRgba(neonColor, 0.15),
+                  color: neonColor,
+                  borderColor: hexToRgba(neonColor, 0.3)
+                }}
+              >
                 {isUnitCommonArea(unit) ? 'Espacio Común' : 'Departamento'}
               </span>
               <span className="text-xs text-slate-400 font-bold truncate flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-[#00f2fe]" />
+                <Building2 className="w-3.5 h-3.5" style={{ color: neonColor }} />
                 {project.name}
               </span>
             </div>
@@ -251,7 +267,8 @@ export function ChecklistView({
               </h2>
               <button
                 onClick={() => onEditUnit(unit)}
-                className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-[#00f2fe] border border-slate-700 hover:border-[#00f2fe]/50 transition-colors"
+                className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors"
+                style={{ color: neonColor }}
                 title="Editar denominación"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -341,7 +358,7 @@ export function ChecklistView({
               percentage={unitPct}
               size={136}
               strokeWidth={13}
-              glowColor="#00f2fe"
+              glowColor={neonColor}
               animationTrigger={unitCardHoverTrigger}
             />
           </div>
@@ -683,10 +700,14 @@ export function ChecklistView({
               key={trade.id}
               onMouseEnter={() => setActiveTradeId(trade.id)}
               onTouchStart={() => setActiveTradeId(trade.id)}
+              style={isTradeActive ? {
+                borderColor: neonColor,
+                boxShadow: `0 0 24px ${hexToRgba(neonColor, 0.32)}`
+              } : undefined}
               className={`rounded-2xl shadow-md overflow-hidden transition-all duration-300 ${
                 isTradeActive
-                  ? 'border-2 border-[#00f2fe] shadow-[0_0_24px_rgba(0,242,254,0.32)] bg-[#131b2c]'
-                  : 'border border-slate-700/80 hover:border-[#00f2fe]/60 bg-[#131b2c]'
+                  ? 'border-2 bg-[#131b2c]'
+                  : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'
               }`}
             >
               {/* Accordion Header */}
@@ -695,7 +716,10 @@ export function ChecklistView({
                 className="px-4 py-3.5 bg-[#162238] border-b border-slate-700/80 flex items-center justify-between cursor-pointer select-none"
               >
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#0e1422] border border-slate-700 shadow-xs flex items-center justify-center text-[#00f2fe] text-sm flex-shrink-0">
+                  <div
+                    className="w-8 h-8 rounded-xl bg-[#0e1422] border border-slate-700 shadow-xs flex items-center justify-center text-sm flex-shrink-0"
+                    style={{ color: neonColor }}
+                  >
                     {getTradeIcon(trade.id)}
                   </div>
                   <div>
@@ -704,7 +728,7 @@ export function ChecklistView({
                     </h4>
                     <p className="text-[11px] text-slate-400">
                       {completedTradeItems}/{totalTradeItems} verificados •{' '}
-                      <span className="font-bold text-[#00f2fe] font-mono">{tradePct}%</span>
+                      <span className="font-bold font-mono" style={{ color: neonColor }}>{tradePct}%</span>
                     </p>
                   </div>
                 </div>
@@ -724,8 +748,12 @@ export function ChecklistView({
 
                   <div className="w-14 bg-slate-800 h-2 rounded-full overflow-hidden hidden sm:block">
                     <div
-                      className="bg-[#00f2fe] shadow-[0_0_8px_rgba(0,242,254,0.5)] h-full rounded-full transition-all duration-300"
-                      style={{ width: `${tradePct}%` }}
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${tradePct}%`,
+                        backgroundColor: neonColor,
+                        boxShadow: `0 0 8px ${hexToRgba(neonColor, 0.5)}`
+                      }}
                     />
                   </div>
                   <ChevronDown
@@ -1198,10 +1226,15 @@ export function ChecklistView({
           <button
             type="button"
             onClick={onOpenBlueprints}
-            className="px-4 py-2.5 rounded-full bg-[#131b2c] text-[#00f2fe] font-black text-xs flex items-center gap-2 shadow-2xl border-2 border-[#00f2fe] shadow-[0_0_20px_rgba(0,242,254,0.35)] active:scale-95 hover:scale-105 transition-all touch-target"
+            style={{
+              borderColor: neonColor,
+              boxShadow: `0 0 20px ${hexToRgba(neonColor, 0.35)}`,
+              color: neonColor
+            }}
+            className="px-4 py-2.5 rounded-full bg-[#131b2c] font-black text-xs flex items-center gap-2 shadow-2xl border-2 active:scale-95 hover:scale-105 transition-all touch-target"
             title="Cotejar tareas contra el plano técnico"
           >
-            <Compass className="w-4 h-4 text-[#00f2fe]" />
+            <Compass className="w-4 h-4" style={{ color: neonColor }} />
             <span>📐 Ver Planos ({unit.blueprints?.length || 0})</span>
           </button>
         </div>

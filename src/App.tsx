@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
-import { compressImageFile, calculateUnitProgress } from './utils/calculations';
+import { compressImageFile, calculateUnitProgress, hexToRgba } from './utils/calculations';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { UnitsView } from './components/UnitsView';
@@ -237,24 +237,27 @@ export default function App() {
   });
 
   // Colores de fondo y presentación exclusivos y locales de este dispositivo
-  const [localColors, setLocalColors] = useState<{ appBackground: string; presentationBackground: string }>(() => {
+  // Colores de fondo, presentación y neón exclusivos y locales de este dispositivo
+  const [localColors, setLocalColors] = useState<LocalColors>(() => {
     try {
       const storedColors = localStorage.getItem(STORAGE_KEY_LOCAL_COLORS);
       if (storedColors) {
         const parsed = JSON.parse(storedColors);
         return {
           appBackground: parsed.appBackground || '',
-          presentationBackground: parsed.presentationBackground || ''
+          presentationBackground: parsed.presentationBackground || '',
+          neonColor: parsed.neonColor || '#00f2fe'
         };
       }
       // Retrocompatibilidad: si ya se habían guardado colores en STORAGE_KEY_LOGOS en este dispositivo
       const storedLogos = localStorage.getItem(STORAGE_KEY_LOGOS);
       if (storedLogos) {
         const parsed = JSON.parse(storedLogos);
-        if (parsed.appBackground || parsed.presentationBackground) {
-          const migrated = {
+        if (parsed.appBackground || parsed.presentationBackground || parsed.neonColor) {
+          const migrated: LocalColors = {
             appBackground: parsed.appBackground || '',
-            presentationBackground: parsed.presentationBackground || ''
+            presentationBackground: parsed.presentationBackground || '',
+            neonColor: parsed.neonColor || '#00f2fe'
           };
           localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(migrated));
           return migrated;
@@ -265,11 +268,12 @@ export default function App() {
     }
     return {
       appBackground: '',
-      presentationBackground: ''
+      presentationBackground: '',
+      neonColor: '#00f2fe'
     };
   });
 
-  // Guardado persistente exclusivo en localStorage y sincronización con html y body
+  // Guardado persistente exclusivo en localStorage y sincronización con html, body y variables de neón
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(localColors));
@@ -284,6 +288,11 @@ export default function App() {
       document.documentElement.style.backgroundColor = '';
       document.body.style.backgroundColor = '';
     }
+
+    const activeNeon = localColors.neonColor || '#00f2fe';
+    document.documentElement.style.setProperty('--neon-color', activeNeon);
+    document.documentElement.style.setProperty('--neon-glow', hexToRgba(activeNeon, 0.38));
+    document.documentElement.style.setProperty('--neon-glow-soft', hexToRgba(activeNeon, 0.15));
   }, [localColors]);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
@@ -1292,6 +1301,9 @@ export default function App() {
       name: payload.name,
       location: payload.location || 'Obra en ejecución',
       createdAt: new Date().toISOString().split('T')[0],
+      director: payload.director || 'Msc. Arq. Agustín Arrieta',
+      computoSubtitle: payload.computoSubtitle || 'Cómputo, Certificaciones y Rubros',
+      technicalNotes: payload.technicalNotes || 'Toda la información del Expediente',
       expedienteMunicipal: payload.expedienteMunicipal,
       expedienteEdemsa: payload.expedienteEdemsa,
       expedienteAysam: payload.expedienteAysam,
@@ -1529,6 +1541,7 @@ export default function App() {
             projects={projects}
             bannerLogoUrl={logos.banner}
             presentationBg={localColors.presentationBackground}
+            neonColor={localColors.neonColor || '#00f2fe'}
             onSelectProject={handleSelectProject}
             onOpenNewProjectModal={() => setIsNewProjectModalOpen(true)}
             onOpenLogoEditor={() => {
@@ -1550,6 +1563,7 @@ export default function App() {
           <UnitsView
             project={selectedProject}
             presentationBg={localColors.presentationBackground}
+            neonColor={localColors.neonColor || '#00f2fe'}
             onSelectUnit={handleSelectUnit}
             onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
             onOpenReportModal={handleOpenReportModal}
@@ -1576,6 +1590,7 @@ export default function App() {
             project={selectedProject}
             unit={selectedUnit}
             allProjects={projects}
+            neonColor={localColors.neonColor || '#00f2fe'}
             onToggleItem={handleToggleItem}
             onUpdateItemProgress={handleUpdateItemProgress}
             onDeleteItem={handleDeleteItem}
@@ -1607,9 +1622,13 @@ export default function App() {
       <nav className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-[#162035]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-5 py-2 flex justify-around items-center z-40 shadow-[0_12px_40px_rgba(0,0,0,0.8)] no-print transition-all">
         <button
           onClick={() => handleNavigate('dashboard')}
+          style={currentView === 'dashboard' ? {
+            color: localColors.neonColor || '#00f2fe',
+            filter: `drop-shadow(0 0 8px ${hexToRgba(localColors.neonColor || '#00f2fe', 0.6)})`
+          } : undefined}
           className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
             currentView === 'dashboard'
-              ? 'text-[#00c2ff] filter drop-shadow-[0_0_8px_rgba(0,194,255,0.6)]'
+              ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Ir a Obras / Proyectos"
@@ -1620,9 +1639,13 @@ export default function App() {
 
         <button
           onClick={handleGoToUnitsView}
+          style={currentView === 'units' ? {
+            color: localColors.neonColor || '#00f2fe',
+            filter: `drop-shadow(0 0 8px ${hexToRgba(localColors.neonColor || '#00f2fe', 0.6)})`
+          } : undefined}
           className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
             currentView === 'units'
-              ? 'text-[#00c2ff] filter drop-shadow-[0_0_8px_rgba(0,194,255,0.6)]'
+              ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Ir a Departamentos y Unidades"
@@ -1637,9 +1660,10 @@ export default function App() {
             setCroquisModalTargetUnitId(selectedUnitId || undefined);
             setIsCroquisModalOpen(true);
           }}
+          style={isCroquisModalOpen ? { color: localColors.neonColor || '#00f2fe' } : undefined}
           className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target group relative transition-colors ${
             isCroquisModalOpen
-              ? 'text-[#00c2ff]'
+              ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Abrir hoja de croquis a mano alzada para este u otro depto"
@@ -1738,6 +1762,7 @@ export default function App() {
         currentLogos={logos}
         localAppBackground={localColors.appBackground}
         localPresentationBackground={localColors.presentationBackground}
+        localNeonColor={localColors.neonColor || '#00f2fe'}
         initialTarget={logoEditorTarget}
         onClose={() => setIsLogoEditorOpen(false)}
         onSaveLogos={(newLogos, newLocalColors) => {

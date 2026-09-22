@@ -99,6 +99,8 @@ export interface Project {
   expedienteEdemsa?: string;
   expedienteAysam?: string;
   technicalNotes?: string;
+  director?: string; // Msc. Arq. o Director de Obra
+  computoSubtitle?: string; // Especialidad o Cómputo y Certificaciones
   floorsConfig?: FloorConfig[];
   customServices?: ProjectCustomService[];
   milestones?: Milestone[];
@@ -119,6 +121,12 @@ export interface CustomLogos {
   banner: string;
   appBackground?: string;
   presentationBackground?: string;
+}
+
+export interface LocalColors {
+  appBackground: string;
+  presentationBackground: string;
+  neonColor?: string;
 }
 
 export type ViewMode = 'dashboard' | 'units' | 'checklist';

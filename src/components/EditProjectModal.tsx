@@ -49,6 +49,8 @@ export function EditProjectModal({
   const [startDate, setStartDate] = useState(project.startDate || project.createdAt?.split('T')[0] || '');
   const [estimatedEndDate, setEstimatedEndDate] = useState(project.estimatedEndDate || '');
   const [technicalNotes, setTechnicalNotes] = useState(project.technicalNotes || '');
+  const [director, setDirector] = useState(project.director || 'Msc. Arq. Agustín Arrieta');
+  const [computoSubtitle, setComputoSubtitle] = useState(project.computoSubtitle || 'Cómputo, Certificaciones y Rubros');
 
   // Dynamic additional custom services & expedientes
   const [customServices, setCustomServices] = useState<ProjectCustomService[]>(
@@ -67,6 +69,8 @@ export function EditProjectModal({
     setStartDate(project.startDate || project.createdAt?.split('T')[0] || '');
     setEstimatedEndDate(project.estimatedEndDate || '');
     setTechnicalNotes(project.technicalNotes || '');
+    setDirector(project.director || 'Msc. Arq. Agustín Arrieta');
+    setComputoSubtitle(project.computoSubtitle || 'Cómputo, Certificaciones y Rubros');
     setCustomServices(project.customServices || []);
   }, [project]);
 
@@ -110,6 +114,8 @@ export function EditProjectModal({
       startDate: startDate || undefined,
       estimatedEndDate: estimatedEndDate || undefined,
       technicalNotes: technicalNotes.trim(),
+      director: director.trim(),
+      computoSubtitle: computoSubtitle.trim(),
       customServices
     });
 
@@ -169,6 +175,61 @@ export function EditProjectModal({
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Ej: Av. San Martín 1540 • Ciudad"
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Sección Destacada: Datos de Avance General (Presentación Ejecutiva) */}
+          <div className="bg-[#131b2c] p-4 rounded-2xl border-2 border-amber-500/50 shadow-md space-y-3 text-white">
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
+              <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                Datos de Avance General (Ficha Frontal)
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">
+                Se muestran en la tarjeta de obra
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-[#00c2ff]" />
+                Dirección Técnica / Arquitecto / Profesional (Msc. Arq.)
+              </label>
+              <input
+                type="text"
+                value={director}
+                onChange={(e) => setDirector(e.target.value)}
+                placeholder="Ej: Msc. Arq. Agustín Arrieta"
+                className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#0e1422] text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-semibold placeholder-slate-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <FileCheck className="w-3.5 h-3.5 text-[#00c2ff]" />
+                Línea 1: Memoria / Expediente / Documentación
+              </label>
+              <input
+                type="text"
+                value={technicalNotes}
+                onChange={(e) => setTechnicalNotes(e.target.value)}
+                placeholder="Ej: Toda la información del Expediente"
+                className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#0e1422] text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-semibold placeholder-slate-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-[#00c2ff]" />
+                Línea 3: Especialidad / Cómputo y Certificaciones
+              </label>
+              <input
+                type="text"
+                value={computoSubtitle}
+                onChange={(e) => setComputoSubtitle(e.target.value)}
+                placeholder="Ej: Cómputo, Certificaciones y Rubros"
+                className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-[#0e1422] text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-semibold placeholder-slate-500"
               />
             </div>
           </div>

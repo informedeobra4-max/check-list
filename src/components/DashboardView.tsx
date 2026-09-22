@@ -18,7 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { Project, StatusFilter } from '../types';
-import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea } from '../utils/calculations';
+import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea, hexToRgba } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 import { ExecutiveGaugeChart } from './ExecutiveGaugeChart';
 import { ExecutiveTimeline } from './ExecutiveTimeline';
@@ -27,6 +27,7 @@ interface DashboardViewProps {
   projects: Project[];
   bannerLogoUrl: string;
   presentationBg?: string;
+  neonColor?: string;
   onSelectProject: (projectId: string) => void;
   onOpenNewProjectModal: () => void;
   onOpenLogoEditor: () => void;
@@ -44,6 +45,7 @@ export function DashboardView({
   projects,
   bannerLogoUrl,
   presentationBg,
+  neonColor = '#00f2fe',
   onSelectProject,
   onOpenNewProjectModal,
   onOpenLogoEditor,
@@ -269,14 +271,18 @@ export function DashboardView({
                   setActiveCardId(project.id);
                   onSelectProject(project.id);
                 }}
+                style={isCurrentActive ? {
+                  borderColor: neonColor,
+                  boxShadow: `0 0 35px ${hexToRgba(neonColor, 0.38)}`
+                } : undefined}
                 className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
                   isCurrentActive
-                    ? 'border-2 border-[#00f2fe] shadow-[0_0_35px_rgba(0,242,254,0.38)] bg-[#131b2c] scale-[1.01]'
-                    : 'border border-slate-700/80 hover:border-[#00f2fe] hover:shadow-[0_0_25px_rgba(0,242,254,0.25)] bg-[#131b2c]'
+                    ? 'border-2 scale-[1.01] bg-[#131b2c]'
+                    : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'
                 } text-white`}
               >
                 <div className="space-y-4">
-                  {/* Upper Section: Project Details on Left, Large Glowing Cyan Donut on Right */}
+                  {/* Upper Section: Project Details on Left, Large Glowing Donut on Right */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1.5 flex-1 min-w-0 pr-1">
                       {/* Deptos & Comunes Tag */}
@@ -284,17 +290,22 @@ export function DashboardView({
                         <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
                           {deptosCount > 0 ? deptosCount : 12} DEPTOS - {commonCount > 0 ? commonCount : 4} COMUNES
                         </span>
-                        <span className="text-[11px] text-[#00f2fe]/90 font-bold">Comunadas</span>
+                        <span className="text-[11px] font-bold" style={{ color: neonColor }}>
+                          Comunadas
+                        </span>
                       </div>
 
                       {/* Project Name */}
-                      <h4 className={`text-2xl font-black tracking-tight text-white transition-colors truncate ${isCurrentActive ? 'text-[#00f2fe]' : 'group-hover:text-[#00f2fe]'}`}>
+                      <h4
+                        style={isCurrentActive ? { color: neonColor } : undefined}
+                        className="text-2xl font-black tracking-tight text-white transition-colors truncate group-hover:text-slate-100"
+                      >
                         {project.name}
                       </h4>
 
                       {/* Location with Pin */}
                       <p className="text-xs text-slate-400 flex items-center gap-1.5 truncate">
-                        <MapPin className="w-3.5 h-3.5 text-[#00f2fe] flex-shrink-0" />
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: neonColor }} />
                         <span className="truncate">{project.location || 'Calle Agustín Alvarez 315'}</span>
                       </p>
 
@@ -303,21 +314,43 @@ export function DashboardView({
 
                       {/* Avance General Technical Details */}
                       <div className="pt-0.5 text-xs text-slate-300 space-y-1">
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">
-                          Avance General
-                        </p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                            Avance General
+                          </p>
+                          {onEditProject && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditProject(project);
+                              }}
+                              className="px-1.5 py-0.5 -mr-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1 text-[10px] font-bold border border-transparent hover:border-slate-700"
+                              title="Editar datos de Avance General"
+                            >
+                              <Pencil className="w-3 h-3" style={{ color: neonColor }} />
+                              <span>Editar</span>
+                            </button>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 truncate text-slate-300">
                           <FileCheck className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                           <span className="truncate">{project.technicalNotes || 'Toda la información del Expediente'}</span>
                         </div>
                         <div className="flex items-center gap-2 truncate text-slate-300">
                           <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                          <span className="truncate">Msc. Arq. Agustín Arrieta</span>
+                          <span className="truncate">{project.director || 'Msc. Arq. Agustín Arrieta'}</span>
                         </div>
                         <div className="flex items-center gap-2 truncate text-slate-300">
                           <Zap className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                          <span className="truncate">Cómputo, Certificaciones y Rubros</span>
+                          <span className="truncate">{project.computoSubtitle || 'Cómputo, Certificaciones y Rubros'}</span>
                         </div>
+                        {project.expedienteMunicipal && (
+                          <div className="flex items-center gap-2 truncate text-slate-400 text-[11px]">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Exp:</span>
+                            <span className="truncate">{project.expedienteMunicipal}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -327,7 +360,7 @@ export function DashboardView({
                         percentage={displayProgress}
                         size={144}
                         strokeWidth={14}
-                        glowColor={isCurrentActive ? '#00f2fe' : '#06b6d4'}
+                        glowColor={neonColor}
                         animationTrigger={triggerVal}
                       />
                     </div>
@@ -387,8 +420,11 @@ export function DashboardView({
                           {/* Horizontal Capsule Bar */}
                           <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-[#00f2fe] transition-all duration-500"
-                              style={{ width: `${deptosPercent}%` }}
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${deptosPercent}%`,
+                                background: `linear-gradient(to right, #34d399, ${neonColor})`
+                              }}
                             />
                           </div>
 
@@ -412,7 +448,7 @@ export function DashboardView({
                               cy="18"
                               r="12"
                               fill="none"
-                              stroke={deptosPercent > 0 ? '#10b981' : '#00f2fe'}
+                              stroke={deptosPercent > 0 ? '#10b981' : neonColor}
                               strokeWidth="6"
                               strokeDasharray="75.4"
                               strokeDashoffset={75.4 - (deptosPercent / 100) * 75.4}
@@ -457,7 +493,7 @@ export function DashboardView({
                         className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-[11px] flex items-center gap-1 border border-slate-700 transition-colors"
                         title="Editar fechas y ficha técnica"
                       >
-                        <Pencil className="w-3 h-3 text-[#00f2fe]" />
+                        <Pencil className="w-3 h-3" style={{ color: neonColor }} />
                         <span>Editar</span>
                       </button>
                     )}
@@ -505,7 +541,10 @@ export function DashboardView({
                     )}
                   </div>
 
-                  <span className="font-black text-xs text-[#00f2fe] flex items-center group-hover:translate-x-1 transition-transform">
+                  <span
+                    className="font-black text-xs flex items-center group-hover:translate-x-1 transition-transform"
+                    style={{ color: neonColor }}
+                  >
                     Ver Departamentos <ChevronRight className="w-4 h-4 ml-0.5" />
                   </span>
                 </div>

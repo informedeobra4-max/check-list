@@ -285,3 +285,21 @@ export function parseUnitFloor(unit: { name?: string; floorNumber?: number; floo
   return { floorNumber: 1, label: 'Piso 1', isCommon: false };
 }
 
+/**
+ * Converts a hex color (#RGB, #RRGGBB) to an rgba(...) string with specified alpha
+ */
+export function hexToRgba(hex?: string, alpha: number = 1): string {
+  if (!hex) return `rgba(0, 242, 254, ${alpha})`;
+  let clean = hex.replace('#', '').trim();
+  if (clean.length === 3) {
+    clean = clean.split('').map(c => c + c).join('');
+  }
+  if (clean.length !== 6) return `rgba(0, 242, 254, ${alpha})`;
+  const num = parseInt(clean, 16);
+  if (isNaN(num)) return `rgba(0, 242, 254, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+

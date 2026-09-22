@@ -1,19 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check } from 'lucide-react';
+import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check, Sparkles } from 'lucide-react';
 import { CustomLogos } from '../types';
 import { DEFAULT_LOGO_URL } from '../data/initialData';
-import { compressImageFile } from '../utils/calculations';
+import { compressImageFile, hexToRgba } from '../utils/calculations';
 
 interface LogoEditorModalProps {
   isOpen: boolean;
   currentLogos: CustomLogos;
   localAppBackground?: string;
   localPresentationBackground?: string;
+  localNeonColor?: string;
   initialTarget?: 'header' | 'banner';
   onClose: () => void;
-  onSaveLogos: (logos: CustomLogos, localColors?: { appBackground: string; presentationBackground: string }) => void;
+  onSaveLogos: (
+    logos: CustomLogos,
+    localColors?: {
+      appBackground: string;
+      presentationBackground: string;
+      neonColor?: string;
+    }
+  ) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
+
+export const NEON_COLOR_PRESETS = [
+  { label: 'Cian Neón (Original)', value: '#00f2fe', colorClass: 'bg-[#00f2fe]' },
+  { label: 'Verde Esmeralda', value: '#10b981', colorClass: 'bg-[#10b981]' },
+  { label: 'Ámbar / Oro Eléctrico', value: '#f59e0b', colorClass: 'bg-[#f59e0b]' },
+  { label: 'Azul Eléctrico', value: '#00c2ff', colorClass: 'bg-[#00c2ff]' },
+  { label: 'Violeta Cyber', value: '#a855f7', colorClass: 'bg-[#a855f7]' },
+  { label: 'Rojo Coral Neón', value: '#f43f5e', colorClass: 'bg-[#f43f5e]' },
+  { label: 'Verde Flúor / Lima', value: '#84cc16', colorClass: 'bg-[#84cc16]' },
+  { label: 'Fucsia Magenta', value: '#ec4899', colorClass: 'bg-[#ec4899]' }
+];
 
 const APP_BG_PRESETS = [
   { label: 'Original', value: '', colorClass: 'bg-slate-900 border-slate-700' },
@@ -74,6 +93,7 @@ export function LogoEditorModal({
   currentLogos,
   localAppBackground = '',
   localPresentationBackground = '',
+  localNeonColor = '#00f2fe',
   initialTarget = 'header',
   onClose,
   onSaveLogos,
@@ -86,14 +106,16 @@ export function LogoEditorModal({
   const [urlInput, setUrlInput] = useState<string>('');
   const [appBg, setAppBg] = useState<string>(localAppBackground);
   const [presentationBg, setPresentationBg] = useState<string>(localPresentationBackground);
+  const [neonColor, setNeonColor] = useState<string>(localNeonColor || '#00f2fe');
 
   useEffect(() => {
     if (isOpen) {
       setAppBg(localAppBackground);
       setPresentationBg(localPresentationBackground);
+      setNeonColor(localNeonColor || '#00f2fe');
       setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
     }
-  }, [isOpen, localAppBackground, localPresentationBackground, currentLogos, initialTarget]);
+  }, [isOpen, localAppBackground, localPresentationBackground, localNeonColor, currentLogos, initialTarget]);
 
   if (!isOpen) return null;
 
@@ -133,7 +155,8 @@ export function LogoEditorModal({
     };
     const localColors = {
       appBackground: appBg,
-      presentationBackground: presentationBg
+      presentationBackground: presentationBg,
+      neonColor: neonColor || '#00f2fe'
     };
     onSaveLogos(updatedLogos, localColors);
     onClose();
@@ -143,7 +166,8 @@ export function LogoEditorModal({
   const handleResetColors = () => {
     setAppBg('');
     setPresentationBg('');
-    onShowToast('Colores restablecidos a los originales en este dispositivo', 'RotateCcw');
+    setNeonColor('#00f2fe');
+    onShowToast('Colores y neón restablecidos a los originales en este dispositivo', 'RotateCcw');
   };
 
   const handleReset = () => {
@@ -155,7 +179,8 @@ export function LogoEditorModal({
       setTempPreview(DEFAULT_LOGO_URL);
       setAppBg('');
       setPresentationBg('');
-      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '' });
+      setNeonColor('#00f2fe');
+      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '', neonColor: '#00f2fe' });
       onClose();
       onShowToast('Logotipos y colores restablecidos al original', 'RotateCcw');
     }
@@ -403,6 +428,91 @@ export function LogoEditorModal({
                       style={p.previewStyle}
                     />
                     <span className="truncate">{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Color del Neón Ejecutivo */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>3. Color del Neón (Líneas y Luces de Obras)</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase">
+                  {neonColor ? neonColor : '#00F2FE'}
+                </span>
+                <label className="w-6 h-6 rounded-full border border-slate-300 shadow-xs cursor-pointer overflow-hidden flex items-center justify-center p-0 relative" title="Seleccionar color de neón libre">
+                  <input
+                    type="color"
+                    value={neonColor || '#00f2fe'}
+                    onChange={(e) => setNeonColor(e.target.value)}
+                    className="w-8 h-8 cursor-pointer opacity-0 absolute"
+                  />
+                  <span
+                    className="w-full h-full rounded-full border border-white"
+                    style={{ backgroundColor: neonColor || '#00f2fe' }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Neon Live Preview Badge */}
+            <div
+              className="mb-2.5 p-2.5 rounded-xl bg-[#131b2c] border-2 transition-all flex items-center justify-between shadow-md"
+              style={{
+                borderColor: neonColor || '#00f2fe',
+                boxShadow: `0 0 16px ${hexToRgba(neonColor || '#00f2fe', 0.4)}`
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2.5 h-2.5 rounded-full animate-pulse"
+                  style={{
+                    backgroundColor: neonColor || '#00f2fe',
+                    boxShadow: `0 0 8px ${neonColor || '#00f2fe'}`
+                  }}
+                />
+                <span className="text-xs font-black text-white">Vista previa del borde neón</span>
+              </div>
+              <span
+                className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border"
+                style={{
+                  color: neonColor || '#00f2fe',
+                  borderColor: hexToRgba(neonColor || '#00f2fe', 0.4),
+                  backgroundColor: hexToRgba(neonColor || '#00f2fe', 0.15)
+                }}
+              >
+                Iluminado
+              </span>
+            </div>
+
+            {/* Quick Palette Chips for Neon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {NEON_COLOR_PRESETS.map((p) => {
+                const isSelected = (neonColor || '#00f2fe').toLowerCase() === p.value.toLowerCase();
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setNeonColor(p.value)}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`w-3 h-3 rounded-full shrink-0 border border-slate-400/40 shadow-xs ${p.colorClass}`}
+                      style={{
+                        backgroundColor: p.value,
+                        boxShadow: `0 0 8px ${hexToRgba(p.value, 0.6)}`
+                      }}
+                    />
+                    <span className="truncate">{p.label.split(' ')[0]}</span>
                   </button>
                 );
               })}

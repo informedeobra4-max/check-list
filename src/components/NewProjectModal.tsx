@@ -28,6 +28,9 @@ export interface GeneratedUnitConfig {
 export interface NewProjectPayload {
   name: string;
   location: string;
+  director?: string;
+  computoSubtitle?: string;
+  technicalNotes?: string;
   expedienteMunicipal?: string;
   expedienteEdemsa?: string;
   expedienteAysam?: string;
@@ -82,8 +85,11 @@ export function NewProjectModal({
   const [customAmenities, setCustomAmenities] = useState<string[]>([]);
   const [newCustomAmenity, setNewCustomAmenity] = useState('');
 
-  // Administrative (optional)
+  // Administrative & Avance General (optional)
   const [showAdminFields, setShowAdminFields] = useState(false);
+  const [director, setDirector] = useState('Msc. Arq. Agustín Arrieta');
+  const [computoSubtitle, setComputoSubtitle] = useState('Cómputo, Certificaciones y Rubros');
+  const [technicalNotes, setTechnicalNotes] = useState('Toda la información del Expediente');
   const [expedienteMunicipal, setExpedienteMunicipal] = useState('');
   const [expedienteEdemsa, setExpedienteEdemsa] = useState('');
   const [expedienteAysam, setExpedienteAysam] = useState('');
@@ -262,6 +268,9 @@ export function NewProjectModal({
     onCreateProject({
       name: name.trim(),
       location: location.trim(),
+      director: director.trim() || undefined,
+      computoSubtitle: computoSubtitle.trim() || undefined,
+      technicalNotes: technicalNotes.trim() || undefined,
       expedienteMunicipal: expedienteMunicipal.trim() || undefined,
       expedienteEdemsa: expedienteEdemsa.trim() || undefined,
       expedienteAysam: expedienteAysam.trim() || undefined,
@@ -589,6 +598,51 @@ export function NewProjectModal({
 
             {showAdminFields && (
               <div className="mt-2 bg-slate-50 dark:bg-slate-850 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 animate-fade-in">
+                {/* Datos de Avance General / Dirección de Obra */}
+                <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-400 block">
+                    Ficha de Avance General (Presentación)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-0.5">
+                        Dirección Técnica / Profesional (Msc. Arq.)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Msc. Arq. Agustín Arrieta"
+                        value={director}
+                        onChange={(e) => setDirector(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-0.5">
+                        Subtítulo / Especialidad
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Cómputo, Certificaciones y Rubros"
+                        value={computoSubtitle}
+                        onChange={(e) => setComputoSubtitle(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-0.5">
+                      Memoria / Expediente de Obra
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Toda la información del Expediente"
+                      value={technicalNotes}
+                      onChange={(e) => setTechnicalNotes(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-medium"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1">
