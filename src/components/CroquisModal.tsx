@@ -34,7 +34,11 @@ import {
   ChevronRight,
   Eye,
   Sliders,
-  Sparkles
+  Sparkles,
+  MoreVertical,
+  ZoomIn,
+  ZoomOut,
+  Hand
 } from 'lucide-react';
 import { Project, Unit, SketchDocument, BlueprintDocument } from '../types';
 
@@ -76,6 +80,8 @@ const COLOR_PALETTE = [
   { label: 'Verde Instalación', value: '#16a34a' },
   { label: 'Naranja / Cota', value: '#ea580c' },
   { label: 'Amarillo Resalte', value: '#eab308' },
+  { label: 'Cian Neón', value: '#00f2fe' },
+  { label: 'Violeta Cyber', value: '#a855f7' },
   { label: 'Blanco', value: '#ffffff' }
 ];
 
@@ -188,8 +194,16 @@ export function CroquisModal({
   const [color, setColor] = useState<string>('#dc2626'); // Red default for technical markups
   const [strokeWidth, setStrokeWidth] = useState<number>(4);
   const [paperType, setPaperType] = useState<PaperType>('grid');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Zoom & Pan State (Full-Screen Ergonomics)
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanMode, setIsPanMode] = useState<boolean>(false);
+  const [imageFit, setImageFit] = useState<'contain' | 'cover'>('contain');
+
+  // The 3-Dots Menu Drawer State
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState<boolean>(false);
 
   // Background Document / Photo / PDF state
   const [bgDocument, setBgDocument] = useState<BackgroundDoc | null>(null);
@@ -206,6 +220,18 @@ export function CroquisModal({
   const isDrawingRef = useRef(false);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
   const snapshotRef = useRef<ImageData | null>(null);
+
+  // Pan dragging tracking
+  const isDraggingPanRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Touch Pinch-to-Zoom tracking
+  const touchStateRef = useRef<{
+    initialDist: number;
+    initialZoom: number;
+    initialMid: { x: number; y: number };
+    initialPan: { x: number; y: number };
+  } | null>(null);
 
   // Undo / Redo history stacks
   const undoStackRef = useRef<ImageData[]>([]);
@@ -406,6 +432,87 @@ export function CroquisModal({
 
     pushUndoState();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setIsToolsMenuOpen(false);
+  };
+
+  // Zoom Controls
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(5.0, Number((prev + 0.25).toFixed(2))));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(0.5, Number((prev - 0.25).toFixed(2))));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+    setIsPanMode(false);
+    showToast('Zoom restablecido al 100%');
+  };
+
+  const handleTogglePanMode = () => {
+    setIsPanMode(prev => {
+      const next = !prev;
+      showToast(next ? 'Modo Mover activado: arrastra para desplazarte' : 'Modo Dibujo activado');
+      return next;
+    });
+  };
+
+  // Two-Finger Touch Pinch-to-Zoom & Pan Handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      if (isDrawingRef.current) {
+        isDrawingRef.current = false;
+        startPointRef.current = null;
+        snapshotRef.current = null;
+      }
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+      touchStateRef.current = {
+        initialDist: dist,
+        initialZoom: zoom,
+        initialMid: mid,
+        initialPan: { ...pan }
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStateRef.current) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const mid = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+
+      const scaleRatio = dist / (touchStateRef.current.initialDist || 1);
+      const newZoom = Math.min(5.0, Math.max(0.5, Number((touchStateRef.current.initialZoom * scaleRatio).toFixed(2))));
+      setZoom(newZoom);
+
+      const deltaX = mid.x - touchStateRef.current.initialMid.x;
+      const deltaY = mid.y - touchStateRef.current.initialMid.y;
+      setPan({
+        x: Math.round(touchStateRef.current.initialPan.x + deltaX),
+        y: Math.round(touchStateRef.current.initialPan.y + deltaY)
+      });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      touchStateRef.current = null;
+    }
+  };
+
+  // Mouse Wheel Zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || isPanMode) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      setZoom(prev => Math.min(5.0, Math.max(0.5, Number((prev + delta).toFixed(2)))));
+    }
   };
 
   /**
@@ -467,12 +574,29 @@ export function CroquisModal({
   // Pointer Down (Pen / Touch / Mouse Start)
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    // If Pan Mode is active and not drawing with a dedicated stylus pen, start panning
+    if (isPanMode && e.pointerType !== 'pen') {
+      isDraggingPanRef.current = true;
+      panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
 
     const { x, y, pressure } = getCanvasPoint(e);
     isDrawingRef.current = true;
@@ -501,6 +625,15 @@ export function CroquisModal({
 
   // Pointer Move (Pen / Touch / Mouse Drawing)
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // If dragging pan
+    if (isDraggingPanRef.current) {
+      setPan({
+        x: Math.round(e.clientX - panStartRef.current.x),
+        y: Math.round(e.clientY - panStartRef.current.y)
+      });
+      return;
+    }
+
     if (!isDrawingRef.current || !startPointRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -548,6 +681,16 @@ export function CroquisModal({
 
   // Pointer Up / Cancel
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isDraggingPanRef.current) {
+      isDraggingPanRef.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
     startPointRef.current = null;
@@ -615,7 +758,11 @@ export function CroquisModal({
         if (sketchTitle === 'Croquis en sitio') {
           setSketchTitle(`Anotaciones: ${file.name.replace(/\.[^/.]+$/, '')}`);
         }
-        showToast(`Plano PDF cargado (${result.totalPages} ${result.totalPages === 1 ? 'pág' : 'págs'})`);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setIsPanMode(false);
+        setIsToolsMenuOpen(false);
+        showToast(`Plano PDF cargado en pantalla completa (${result.totalPages} pág)`);
       } else {
         // Image or Live Camera Photo
         const reader = new FileReader();
@@ -631,7 +778,11 @@ export function CroquisModal({
             if (sketchTitle === 'Croquis en sitio') {
               setSketchTitle(isCamera ? 'Detalle fotográfico en sitio' : `Anotaciones: ${file.name.replace(/\.[^/.]+$/, '')}`);
             }
-            showToast(isCamera ? 'Foto tomada y lista para dibujar encima' : 'Imagen cargada en el lienzo');
+            setZoom(1);
+            setPan({ x: 0, y: 0 });
+            setIsPanMode(false);
+            setIsToolsMenuOpen(false);
+            showToast(isCamera ? 'Foto en pantalla completa lista para croquizar y hacer zoom' : 'Imagen a pantalla completa lista');
           }
           setIsLoadingFile(false);
         };
@@ -688,7 +839,11 @@ export function CroquisModal({
         if (sketchTitle === 'Croquis en sitio') {
           setSketchTitle(`Sobre plano: ${bp.name}`);
         }
-        showToast(`Plano "${bp.name}" cargado en el fondo`);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setIsPanMode(false);
+        setIsToolsMenuOpen(false);
+        showToast(`Plano "${bp.name}" cargado a pantalla completa`);
       } else if (bp.type === 'pdf') {
         showToast('Cargando plano PDF...');
         const res = await fetch(bp.url);
@@ -706,6 +861,10 @@ export function CroquisModal({
         if (sketchTitle === 'Croquis en sitio') {
           setSketchTitle(`Sobre plano: ${bp.name}`);
         }
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setIsPanMode(false);
+        setIsToolsMenuOpen(false);
         showToast(`Plano PDF "${bp.name}" cargado`);
       }
     } catch (err) {
@@ -721,13 +880,18 @@ export function CroquisModal({
     const drawingCanvas = canvasRef.current;
     if (!drawingCanvas) return null;
 
-    const outCanvas = document.createElement('canvas');
+    const container = containerRef.current;
+    const containerW = container ? container.clientWidth : 1200;
+    const containerH = container ? container.clientHeight : 800;
+    const containerRatio = containerW / (containerH || 1);
+
     const width = 1200;
-    const headerHeight = 150;
-    const bodyHeight = 900;
+    const headerHeight = 140;
+    const bodyHeight = Math.max(600, Math.round(width / containerRatio));
     const footerHeight = 40;
     const totalHeight = headerHeight + bodyHeight + footerHeight;
 
+    const outCanvas = document.createElement('canvas');
     outCanvas.width = width;
     outCanvas.height = totalHeight;
 
@@ -787,14 +951,27 @@ export function CroquisModal({
           let drawX = 0;
           let drawY = bodyY;
 
-          if (imgRatio > bodyRatio) {
-            drawW = width;
-            drawH = width / imgRatio;
-            drawY = bodyY + (bodyHeight - drawH) / 2;
+          if (imageFit === 'cover') {
+            if (imgRatio > bodyRatio) {
+              drawH = bodyHeight;
+              drawW = bodyHeight * imgRatio;
+              drawX = (width - drawW) / 2;
+            } else {
+              drawW = width;
+              drawH = width / imgRatio;
+              drawY = bodyY + (bodyHeight - drawH) / 2;
+            }
           } else {
-            drawH = bodyHeight;
-            drawW = bodyHeight * imgRatio;
-            drawX = (width - drawW) / 2;
+            // contain
+            if (imgRatio > bodyRatio) {
+              drawW = width;
+              drawH = width / imgRatio;
+              drawY = bodyY + (bodyHeight - drawH) / 2;
+            } else {
+              drawH = bodyHeight;
+              drawW = bodyHeight * imgRatio;
+              drawX = (width - drawW) / 2;
+            }
           }
 
           ctx.save();
@@ -990,448 +1167,84 @@ export function CroquisModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div
-        className={`bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300 ${
-          isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[94vh] max-h-[950px]'
-        }`}
-      >
-        {/* Hidden Camera Input */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => handleFilePicked(e, true)}
-          className="hidden"
-        />
+    <div className="fixed inset-0 z-50 flex flex-col w-screen h-screen bg-slate-950 overflow-hidden select-none animate-in fade-in duration-150">
+      {/* Hidden Camera Input */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => handleFilePicked(e, true)}
+        className="hidden"
+      />
 
-        {/* Hidden File Picker Input (Images or PDFs) */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,.pdf,application/pdf"
-          onChange={(e) => handleFilePicked(e, false)}
-          className="hidden"
-        />
+      {/* Hidden File Picker Input (Images or PDFs) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf,application/pdf"
+        onChange={(e) => handleFilePicked(e, false)}
+        className="hidden"
+      />
 
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-xl border border-amber-500 flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top-2">
-            <Check className="w-4 h-4 text-emerald-400" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {/* Loading File Overlay */}
-        {isLoadingFile && (
-          <div className="absolute inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-3">
-            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-black tracking-wide text-amber-400 uppercase">
-              Cargando documento en el lienzo...
-            </p>
-          </div>
-        )}
-
-        {/* Modal Header */}
-        <div className="p-3 sm:p-4 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center flex-shrink-0">
-              <PenTool className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-1.5 truncate">
-                  <span>CROQUIS DE OBRA</span>
-                  <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-black uppercase">
-                    Precisión Lápiz
-                  </span>
-                </h2>
-              </div>
-              <p className="text-xs text-amber-400/90 font-bold truncate flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{activeProject?.name || 'Obra'}</span>
-                <span className="text-slate-500">•</span>
-                <DoorOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{currentUnit?.name || 'Unidad'}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {/* Tab switch */}
-            <div className="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 mr-1">
-              <button
-                onClick={() => setActiveTab('draw')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
-                  activeTab === 'draw' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span>Lienzo</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all touch-target ${
-                  activeTab === 'history' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Historial ({unitSketches.length})</span>
-              </button>
-            </div>
-
-            {/* Fullscreen Toggle */}
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors hidden sm:flex touch-target"
-              title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa para tablet'}
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-rose-600/30 hover:border-rose-500 rounded-xl transition-colors touch-target"
-              title="Cerrar croquis"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2 rounded-2xl shadow-2xl border border-amber-500/80 flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top-2 backdrop-blur-md">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
         </div>
+      )}
 
-        {/* Tab 1: Drawing Canvas & Tools */}
-        {activeTab === 'draw' && (
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-100 dark:bg-slate-950">
-            {/* Top Config: Obra & Depto Selector + Title */}
-            <div className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
-                {/* Obra / Proyecto Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-                  <Building2 className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Obra:</span>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => handleSelectProject(e.target.value)}
-                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
-                  >
-                    {projects.map((p) => (
-                      <option
-                        key={p.id}
-                        value={p.id}
-                        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      {/* Loading Overlay */}
+      {isLoadingFile && (
+        <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-3">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-black tracking-wide text-amber-400 uppercase">
+            Cargando documento a pantalla completa...
+          </p>
+        </div>
+      )}
 
-                {/* Depto / Espacio Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-                  <DoorOpen className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Depto:</span>
-                  <select
-                    value={selectedUnitId}
-                    onChange={(e) => setSelectedUnitId(e.target.value)}
-                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
-                  >
-                    {(activeProject?.units || []).map((u) => (
-                      <option
-                        key={u.id}
-                        value={u.id}
-                        className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        {u.name} {u.type === 'common_area' ? '(Común)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      {/* TAB 1: DRAWING FULL SCREEN CANVAS */}
+      {activeTab === 'draw' && (
+        <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 relative overflow-hidden">
+          {/* ULTRA-MINIMAL TOP FLOATING BAR (Takes minimal space: 48px) */}
+          <div className="h-12 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-2 sm:px-4 flex items-center justify-between z-30 shrink-0 select-none">
+            {/* Left: Close & Obra/Depto stamp */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-rose-600/30 rounded-xl transition-colors touch-target"
+                title="Cerrar croquis"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-                {/* Title Input */}
-                <input
-                  type="text"
-                  value={sketchTitle}
-                  onChange={(e) => setSketchTitle(e.target.value)}
-                  placeholder="Referencia del croquis (ej: Instalación sanitaria baño)"
-                  className="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Import Actions: Camera, File/PDF, Blueprints */}
-              <div className="flex items-center gap-1.5">
-                {/* Take Live Photo Button */}
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 transition-all touch-target shadow-2xs active:scale-95"
-                  title="Tomar foto con la cámara para dibujar anotaciones encima"
-                >
-                  <Camera className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Foto</span>
-                </button>
-
-                {/* Pick Image or PDF Button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 transition-all touch-target shadow-2xs active:scale-95"
-                  title="Buscar imagen o plano PDF en los archivos para escribir encima"
-                >
-                  <Upload className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Imagen / PDF</span>
-                </button>
-
-                {/* Unit Blueprints Dropdown if unit has plans */}
-                {unitBlueprints.length > 0 && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsBlueprintsDropdownOpen(!isBlueprintsDropdownOpen)}
-                      className="px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 rounded-xl font-bold text-xs flex items-center gap-1.5 border border-amber-500/30 transition-all touch-target shadow-2xs active:scale-95"
-                      title="Cargar uno de los planos técnicos guardados en esta unidad"
-                    >
-                      <Compass className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Planos ({unitBlueprints.length})</span>
-                    </button>
-
-                    {isBlueprintsDropdownOpen && (
-                      <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-1 z-30 animate-in fade-in slide-in-from-top-2">
-                        <div className="px-2.5 py-1.5 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                          Planos de {currentUnit?.name}:
-                        </div>
-                        <div className="max-h-48 overflow-y-auto py-1">
-                          {unitBlueprints.map((bp) => (
-                            <button
-                              key={bp.id}
-                              type="button"
-                              onClick={() => handleLoadBlueprintAsBackground(bp)}
-                              className="w-full text-left px-2.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between gap-1.5 transition-colors"
-                            >
-                              <div className="truncate">
-                                <p className="truncate">{bp.name}</p>
-                                <span className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-black">
-                                  {bp.category} • {bp.type.toUpperCase()}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              <div className="min-w-0 flex items-center gap-1.5 text-xs">
+                <span className="font-black text-white truncate max-w-[90px] sm:max-w-[150px]">
+                  {activeProject?.name || 'Obra'}
+                </span>
+                <span className="text-amber-400 font-bold truncate max-w-[85px] sm:max-w-[130px]">
+                  • {currentUnit?.name || 'Unidad'}
+                </span>
+                {bgDocument && (
+                  <span className="hidden md:inline text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-700/50 px-1.5 py-0.5 rounded-md truncate max-w-[140px]">
+                    📷 {bgDocument.name}
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* Drawing Tools Toolbar */}
-            <div className="p-2 bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar text-xs">
-              {/* Primary Tools */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setTool('pen')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'pen'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Lápiz / Pluma para trazo libre"
-                >
-                  <Pencil className="w-4 h-4" />
-                  <span className="hidden sm:inline">Lápiz</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('highlighter')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'highlighter'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Resaltador / Marcador semitransparente"
-                >
-                  <Highlighter className="w-4 h-4" />
-                  <span className="hidden sm:inline">Marcador</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('line')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'line'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Línea recta (paredes, tabiques, cotas)"
-                >
-                  <Minus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Línea</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('arrow')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'arrow'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Flecha para indicar detalles o medidas"
-                >
-                  <MoveRight className="w-4 h-4" />
-                  <span className="hidden sm:inline">Flecha</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('rect')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'rect'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Rectángulo (ambientes, vanos, aberturas)"
-                >
-                  <Square className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('circle')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'circle'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Círculo (caños, bocas de luz, pases de losa)"
-                >
-                  <Circle className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('text')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'text'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Texto / Cotas mecanografiadas"
-                >
-                  <Type className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setTool('eraser')}
-                  className={`p-2 rounded-xl flex items-center gap-1 font-bold transition-all touch-target ${
-                    tool === 'eraser'
-                      ? 'bg-rose-500 text-white shadow-sm'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                  title="Goma de borrar trazos"
-                >
-                  <Eraser className="w-4 h-4" />
-                  <span className="hidden sm:inline">Goma</span>
-                </button>
-              </div>
-
-              {/* Stroke Width Selector */}
-              <div className="flex items-center gap-1 border-l border-r border-slate-200 dark:border-slate-800 px-2">
-                {STROKE_WIDTHS.map((sw) => (
-                  <button
-                    key={sw.value}
-                    onClick={() => setStrokeWidth(sw.value)}
-                    className={`p-1.5 rounded-lg text-xs font-bold transition-all touch-target ${
-                      strokeWidth === sw.value
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
-                    }`}
-                    title={`Grosor ${sw.label}`}
-                  >
-                    <div
-                      className="rounded-full bg-current"
-                      style={{
-                        width: `${Math.min(12, sw.value * 1.5 + 2)}px`,
-                        height: `${Math.min(12, sw.value * 1.5 + 2)}px`
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-
-              {/* Color Palette */}
-              <div className="flex items-center gap-1">
-                {COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => {
-                      setColor(c.value);
-                      if (tool === 'eraser') setTool('pen');
-                    }}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform touch-target flex-shrink-0 ${
-                      color === c.value && tool !== 'eraser'
-                        ? 'scale-125 border-amber-500 shadow-sm'
-                        : 'border-slate-300 dark:border-slate-700'
-                    }`}
-                    style={{ backgroundColor: c.value }}
-                    title={c.label}
-                  />
-                ))}
-                {/* HTML Color Picker */}
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => {
-                    setColor(e.target.value);
-                    if (tool === 'eraser') setTool('pen');
-                  }}
-                  className="w-6 h-6 p-0 border-0 rounded-full cursor-pointer bg-transparent"
-                  title="Color personalizado"
-                />
-              </div>
-
-              {/* Paper Background Selector (when no document is loaded) */}
-              {!bgDocument && (
-                <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaperType('white')}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                      paperType === 'white'
-                        ? 'bg-amber-500 text-slate-950 border-amber-500'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                    }`}
-                    title="Hoja Blanca lisa"
-                  >
-                    Blanco
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaperType('grid')}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors flex items-center gap-1 ${
-                      paperType === 'grid'
-                        ? 'bg-amber-500 text-slate-950 border-amber-500'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                    }`}
-                    title="Hoja Cuadriculada / Milimetrada (ideal arquitectura)"
-                  >
-                    <Grid className="w-3 h-3" />
-                    <span className="hidden sm:inline">Cuadrícula</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Undo / Redo & Clear */}
-              <div className="flex items-center gap-1 ml-auto">
+            {/* Center: Quick Undo/Redo & Zoom Pill */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Quick Undo / Redo */}
+              <div className="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/80 p-0.5">
                 <button
                   type="button"
                   disabled={!canUndo}
                   onClick={handleUndo}
-                  className="p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 touch-target"
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg disabled:opacity-25 transition-colors touch-target"
                   title="Deshacer trazo"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -1440,347 +1253,897 @@ export function CroquisModal({
                   type="button"
                   disabled={!canRedo}
                   onClick={handleRedo}
-                  className="p-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 touch-target"
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg disabled:opacity-25 transition-colors touch-target"
                   title="Rehacer trazo"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* Active Tool & Color Indicator Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (tool === 'eraser') setTool('pen');
+                  else setTool('eraser');
+                }}
+                className={`p-1.5 rounded-xl border flex items-center gap-1 text-xs font-bold transition-all touch-target ${
+                  tool === 'eraser'
+                    ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                    : 'bg-slate-800/90 text-slate-200 border-slate-700/80'
+                }`}
+                title={tool === 'eraser' ? 'Borrador activo (toca para volver a dibujar)' : 'Alternar a borrador'}
+              >
+                {tool === 'eraser' ? (
+                  <Eraser className="w-4 h-4 text-rose-400" />
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-white/40"
+                      style={{ backgroundColor: color }}
+                    />
+                  </div>
+                )}
+              </button>
+
+              {/* Quick Zoom Pill */}
+              <div className="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/80 p-0.5 text-xs font-bold">
                 <button
                   type="button"
-                  onClick={handleClear}
-                  className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors touch-target"
-                  title="Borrar todo el dibujo"
+                  onClick={handleZoomOut}
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors touch-target"
+                  title="Alejar zoom"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  className="px-1.5 py-1 text-[11px] font-mono text-amber-400 hover:text-amber-300 transition-colors"
+                  title="Restablecer zoom al 100% y centrar"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors touch-target"
+                  title="Acercar zoom"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Pan / Move Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={handleTogglePanMode}
+                  className={`p-1.5 rounded-lg transition-all touch-target ${
+                    isPanMode
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
+                  title={isPanMode ? 'Modo Mover activado: arrastra para desplazarte' : 'Activar modo mover / desplazar pantalla'}
+                >
+                  <Hand className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Drawing Canvas Area with Absolute High-Precision Container */}
-            <div className="flex-1 p-2 sm:p-4 flex items-center justify-center overflow-hidden min-h-0 relative">
-              {/* Paper Container */}
-              <div
-                ref={containerRef}
-                className={`w-full h-full rounded-2xl shadow-inner border border-slate-300 dark:border-slate-800 relative overflow-hidden flex items-center justify-center touch-none ${
-                  bgDocument
-                    ? 'bg-slate-100 dark:bg-slate-950'
-                    : paperType === 'dark'
-                    ? 'bg-slate-900'
-                    : paperType === 'grid'
-                    ? 'bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]'
-                    : paperType === 'lines'
-                    ? 'bg-white bg-[linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:100%_28px]'
-                    : 'bg-white'
-                }`}
+            {/* Right: Quick Save & THE 3-DOTS BUTTON (⋮) */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Quick Save */}
+              <button
+                type="button"
+                onClick={handleSaveToUnit}
+                className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-xs transition-all active:scale-95 touch-target"
+                title="Guardar croquis en la unidad"
               >
-                {/* Visual Stamp Indicator on Sheet */}
-                <div className="absolute top-2 left-3 pointer-events-none opacity-40 text-[10px] font-black uppercase tracking-wider text-slate-500 z-10">
-                  {activeProject?.name || 'Obra'} • {currentUnit?.name || 'Unidad'}
-                </div>
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar</span>
+              </button>
 
-                {/* Underlay Image / Photo / PDF Page */}
+              {/* 3-DOTS MENU BUTTON (⋮) */}
+              <button
+                type="button"
+                onClick={() => setIsToolsMenuOpen(true)}
+                className="p-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1 shadow-md transition-all active:scale-95 touch-target border border-amber-400"
+                title="Abrir menú de herramientas, colores, formas y ajustes de croquis"
+              >
+                <MoreVertical className="w-4 h-4 stroke-[3]" />
+                <span className="text-xs font-black hidden xs:inline">Opciones</span>
+              </button>
+            </div>
+          </div>
+
+          {/* MAIN CANVAS AREA: OCCUPIES 100% OF REMAINING SCREEN */}
+          <div
+            className="flex-1 w-full h-[calc(100vh-48px)] relative overflow-hidden flex items-center justify-center bg-slate-950"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onWheel={handleWheel}
+          >
+            <div
+              ref={containerRef}
+              className={`w-full h-full relative overflow-hidden flex items-center justify-center touch-none select-none ${
+                isPanMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+              } ${
+                bgDocument
+                  ? 'bg-slate-950'
+                  : paperType === 'dark'
+                  ? 'bg-slate-900'
+                  : paperType === 'grid'
+                  ? 'bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px]'
+                  : paperType === 'lines'
+                  ? 'bg-white bg-[linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:100%_28px]'
+                  : 'bg-white'
+              }`}
+            >
+              {/* Transformed Content Wrapper (Synchronizes Zoom & Pan for both Photo and Canvas) */}
+              <div
+                className="w-full h-full relative flex items-center justify-center pointer-events-auto"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transformOrigin: 'center center'
+                }}
+              >
+                {/* Background Document / Photo / PDF */}
                 {bgDocument && (
                   <img
                     src={bgDocument.dataUrl}
                     alt={bgDocument.name}
                     style={{ opacity: bgDocument.opacity }}
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+                    className={`absolute inset-0 w-full h-full pointer-events-none select-none ${
+                      imageFit === 'cover' ? 'object-cover' : 'object-contain'
+                    }`}
                   />
                 )}
 
-                {/* Floating Controls Bar for Loaded Document */}
-                {bgDocument && (
-                  <div className="absolute top-2 left-2 right-2 z-20 bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-500/40 flex items-center justify-between gap-2 shadow-lg text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      <span className="font-bold truncate text-slate-200">
-                        Fondo: <span className="text-amber-400">{bgDocument.name}</span>
-                      </span>
-
-                      {/* PDF Multi-page navigation */}
-                      {bgDocument.totalPages && bgDocument.totalPages > 1 && (
-                        <div className="flex items-center gap-1.5 bg-slate-800 px-2 py-0.5 rounded-lg text-[11px] font-bold border border-slate-700 ml-1">
-                          <button
-                            type="button"
-                            disabled={bgDocument.page! <= 1}
-                            onClick={() => handlePdfPageChange(bgDocument.page! - 1)}
-                            className="p-0.5 hover:text-amber-400 disabled:opacity-30 touch-target"
-                            title="Página anterior"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                          </button>
-                          <span>
-                            Pág {bgDocument.page} / {bgDocument.totalPages}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={bgDocument.page! >= bgDocument.totalPages!}
-                            onClick={() => handlePdfPageChange(bgDocument.page! + 1)}
-                            className="p-0.5 hover:text-amber-400 disabled:opacity-30 touch-target"
-                            title="Página siguiente"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Opacity slider */}
-                      <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400">
-                        <Sliders className="w-3 h-3 text-amber-400" />
-                        <span>Opacidad:</span>
-                        <input
-                          type="range"
-                          min="0.2"
-                          max="1"
-                          step="0.1"
-                          value={bgDocument.opacity}
-                          onChange={(e) =>
-                            setBgDocument((prev) =>
-                              prev ? { ...prev, opacity: parseFloat(e.target.value) } : null
-                            )
-                          }
-                          className="w-16 accent-amber-500 cursor-pointer"
-                        />
-                      </div>
-
-                      {/* Remove Background Button */}
-                      <button
-                        type="button"
-                        onClick={() => setBgDocument(null)}
-                        className="px-2 py-0.5 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-colors touch-target"
-                        title="Quitar documento de fondo y volver al lienzo limpio"
-                      >
-                        Quitar fondo
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* The Precision Transparent Drawing Canvas Layer */}
+                {/* Precision Drawing Canvas */}
                 <canvas
                   ref={canvasRef}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
                   onPointerCancel={handlePointerUp}
-                  className="cursor-crosshair touch-none select-none block relative z-10"
+                  className="block relative z-10 touch-none select-none"
                   style={{ touchAction: 'none' }}
                 />
               </div>
-            </div>
 
-            {/* Bottom Action Footer */}
-            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-                {bgDocument ? (
-                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Dibujando sobre: {bgDocument.name}
-                  </span>
-                ) : (
-                  <span>Dibujo a mano alzada calibrado al 100% para S-Pen / Apple Pencil</span>
-                )}
+              {/* Discreet Bottom Stamp on Sheet */}
+              <div className="absolute bottom-2 left-3 pointer-events-none opacity-40 text-[10px] font-black uppercase tracking-wider text-slate-500 z-20">
+                {activeProject?.name || 'Obra'} • {currentUnit?.name || 'Unidad'}
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* WhatsApp Share Button */}
-                <button
-                  type="button"
-                  onClick={() => handleShareWhatsApp()}
-                  className="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all active:scale-95 touch-target"
-                  title="Enviar croquis por WhatsApp"
-                >
-                  <WhatsAppIcon className="w-4 h-4 fill-white" />
-                  <span>Enviar WhatsApp</span>
-                </button>
-
-                {/* Download PNG Button */}
-                <button
-                  type="button"
-                  onClick={() => handleDownload()}
-                  className="px-3 sm:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/40 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 touch-target"
-                  title="Descargar croquis en imagen de alta resolución"
-                >
-                  <Download className="w-4 h-4 text-amber-400" />
-                  <span>Descargar</span>
-                </button>
-
-                {/* Save to Unit Button */}
-                <button
-                  type="button"
-                  onClick={handleSaveToUnit}
-                  className="px-4 sm:px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 touch-target"
-                  title="Guardar croquis en este departamento y sincronizar en la nube"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Guardar en {currentUnit?.name || 'Depto'}</span>
-                </button>
-              </div>
+              {/* Pan Mode Floating Indicator */}
+              {isPanMode && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-slate-950 font-black text-xs px-3 py-1 rounded-full shadow-xl flex items-center gap-1.5 animate-pulse">
+                  <Hand className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Modo Mover: Arrastra la pantalla • Toca la mano para dibujar</span>
+                </div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Tab 2: Department Sketches History */}
-        {activeTab === 'history' && (
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 overflow-y-auto">
-            {/* Obra & Depto Filter Bar for History */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 mb-4 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Obra Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Obra:</span>
-                  <select
-                    value={selectedProjectId}
-                    onChange={(e) => handleSelectProject(e.target.value)}
-                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[140px] sm:max-w-[190px] truncate"
-                  >
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Depto Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <DoorOpen className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400">Depto:</span>
-                  <select
-                    value={selectedUnitId}
-                    onChange={(e) => setSelectedUnitId(e.target.value)}
-                    className="bg-transparent text-xs font-black text-slate-900 dark:text-white outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
-                  >
-                    {(activeProject?.units || []).map((u) => (
-                      <option key={u.id} value={u.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
-                        {u.name} {u.type === 'common_area' ? '(Común)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-black">
-                  {unitSketches.length} {unitSketches.length === 1 ? 'croquis guardado' : 'croquis guardados'}
-                </span>
-                <button
-                  onClick={() => setActiveTab('draw')}
-                  className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 touch-target shadow-xs hover:bg-amber-400 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Nuevo Croquis</span>
-                </button>
-              </div>
-            </div>
-
-            {unitSketches.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
-                  <PenTool className="w-7 h-7" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  No hay croquis guardados en {currentUnit?.name || 'esta unidad'} ({activeProject?.name})
-                </h4>
-                <p className="text-xs text-slate-500 max-w-sm mt-1 mb-4">
-                  Abre la pestaña de lienzo para hacer un dibujo a mano alzada o escribir sobre una foto o plano PDF y guárdalo aquí.
-                </p>
-                <button
-                  onClick={() => setActiveTab('draw')}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs"
-                >
-                  Comenzar a Dibujar
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {unitSketches.map((sketch) => (
-                  <div
-                    key={sketch.id}
-                    className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col"
-                  >
-                    {/* Thumbnail Image */}
-                    <div className="relative aspect-[16/10] bg-slate-100 dark:bg-slate-950 overflow-hidden border-b border-slate-200 dark:border-slate-800 group">
-                      <img
-                        src={sketch.dataUrl}
-                        alt={sketch.title}
-                        className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
-                      />
-                      <div className="absolute top-2 right-2 flex items-center gap-1">
-                        <span className="text-[10px] font-bold bg-slate-900/80 backdrop-blur-xs text-amber-400 px-2 py-0.5 rounded-lg">
-                          {sketch.createdAt}
-                        </span>
-                      </div>
+          {/* THE 3-DOTS SETTINGS & TOOLS DRAWER / MODAL */}
+          {isToolsMenuOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+              <div className="w-full sm:w-[420px] max-w-full h-full bg-slate-900 border-l border-slate-800 p-4 sm:p-5 overflow-y-auto flex flex-col gap-4 shadow-2xl animate-in slide-in-from-right duration-200 text-white">
+                {/* Drawer Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black">
+                      <Sliders className="w-4 h-4" />
                     </div>
-
-                    {/* Metadata & Actions */}
-                    <div className="p-3 flex-1 flex flex-col justify-between space-y-2.5">
-                      <div>
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white truncate">
-                          {sketch.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {sketch.unitName || currentUnit?.name} • {sketch.projectName || activeProject?.name || 'Obra'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-1.5">
-                          {/* WhatsApp */}
-                          <button
-                            type="button"
-                            onClick={() => handleShareWhatsApp(sketch.dataUrl, sketch.title)}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors touch-target"
-                            title="Enviar por WhatsApp"
-                          >
-                            <WhatsAppIcon className="w-4 h-4 fill-emerald-600" />
-                          </button>
-
-                          {/* Download */}
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(sketch.dataUrl, sketch.title)}
-                            className="p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors touch-target"
-                            title="Descargar imagen"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-
-                          {/* Open in canvas to continue */}
-                          <button
-                            type="button"
-                            onClick={() => handleLoadSketchToCanvas(sketch.dataUrl, sketch.title)}
-                            className="px-2 py-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors flex items-center gap-1 touch-target"
-                            title="Abrir este croquis en el lienzo para seguir dibujando"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            <span>Continuar</span>
-                          </button>
-                        </div>
-
-                        {/* Delete button */}
-                        {onDeleteSketch && activeProject && currentUnit && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteSketch(activeProject.id, currentUnit.id, sketch.id)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors touch-target"
-                            title="Eliminar croquis"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white">Ajustes del Croquis</h3>
+                      <p className="text-[11px] text-amber-400 font-bold">Herramientas, colores y fotos</p>
                     </div>
                   </div>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setIsToolsMenuOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors touch-target"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* SECTION 1: FORMAS Y HERRAMIENTAS DE DIBUJO */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <PenTool className="w-3.5 h-3.5 text-amber-500" />
+                    Herramienta de Trazo
+                  </span>
+
+                  <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('pen');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'pen' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      <Pencil className="w-4 h-4" />
+                      <span className="text-[10px]">Lápiz</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('highlighter');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'highlighter' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Highlighter className="w-4 h-4" />
+                      <span className="text-[10px]">Resaltador</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('line');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'line' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Minus className="w-4 h-4" />
+                      <span className="text-[10px]">Línea</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('arrow');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'arrow' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <MoveRight className="w-4 h-4" />
+                      <span className="text-[10px]">Flecha</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('rect');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'rect' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Square className="w-4 h-4" />
+                      <span className="text-[10px]">Rectángulo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('circle');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'circle' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Circle className="w-4 h-4" />
+                      <span className="text-[10px]">Círculo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('text');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'text' && !isPanMode
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Type className="w-4 h-4" />
+                      <span className="text-[10px]">Texto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('eraser');
+                        setIsPanMode(false);
+                      }}
+                      className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all touch-target ${
+                        tool === 'eraser' && !isPanMode
+                          ? 'bg-rose-500 text-white border-rose-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-755'
+                      }`}
+                    >
+                      <Eraser className="w-4 h-4" />
+                      <span className="text-[10px]">Goma</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors touch-target"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Limpiar todo el dibujo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPanMode(!isPanMode);
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all touch-target ${
+                        isPanMode
+                          ? 'bg-amber-500 text-slate-950 font-black'
+                          : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                      }`}
+                    >
+                      <Hand className="w-3.5 h-3.5" />
+                      <span>{isPanMode ? 'Mover activado' : 'Mover / Desplazar'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* SECTION 2: GROSOR DE TRAZO */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                    Grosor del Trazo ({strokeWidth}px)
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {STROKE_WIDTHS.map((sw) => (
+                      <button
+                        key={sw.value}
+                        type="button"
+                        onClick={() => setStrokeWidth(sw.value)}
+                        className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1.5 border transition-all touch-target ${
+                          strokeWidth === sw.value
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-xs'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                        }`}
+                      >
+                        <div
+                          className="rounded-full bg-current"
+                          style={{
+                            width: `${Math.min(14, sw.value * 1.5 + 2)}px`,
+                            height: `${Math.min(14, sw.value * 1.5 + 2)}px`
+                          }}
+                        />
+                        <span className="text-[10px]">{sw.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SECTION 3: PALETA DE COLORES */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      Color de Trazo
+                    </span>
+                    <span className="text-[11px] font-mono text-amber-400">{color}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {COLOR_PALETTE.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => {
+                          setColor(c.value);
+                          if (tool === 'eraser') setTool('pen');
+                        }}
+                        className={`w-7 h-7 rounded-full border-2 transition-transform touch-target flex-shrink-0 ${
+                          color === c.value && tool !== 'eraser'
+                            ? 'scale-125 border-amber-400 ring-2 ring-amber-400/50 shadow-md'
+                            : 'border-slate-700'
+                        }`}
+                        style={{ backgroundColor: c.value }}
+                        title={c.label}
+                      />
+                    ))}
+
+                    {/* Custom HTML Color Picker */}
+                    <div className="relative flex items-center justify-center">
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => {
+                          setColor(e.target.value);
+                          if (tool === 'eraser') setTool('pen');
+                        }}
+                        className="w-8 h-8 p-0 border-0 rounded-full cursor-pointer bg-transparent"
+                        title="Elegir otro color"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 4: FOTO / IMAGEN / PLANO DE FONDO */}
+                <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                    Fondo a Pantalla Completa (Foto / Imagen / PDF)
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cameraInputRef.current?.click();
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="p-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all touch-target shadow-xs active:scale-95"
+                    >
+                      <Camera className="w-4 h-4 text-emerald-400" />
+                      <span>Tomar Foto</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="p-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all touch-target shadow-xs active:scale-95"
+                    >
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      <span>Cargar Imagen/PDF</span>
+                    </button>
+                  </div>
+
+                  {/* If unit has blueprints */}
+                  {unitBlueprints.length > 0 && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsBlueprintsDropdownOpen(!isBlueprintsDropdownOpen)}
+                        className="w-full p-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 rounded-xl font-bold text-xs flex items-center justify-between transition-all touch-target"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5" />
+                          <span>Planos técnicos de la unidad ({unitBlueprints.length})</span>
+                        </span>
+                        <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isBlueprintsDropdownOpen ? 'rotate-90' : ''}`} />
+                      </button>
+
+                      {isBlueprintsDropdownOpen && (
+                        <div className="mt-1 bg-slate-800 rounded-xl border border-slate-700 p-1 space-y-1 max-h-40 overflow-y-auto">
+                          {unitBlueprints.map((bp) => (
+                            <button
+                              key={bp.id}
+                              type="button"
+                              onClick={() => handleLoadBlueprintAsBackground(bp)}
+                              className="w-full text-left p-2 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-200 flex items-center justify-between"
+                            >
+                              <span className="truncate">{bp.name}</span>
+                              <span className="text-[10px] text-amber-400 font-mono uppercase">{bp.type}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Active Background Document Controls */}
+                  {bgDocument ? (
+                    <div className="p-3 bg-slate-800/80 rounded-xl border border-amber-500/30 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-amber-400 truncate max-w-[200px]">
+                          📷 {bgDocument.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setBgDocument(null)}
+                          className="px-2 py-0.5 bg-rose-600/40 hover:bg-rose-600 text-rose-200 rounded-lg text-[10px] font-bold transition-colors"
+                        >
+                          Quitar fondo
+                        </button>
+                      </div>
+
+                      {/* Opacity slider */}
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>Opacidad: {Math.round(bgDocument.opacity * 100)}%</span>
+                        <input
+                          type="range"
+                          min="0.2"
+                          max="1"
+                          step="0.05"
+                          value={bgDocument.opacity}
+                          onChange={(e) =>
+                            setBgDocument((prev) =>
+                              prev ? { ...prev, opacity: parseFloat(e.target.value) } : null
+                            )
+                          }
+                          className="w-24 accent-amber-500 cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Fit Mode Toggle */}
+                      <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-700">
+                        <span>Ajuste de Pantalla:</span>
+                        <div className="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-700">
+                          <button
+                            type="button"
+                            onClick={() => setImageFit('contain')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              imageFit === 'contain' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
+                            }`}
+                          >
+                            Ajustar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageFit('cover')}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              imageFit === 'cover' ? 'bg-amber-500 text-slate-950' : 'text-slate-400'
+                            }`}
+                          >
+                            Llenar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* PDF Multi-page navigation */}
+                      {bgDocument.totalPages && bgDocument.totalPages > 1 && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-700 text-xs">
+                          <span>Página: {bgDocument.page} de {bgDocument.totalPages}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={bgDocument.page! <= 1}
+                              onClick={() => handlePdfPageChange(bgDocument.page! - 1)}
+                              className="p-1 bg-slate-700 rounded hover:bg-slate-600 disabled:opacity-30"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={bgDocument.page! >= bgDocument.totalPages!}
+                              onClick={() => handlePdfPageChange(bgDocument.page! + 1)}
+                              className="p-1 bg-slate-700 rounded hover:bg-slate-600 disabled:opacity-30"
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Paper Type Selector when no photo/document is loaded
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Tipo de Papel (Sin foto):</span>
+                      <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setPaperType('white')}
+                          className={`p-2 rounded-xl border text-[11px] font-bold ${
+                            paperType === 'white' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          Blanco
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaperType('grid')}
+                          className={`p-2 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1 ${
+                            paperType === 'grid' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          <Grid className="w-3 h-3" />
+                          <span>Cuadrícula</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaperType('lines')}
+                          className={`p-2 rounded-xl border text-[11px] font-bold ${
+                            paperType === 'lines' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          Rayado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaperType('dark')}
+                          className={`p-2 rounded-xl border text-[11px] font-bold ${
+                            paperType === 'dark' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          Oscuro
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 5: DATOS DE LA OBRA Y ESPACIO */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                    Destino del Croquis
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Project select */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Obra:</label>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(e) => handleSelectProject(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2 font-bold text-xs text-white outline-none cursor-pointer"
+                      >
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Unit select */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Depto / Espacio:</label>
+                      <select
+                        value={selectedUnitId}
+                        onChange={(e) => setSelectedUnitId(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl p-2 font-bold text-xs text-white outline-none cursor-pointer"
+                      >
+                        {(activeProject?.units || []).map((u) => (
+                          <option key={u.id} value={u.id} className="bg-slate-900 text-white">
+                            {u.name} {u.type === 'common_area' ? '(Común)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-0.5">Referencia / Título:</label>
+                    <input
+                      type="text"
+                      value={sketchTitle}
+                      onChange={(e) => setSketchTitle(e.target.value)}
+                      placeholder="Ej: Modificación tabique baño"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 font-medium text-xs text-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* SECTION 6: GUARDADO Y ACCIONES */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Save className="w-3.5 h-3.5 text-amber-500" />
+                    Guardar y Compartir
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={handleSaveToUnit}
+                      className="p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 touch-target"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Guardar Croquis</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleShareWhatsApp();
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="p-2.5 bg-green-700 hover:bg-green-600 text-white rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 touch-target"
+                    >
+                      <WhatsAppIcon className="w-4 h-4 fill-white" />
+                      <span>Enviar WhatsApp</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDownload();
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/40 rounded-xl flex items-center justify-center gap-1.5 transition-all touch-target"
+                    >
+                      <Download className="w-4 h-4 text-amber-400" />
+                      <span>Descargar PNG</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('history');
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl flex items-center justify-center gap-1.5 transition-all touch-target"
+                    >
+                      <Layers className="w-4 h-4 text-amber-400" />
+                      <span>Ver Historial ({unitSketches.length})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* BOTTOM CLOSE DRAWER BUTTON */}
+                <div className="pt-2 mt-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsToolsMenuOpen(false)}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all touch-target"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Volver a Pantalla Completa</span>
+                  </button>
+                </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: SKETCHES HISTORY */}
+      {activeTab === 'history' && (
+        <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 p-3 sm:p-5 overflow-y-auto">
+          {/* Top Bar for History */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-900 p-3 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('draw')}
+                className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 touch-target shadow-xs hover:bg-amber-400 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 stroke-[3]" />
+                <span>Volver al Lienzo</span>
+              </button>
+
+              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black">
+                {unitSketches.length} {unitSketches.length === 1 ? 'croquis registrado' : 'croquis registrados'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">
+                {activeProject?.name} • {currentUnit?.name}
+              </span>
+              <button
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl touch-target"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {unitSketches.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-900 rounded-2xl border border-slate-800">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
+                <PenTool className="w-7 h-7" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-200">
+                No hay croquis guardados en {currentUnit?.name || 'esta unidad'} ({activeProject?.name})
+              </h4>
+              <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4">
+                Abre el lienzo para hacer un dibujo a mano alzada o escribir sobre una foto a pantalla completa.
+              </p>
+              <button
+                onClick={() => setActiveTab('draw')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs"
+              >
+                Comenzar a Croquizar
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {unitSketches.map((sketch) => (
+                <div
+                  key={sketch.id}
+                  className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg flex flex-col"
+                >
+                  <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden border-b border-slate-800 group">
+                    <img
+                      src={sketch.dataUrl}
+                      alt={sketch.title}
+                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
+                    />
+                    <div className="absolute top-2 right-2 flex items-center gap-1">
+                      <span className="text-[10px] font-bold bg-slate-900/90 backdrop-blur-xs text-amber-400 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                        {sketch.createdAt}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 flex-1 flex flex-col justify-between space-y-2.5">
+                    <div>
+                      <h4 className="text-xs font-black text-white truncate">
+                        {sketch.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        {sketch.unitName || currentUnit?.name} • {sketch.projectName || activeProject?.name}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleShareWhatsApp(sketch.dataUrl, sketch.title)}
+                          className="p-1.5 text-emerald-400 hover:bg-emerald-950/40 rounded-lg transition-colors touch-target"
+                          title="Enviar por WhatsApp"
+                        >
+                          <WhatsAppIcon className="w-4 h-4 fill-emerald-400" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(sketch.dataUrl, sketch.title)}
+                          className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors touch-target"
+                          title="Descargar imagen"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleLoadSketchToCanvas(sketch.dataUrl, sketch.title)}
+                          className="px-2 py-1 text-[11px] font-bold text-amber-400 hover:bg-amber-950/40 rounded-lg transition-colors flex items-center gap-1 touch-target"
+                          title="Abrir este croquis en el lienzo para seguir dibujando"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Continuar</span>
+                        </button>
+                      </div>
+
+                      {onDeleteSketch && activeProject && currentUnit && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteSketch(activeProject.id, currentUnit.id, sketch.id)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-950/40 rounded-lg transition-colors touch-target"
+                          title="Eliminar croquis"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
