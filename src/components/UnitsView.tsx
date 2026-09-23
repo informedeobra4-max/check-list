@@ -30,6 +30,7 @@ import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor, hexToRgba } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectTimeline } from './ProjectTimeline';
+import { ErrorBoundary } from './ErrorBoundary';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 
@@ -383,14 +384,16 @@ export function UnitsView({
 
         {/* Línea de Tiempo e Hitos Críticos de la Obra */}
         <div className="mt-3.5 pt-2 border-t border-slate-800/80">
-          <ProjectTimeline
-            project={project}
-            compact={false}
-            onOpenMilestonesConfig={onOpenMilestonesConfig}
-            onToggleManualMilestone={onToggleManualMilestone}
-            onUpdateMilestoneProgress={onUpdateMilestoneProgress}
-            onUpdateProjectDates={onUpdateProjectDates}
-          />
+          <ErrorBoundary fallbackTitle="Error al visualizar el cronograma de hitos">
+            <ProjectTimeline
+              project={project}
+              compact={false}
+              onOpenMilestonesConfig={onOpenMilestonesConfig}
+              onToggleManualMilestone={onToggleManualMilestone}
+              onUpdateMilestoneProgress={onUpdateMilestoneProgress}
+              onUpdateProjectDates={onUpdateProjectDates}
+            />
+          </ErrorBoundary>
         </div>
       </div>
 

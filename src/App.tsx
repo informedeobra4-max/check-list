@@ -1705,62 +1705,72 @@ export default function App() {
         )}
 
         {currentView === 'units' && selectedProject && (
-          <UnitsView
-            project={selectedProject}
-            presentationBg={localColors.presentationBackground}
-            neonColor={localColors.neonColor || '#00f2fe'}
-            onSelectUnit={handleSelectUnit}
-            onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
-            onOpenReportModal={handleOpenReportModal}
-            onEditUnit={setEditingUnit}
-            onRequestDeleteUnit={handleRequestDeleteUnit}
-            onRequestDeleteProject={handleRequestDeleteProject}
-            onExportExcel={handleExportExcel}
-            onOpenMilestonesConfig={handleOpenMilestonesConfig}
-            onToggleManualMilestone={handleToggleManualMilestone}
-            onUpdateMilestoneProgress={handleUpdateMilestoneProgress}
-            onUpdateProjectDates={handleUpdateProjectDates}
-            onEditProject={(proj) => setEditingProject(proj)}
-            onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
-            onAddTrade={handleAddTrade}
-            onDeleteTrade={handleDeleteTrade}
-            onOpenCroquis={() => {
-              setCroquisModalTargetUnitId(undefined);
-              setIsCroquisModalOpen(true);
-            }}
-          />
+          <ErrorBoundary
+            fallbackTitle="Error al cargar la obra"
+            onReset={() => setCurrentView('dashboard')}
+          >
+            <UnitsView
+              project={selectedProject}
+              presentationBg={localColors.presentationBackground}
+              neonColor={localColors.neonColor || '#00f2fe'}
+              onSelectUnit={handleSelectUnit}
+              onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
+              onOpenReportModal={handleOpenReportModal}
+              onEditUnit={setEditingUnit}
+              onRequestDeleteUnit={handleRequestDeleteUnit}
+              onRequestDeleteProject={handleRequestDeleteProject}
+              onExportExcel={handleExportExcel}
+              onOpenMilestonesConfig={handleOpenMilestonesConfig}
+              onToggleManualMilestone={handleToggleManualMilestone}
+              onUpdateMilestoneProgress={handleUpdateMilestoneProgress}
+              onUpdateProjectDates={handleUpdateProjectDates}
+              onEditProject={(proj) => setEditingProject(proj)}
+              onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
+              onAddTrade={handleAddTrade}
+              onDeleteTrade={handleDeleteTrade}
+              onOpenCroquis={() => {
+                setCroquisModalTargetUnitId(undefined);
+                setIsCroquisModalOpen(true);
+              }}
+            />
+          </ErrorBoundary>
         )}
 
         {currentView === 'checklist' && selectedProject && selectedUnit && (
-          <ChecklistView
-            project={selectedProject}
-            unit={selectedUnit}
-            allProjects={projects}
-            neonColor={localColors.neonColor || '#00f2fe'}
-            onToggleItem={handleToggleItem}
-            onUpdateItemProgress={handleUpdateItemProgress}
-            onDeleteItem={handleDeleteItem}
-            onAddItem={handleAddItem}
-            onSaveComment={handleSaveItemComment}
-            onSaveObservation={handleSaveObservation}
-            onAddPhoto={handleAddPhoto}
-            onDeletePhoto={handleDeletePhoto}
-            onOpenPhotoViewer={(tradeId, itemId, tradeName, itemName) => {
-              setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
-            }}
-            onTriggerQuickPhoto={handleTriggerCamera}
-            onOpenReportModal={handleOpenReportModal}
-            onEditUnit={setEditingUnit}
-            onRequestDeleteUnit={handleRequestDeleteUnit}
-            onExportExcel={handleExportExcel}
-            onOpenBlueprints={() => setActiveBlueprintViewerUnit(selectedUnit)}
-            onAddTrade={handleAddTrade}
-            onDeleteTrade={handleDeleteTrade}
-            onOpenCroquis={(unitId) => {
-              setCroquisModalTargetUnitId(unitId || selectedUnitId || undefined);
-              setIsCroquisModalOpen(true);
-            }}
-          />
+          <ErrorBoundary
+            fallbackTitle="Error al cargar la unidad"
+            onReset={() => setCurrentView('units')}
+          >
+            <ChecklistView
+              project={selectedProject}
+              unit={selectedUnit}
+              allProjects={projects}
+              neonColor={localColors.neonColor || '#00f2fe'}
+              onToggleItem={handleToggleItem}
+              onUpdateItemProgress={handleUpdateItemProgress}
+              onDeleteItem={handleDeleteItem}
+              onAddItem={handleAddItem}
+              onSaveComment={handleSaveItemComment}
+              onSaveObservation={handleSaveObservation}
+              onAddPhoto={handleAddPhoto}
+              onDeletePhoto={handleDeletePhoto}
+              onOpenPhotoViewer={(tradeId, itemId, tradeName, itemName) => {
+                setActivePhotoViewer({ tradeId, itemId, tradeName, itemName });
+              }}
+              onTriggerQuickPhoto={handleTriggerCamera}
+              onOpenReportModal={handleOpenReportModal}
+              onEditUnit={setEditingUnit}
+              onRequestDeleteUnit={handleRequestDeleteUnit}
+              onExportExcel={handleExportExcel}
+              onOpenBlueprints={() => setActiveBlueprintViewerUnit(selectedUnit)}
+              onAddTrade={handleAddTrade}
+              onDeleteTrade={handleDeleteTrade}
+              onOpenCroquis={(unitId) => {
+                setCroquisModalTargetUnitId(unitId || selectedUnitId || undefined);
+                setIsCroquisModalOpen(true);
+              }}
+            />
+          </ErrorBoundary>
         )}
       </main>
 

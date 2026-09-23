@@ -12,6 +12,7 @@ import {
   Sparkles,
   Layers,
   Building2,
+  Wrench,
   X,
   MapPin,
   MoveHorizontal,
@@ -176,32 +177,44 @@ export function ProjectTimeline({
   const activeResult = calculatedResults.find(r => r.milestone.id === selectedMilestoneId);
 
   // Gantt timeline bounds (start and end timestamps)
+  const nowMs = Date.now();
   const allTimestamps: number[] = [
-    startDate.getTime(),
-    endDate.getTime(),
-    today.getTime()
+    isFinite(startDate.getTime()) ? startDate.getTime() : nowMs,
+    isFinite(endDate.getTime()) ? endDate.getTime() : nowMs + 30 * 24 * 60 * 60 * 1000,
+    nowMs
   ];
 
   milestones.forEach(m => {
-    if (m.startDate) allTimestamps.push(new Date(m.startDate).getTime());
+    if (m.startDate) {
+      const t = new Date(m.startDate).getTime();
+      if (isFinite(t)) allTimestamps.push(t);
+    }
     const targetStr = m.targetDate || m.endDate;
-    if (targetStr) allTimestamps.push(new Date(targetStr).getTime());
+    if (targetStr) {
+      const t = new Date(targetStr).getTime();
+      if (isFinite(t)) allTimestamps.push(t);
+    }
   });
 
-  const rawGanttStartMs = Math.min(...allTimestamps);
-  const rawGanttEndMs = Math.max(...allTimestamps);
+  const validTimestamps = allTimestamps.filter(t => typeof t === 'number' && !isNaN(t) && isFinite(t));
+  if (validTimestamps.length === 0) validTimestamps.push(nowMs);
+  const rawGanttStartMs = Math.min(...validTimestamps);
+  const rawGanttEndMs = Math.max(...validTimestamps);
   // Pad with 3 days before and 5 days after
   const ganttStartMs = rawGanttStartMs - (3 * 24 * 60 * 60 * 1000);
   const ganttEndMs = rawGanttEndMs + (5 * 24 * 60 * 60 * 1000);
   const ganttTotalDurationMs = Math.max(1, ganttEndMs - ganttStartMs);
 
-  const ganttTodayLeft = Math.max(0, Math.min(100, ((today.getTime() - ganttStartMs) / ganttTotalDurationMs) * 100));
+  const rawTodayLeft = ((today.getTime() - ganttStartMs) / ganttTotalDurationMs) * 100;
+  const ganttTodayLeft = isFinite(rawTodayLeft) ? Math.max(0, Math.min(100, rawTodayLeft)) : 50;
 
   // 5 scale markers for Gantt header
   const ganttScaleMarkers = [0, 0.25, 0.5, 0.75, 1].map(fraction => {
     const time = ganttStartMs + (fraction * ganttTotalDurationMs);
     const d = new Date(time);
-    const dateFormatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    const dateFormatted = isFinite(d.getTime())
+      ? d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      : '';
     return {
       leftPercent: fraction * 100,
       label: dateFormatted
@@ -676,6 +689,17 @@ export function ProjectTimeline({
                 className="no-scrollbar relative p-3 w-full rounded-2xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 select-none transition-colors"
               >
                 <div className="min-w-[760px] sm:min-w-[900px] relative space-y-3">
+                  {/* Vertical "HOY" Marker Line running down all rows */}
+                  <div
+                    style={{ left: `${ganttTodayLeft}%` }}
+                    className="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-20 pointer-events-none"
+                  >
+                    <div className="absolute -top-1 -translate-x-1/2 bg-slate-950 text-amber-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm border border-amber-500/80 flex items-center gap-0.5">
+                      <MapPin className="w-2 h-2 text-amber-400 fill-amber-400" />
+                      HOY
+                    </div>
+                  </div>
+
                   {/* Top Time Scale Axis */}
                   <div className="relative pb-2 border-b border-slate-200 dark:border-slate-700/80">
                     <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 px-1">
@@ -685,17 +709,6 @@ export function ProjectTimeline({
                           <span>{marker.label}</span>
                         </span>
                       ))}
-                    </div>
-
-                    {/* Vertical "HOY" Marker Line running down all rows */}
-                    <div
-                      style={{ left: `${ganttTodayLeft}%` }}
-                      className="absolute top-0 bottom-[-9999px] w-0.5 bg-amber-500 z-20 pointer-events-none"
-                    >
-                      <div className="absolute -top-1 -translate-x-1/2 bg-slate-950 text-amber-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm border border-amber-500/80 flex items-center gap-0.5">
-                        <MapPin className="w-2 h-2 text-amber-400 fill-amber-400" />
-                        HOY
-                      </div>
                     </div>
                   </div>
 
@@ -707,13 +720,19 @@ export function ProjectTimeline({
                       const isStartedOverdue = result.isStartedOverdue;
                       const isOverdue = result.isOverdue;
 
-                      // Calculate bar left & width
-                      const mStartMs = milestone.startDate ? new Date(milestone.startDate).getTime() : ganttStartMs;
+                      // Calculate bar left & width safely
+                      const mStartMs = milestone.startDate && isFinite(new Date(milestone.startDate).getTime())
+                        ? new Date(milestone.startDate).getTime()
+                        : ganttStartMs;
                       const targetDateStr = milestone.targetDate || milestone.endDate;
-                      const mEndMs = targetDateStr ? new Date(targetDateStr).getTime() : (mStartMs + (30 * 24 * 60 * 60 * 1000));
+                      const mEndMs = targetDateStr && isFinite(new Date(targetDateStr).getTime())
+                        ? new Date(targetDateStr).getTime()
+                        : (mStartMs + (30 * 24 * 60 * 60 * 1000));
 
-                      const barLeftPercent = Math.max(0, Math.min(95, ((mStartMs - ganttStartMs) / ganttTotalDurationMs) * 100));
-                      const barWidthPercent = Math.max(5, Math.min(100 - barLeftPercent, ((mEndMs - mStartMs) / ganttTotalDurationMs) * 100));
+                      const rawLeft = ((mStartMs - ganttStartMs) / ganttTotalDurationMs) * 100;
+                      const rawWidth = ((mEndMs - mStartMs) / ganttTotalDurationMs) * 100;
+                      const barLeftPercent = isFinite(rawLeft) ? Math.max(0, Math.min(95, rawLeft)) : 0;
+                      const barWidthPercent = isFinite(rawWidth) ? Math.max(5, Math.min(100 - barLeftPercent, rawWidth)) : 20;
 
                       return (
                         <div

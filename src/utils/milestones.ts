@@ -31,7 +31,7 @@ export interface MilestoneCalculationResult {
 }
 
 export function formatTargetDate(dateStr?: string): string {
-  if (!dateStr) return 'Sin fecha';
+  if (!dateStr || typeof dateStr !== 'string') return 'Sin fecha';
   try {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
@@ -42,12 +42,18 @@ export function formatTargetDate(dateStr?: string): string {
         'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
         'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
       ];
-      return `${day} ${months[monthIndex] || ''} ${year}`;
+      if (months[monthIndex]) {
+        return `${day} ${months[monthIndex]} ${year}`;
+      }
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     }
   } catch (e) {
     console.error('Error formatting date', e);
   }
-  return dateStr;
+  return dateStr || 'Sin fecha';
 }
 
 export function calculateMilestoneProgress(
