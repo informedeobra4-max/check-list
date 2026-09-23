@@ -370,52 +370,118 @@ export default function App() {
     setIsMilestonesModalOpen(true);
   };
 
-  // Save or Update Milestone
+  // Save or Update Milestone with Supabase Cloud persistence
   const handleSaveMilestone = (projectId: string, milestone: Milestone) => {
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== projectId) return proj;
-      const currentList = proj.milestones || [];
-      const exists = currentList.some(m => m.id === milestone.id);
-      const updated = exists
-        ? currentList.map(m => m.id === milestone.id ? milestone : m)
-        : [...currentList, milestone];
-      return {
-        ...proj,
-        milestones: updated
-      };
-    }));
-    showToast('Hito crítico guardado con éxito', 'Calendar');
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        const currentList = proj.milestones || [];
+        const exists = currentList.some(m => m.id === milestone.id);
+        const updatedMilestones = exists
+          ? currentList.map(m => m.id === milestone.id ? milestone : m)
+          : [...currentList, milestone];
+        return {
+          ...proj,
+          milestones: updatedMilestones
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Hito "${milestone.name}" guardado en la Nube`, 'Calendar');
+    });
   };
 
-  // Delete Milestone
+  // Delete Milestone with Supabase Cloud persistence
   const handleDeleteMilestone = (projectId: string, milestoneId: string) => {
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== projectId) return proj;
-      return {
-        ...proj,
-        milestones: (proj.milestones || []).filter(m => m.id !== milestoneId)
-      };
-    }));
-    showToast('Hito eliminado del cronograma', 'Trash2');
+    if (!confirm('¿Eliminar este hito del cronograma de la obra?')) return;
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        return {
+          ...proj,
+          milestones: (proj.milestones || []).filter(m => m.id !== milestoneId)
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast('Hito eliminado del cronograma', 'Trash2');
+    });
   };
 
-  // Toggle Manual Complete on Milestone
+  // Toggle Manual Complete on Milestone with Supabase Cloud persistence
   const handleToggleManualMilestone = (projectId: string, milestoneId: string) => {
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== projectId) return proj;
-      return {
-        ...proj,
-        milestones: (proj.milestones || []).map(m => {
-          if (m.id !== milestoneId) return m;
-          const nextManual = !m.manualCompleted;
-          return {
-            ...m,
-            manualCompleted: nextManual
-          };
-        })
-      };
-    }));
-    showToast('Estado del hito actualizado', 'Check');
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        return {
+          ...proj,
+          milestones: (proj.milestones || []).map(m => {
+            if (m.id !== milestoneId) return m;
+            const nextManual = !m.manualCompleted;
+            return {
+              ...m,
+              manualCompleted: nextManual,
+              progressPercentage: nextManual ? 100 : (m.progressPercentage ?? 0)
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast('Estado del hito actualizado en la Nube', 'Check');
+    });
+  };
+
+  // Update Milestone Progress Percentage with Supabase Cloud persistence
+  const handleUpdateMilestoneProgress = (projectId: string, milestoneId: string, percentage: number) => {
+    lastLocalEditTimeRef.current = Date.now();
+    const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        return {
+          ...proj,
+          milestones: (proj.milestones || []).map(m => {
+            if (m.id !== milestoneId) return m;
+            return {
+              ...m,
+              progressPercentage: clamped,
+              manualCompleted: clamped === 100 ? true : (m.manualCompleted && clamped < 100 ? false : m.manualCompleted)
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Avance del hito actualizado al ${clamped}%`, 'Check');
+    });
   };
 
   const projectForMilestones = projects.find(p => p.id === (milestonesProjectId || selectedProjectId));
@@ -1652,6 +1718,7 @@ export default function App() {
             onExportExcel={handleExportExcel}
             onOpenMilestonesConfig={handleOpenMilestonesConfig}
             onToggleManualMilestone={handleToggleManualMilestone}
+            onUpdateMilestoneProgress={handleUpdateMilestoneProgress}
             onUpdateProjectDates={handleUpdateProjectDates}
             onEditProject={(proj) => setEditingProject(proj)}
             onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
@@ -1873,6 +1940,7 @@ export default function App() {
           onSaveMilestone={handleSaveMilestone}
           onDeleteMilestone={handleDeleteMilestone}
           onToggleManualMilestone={handleToggleManualMilestone}
+          onUpdateMilestoneProgress={handleUpdateMilestoneProgress}
         />
       )}
 

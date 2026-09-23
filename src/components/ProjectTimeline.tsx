@@ -31,6 +31,7 @@ interface ProjectTimelineProps {
   project: Project;
   onOpenMilestonesConfig: (projectId: string) => void;
   onToggleManualMilestone?: (projectId: string, milestoneId: string) => void;
+  onUpdateMilestoneProgress?: (projectId: string, milestoneId: string, percentage: number) => void;
   compact?: boolean;
   onSelectUnit?: (unitId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
@@ -40,6 +41,7 @@ export function ProjectTimeline({
   project,
   onOpenMilestonesConfig,
   onToggleManualMilestone,
+  onUpdateMilestoneProgress,
   compact = false,
   onSelectUnit,
   onUpdateProjectDates
@@ -47,6 +49,7 @@ export function ProjectTimeline({
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null);
   const [showUnitsBreakdown, setShowUnitsBreakdown] = useState(false);
   const [isEditingDatesModalOpen, setIsEditingDatesModalOpen] = useState(false);
+  const [timelineViewMode, setTimelineViewMode] = useState<'gantt' | 'nodes'>('gantt');
 
   // Form states for schedule dates editor
   const [editStartDate, setEditStartDate] = useState('');
@@ -171,6 +174,39 @@ export function ProjectTimeline({
   const completedCount = calculatedResults.filter(r => r.status === 'success_green').length;
 
   const activeResult = calculatedResults.find(r => r.milestone.id === selectedMilestoneId);
+
+  // Gantt timeline bounds (start and end timestamps)
+  const allTimestamps: number[] = [
+    startDate.getTime(),
+    endDate.getTime(),
+    today.getTime()
+  ];
+
+  milestones.forEach(m => {
+    if (m.startDate) allTimestamps.push(new Date(m.startDate).getTime());
+    const targetStr = m.targetDate || m.endDate;
+    if (targetStr) allTimestamps.push(new Date(targetStr).getTime());
+  });
+
+  const rawGanttStartMs = Math.min(...allTimestamps);
+  const rawGanttEndMs = Math.max(...allTimestamps);
+  // Pad with 3 days before and 5 days after
+  const ganttStartMs = rawGanttStartMs - (3 * 24 * 60 * 60 * 1000);
+  const ganttEndMs = rawGanttEndMs + (5 * 24 * 60 * 60 * 1000);
+  const ganttTotalDurationMs = Math.max(1, ganttEndMs - ganttStartMs);
+
+  const ganttTodayLeft = Math.max(0, Math.min(100, ((today.getTime() - ganttStartMs) / ganttTotalDurationMs) * 100));
+
+  // 5 scale markers for Gantt header
+  const ganttScaleMarkers = [0, 0.25, 0.5, 0.75, 1].map(fraction => {
+    const time = ganttStartMs + (fraction * ganttTotalDurationMs);
+    const d = new Date(time);
+    const dateFormatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    return {
+      leftPercent: fraction * 100,
+      label: dateFormatted
+    };
+  });
 
   // Find closest milestone to today for auto-scroll
   const todayTime = new Date(todayStr).getTime();
@@ -557,8 +593,8 @@ export function ProjectTimeline({
           </div>
         ) : (
           <div>
-            {/* Header with Alarm Counts */}
-            <div className="flex items-center justify-between gap-2 mb-2">
+            {/* Header with Alarm Counts & View Mode Switcher */}
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
@@ -587,131 +623,363 @@ export function ProjectTimeline({
                 )}
               </div>
 
-              {/* Mobile swipe hint */}
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 sm:hidden">
-                <MoveHorizontal className="w-3 h-3 text-amber-500 animate-pulse" />
-                <span>Deslizar</span>
+              {/* View Switcher & Actions */}
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setTimelineViewMode('gantt')}
+                    className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-all ${
+                      timelineViewMode === 'gantt'
+                        ? 'bg-amber-500 text-slate-950 shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Project Manager (Gantt)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineViewMode('nodes')}
+                    className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-all ${
+                      timelineViewMode === 'nodes'
+                        ? 'bg-amber-500 text-slate-950 shadow-2xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Nodos
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenMilestonesConfig(project.id)}
+                  className="px-2 py-1 bg-slate-100 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 hover:text-amber-700 font-bold text-xs rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1 transition-colors"
+                  title="Gestionar o agregar hitos"
+                >
+                  <Sliders className="w-3 h-3 text-amber-500" />
+                  <span className="hidden sm:inline">Gestionar Hitos</span>
+                </button>
               </div>
             </div>
 
-            {/* Horizontal Milestone Track with Touch Scroll */}
-            <div
-              ref={scrollContainerRef}
-              style={{
-                overflowX: 'auto',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none'
-              }}
-              className="no-scrollbar relative pt-6 pb-3 px-3 w-full rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/90 dark:border-slate-700/80 select-none transition-colors"
-            >
+            {/* ======================================================== */}
+            {/* VIEW MODE 1: PROJECT MANAGER GANTT TIMELINE             */}
+            {/* ======================================================== */}
+            {timelineViewMode === 'gantt' && (
               <div
-                style={{ minWidth: `${Math.max(560, calculatedResults.length * 135)}px` }}
-                className="relative flex items-start justify-between gap-4 px-6"
+                style={{
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}
+                className="no-scrollbar relative p-3 w-full rounded-2xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 select-none transition-colors"
               >
-                {/* Continuous line */}
-                <div className="absolute top-8 left-8 right-8 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full z-0" />
+                <div className="min-w-[760px] sm:min-w-[900px] relative space-y-3">
+                  {/* Top Time Scale Axis */}
+                  <div className="relative pb-2 border-b border-slate-200 dark:border-slate-700/80">
+                    <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 px-1">
+                      {ganttScaleMarkers.map((marker, i) => (
+                        <span key={i} className="flex flex-col items-center">
+                          <span className="h-1.5 w-0.5 bg-slate-300 dark:bg-slate-600 mb-0.5"></span>
+                          <span>{marker.label}</span>
+                        </span>
+                      ))}
+                    </div>
 
-                {calculatedResults.map((result, idx) => {
-                  const { milestone, status, isPulsing, consolidatedProgress, minRequired } = result;
-                  const isSelected = selectedMilestoneId === milestone.id;
-                  const isTodayMilestone = idx === closestIndex;
-
-                  let nodeStyles = 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300';
-                  let statusDot = 'bg-slate-400';
-
-                  if (status === 'alarm_red') {
-                    nodeStyles = 'bg-rose-600 border-rose-700 text-white shadow-md ring-4 ring-rose-300/80 dark:ring-rose-900/60';
-                    statusDot = 'bg-rose-500';
-                  } else if (status === 'warning_yellow') {
-                    nodeStyles = 'bg-amber-400 border-amber-500 text-slate-950 shadow-sm ring-2 ring-amber-200 dark:ring-amber-900/60';
-                    statusDot = 'bg-amber-500';
-                  } else if (status === 'success_green') {
-                    nodeStyles = 'bg-emerald-600 border-emerald-700 text-white shadow-xs ring-2 ring-emerald-200 dark:ring-emerald-900/60';
-                    statusDot = 'bg-emerald-500';
-                  } else {
-                    nodeStyles = 'bg-blue-600 border-blue-700 text-white shadow-xs ring-1 ring-blue-200 dark:ring-blue-900/60';
-                    statusDot = 'bg-blue-500';
-                  }
-
-                  return (
+                    {/* Vertical "HOY" Marker Line running down all rows */}
                     <div
-                      key={milestone.id}
-                      ref={isTodayMilestone ? todayMilestoneMarkerRef : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMilestoneId(isSelected ? null : milestone.id);
-                        setShowUnitsBreakdown(false);
-                      }}
-                      className="flex flex-col items-center cursor-pointer group w-28 flex-shrink-0 text-center transition-transform hover:scale-105 relative"
+                      style={{ left: `${ganttTodayLeft}%` }}
+                      className="absolute top-0 bottom-[-9999px] w-0.5 bg-amber-500 z-20 pointer-events-none"
                     >
-                      {/* Marker for today if closest */}
-                      {isTodayMilestone && (
-                        <div className="absolute -top-6 flex flex-col items-center z-20 pointer-events-none">
-                          <span className="bg-slate-950 text-amber-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-md border border-amber-500/70 flex items-center gap-1">
-                            <MapPin className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                            HOY
-                          </span>
-                          <div className="w-0.5 h-2 bg-amber-500"></div>
-                        </div>
-                      )}
+                      <div className="absolute -top-1 -translate-x-1/2 bg-slate-950 text-amber-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm border border-amber-500/80 flex items-center gap-0.5">
+                        <MapPin className="w-2 h-2 text-amber-400 fill-amber-400" />
+                        HOY
+                      </div>
+                    </div>
+                  </div>
 
-                      {/* Node circle */}
+                  {/* Milestone Rows */}
+                  <div className="space-y-2.5 pt-1">
+                    {calculatedResults.map((result) => {
+                      const { milestone, status, consolidatedProgress } = result;
+                      const isSelected = selectedMilestoneId === milestone.id;
+                      const isStartedOverdue = result.isStartedOverdue;
+                      const isOverdue = result.isOverdue;
+
+                      // Calculate bar left & width
+                      const mStartMs = milestone.startDate ? new Date(milestone.startDate).getTime() : ganttStartMs;
+                      const targetDateStr = milestone.targetDate || milestone.endDate;
+                      const mEndMs = targetDateStr ? new Date(targetDateStr).getTime() : (mStartMs + (30 * 24 * 60 * 60 * 1000));
+
+                      const barLeftPercent = Math.max(0, Math.min(95, ((mStartMs - ganttStartMs) / ganttTotalDurationMs) * 100));
+                      const barWidthPercent = Math.max(5, Math.min(100 - barLeftPercent, ((mEndMs - mStartMs) / ganttTotalDurationMs) * 100));
+
+                      return (
+                        <div
+                          key={milestone.id}
+                          onClick={() => {
+                            setSelectedMilestoneId(isSelected ? null : milestone.id);
+                            setShowUnitsBreakdown(false);
+                          }}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-400 dark:border-amber-600 ring-2 ring-amber-400/40 shadow-sm'
+                              : status === 'alarm_red'
+                              ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60 hover:border-rose-400'
+                              : 'bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                          }`}
+                        >
+                          {/* Row Header Information */}
+                          <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                              {/* Sector Badge */}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                                <Building2 className="w-2.5 h-2.5 text-amber-500" />
+                                {milestone.buildingPart || 'Estructura Global'}
+                              </span>
+
+                              {/* Trade Badge */}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 flex items-center gap-1">
+                                <Wrench className="w-2.5 h-2.5 text-amber-600" />
+                                {milestone.tradeCategory || milestone.linkedTradeId || 'General'}
+                              </span>
+
+                              {/* Title */}
+                              <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                                {milestone.name}
+                              </span>
+
+                              {/* Date span */}
+                              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                                ({result.startDateFormatted} ➔ {result.targetDateFormatted})
+                              </span>
+                            </div>
+
+                            {/* Direct Quick Percentage Adjuster */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1"
+                            >
+                              {onUpdateMilestoneProgress && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateMilestoneProgress(project.id, milestone.id, Math.max(0, consolidatedProgress - 10))}
+                                  className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-black text-xs flex items-center justify-center transition-colors"
+                                  title="Disminuir 10%"
+                                >
+                                  -
+                                </button>
+                              )}
+                              <span className={`text-[11px] font-mono font-black px-2 py-0.5 rounded-md border ${
+                                status === 'alarm_red'
+                                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-800 animate-pulse'
+                                  : status === 'success_green'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                              }`}>
+                                {consolidatedProgress}%
+                              </span>
+                              {onUpdateMilestoneProgress && (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateMilestoneProgress(project.id, milestone.id, Math.min(100, consolidatedProgress + 10))}
+                                  className="w-5 h-5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center transition-colors"
+                                  title="Aumentar 10%"
+                                >
+                                  +
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Horizontal Gantt Bar Track */}
+                          <div className="relative w-full h-7 bg-slate-100 dark:bg-slate-800/80 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/60">
+                            {/* Gantt Bar positioned according to timeline span */}
+                            <div
+                              style={{
+                                left: `${barLeftPercent}%`,
+                                width: `${barWidthPercent}%`
+                              }}
+                              className={`absolute top-0.5 bottom-0.5 rounded-lg overflow-hidden flex items-center px-2 transition-all ${
+                                status === 'alarm_red'
+                                  ? 'bg-rose-950/80 border-2 border-rose-500 text-rose-100 shadow-sm shadow-rose-950 animate-pulse'
+                                  : status === 'warning_yellow'
+                                  ? 'bg-amber-950/80 border-2 border-amber-400 text-amber-100'
+                                  : status === 'success_green'
+                                  ? 'bg-emerald-950/80 border-2 border-emerald-500 text-emerald-100'
+                                  : 'bg-blue-950/80 border border-blue-500 text-blue-100'
+                              }`}
+                            >
+                              {/* Internal Progress Fill */}
+                              <div
+                                style={{ width: `${consolidatedProgress}%` }}
+                                className={`absolute top-0 bottom-0 left-0 transition-all duration-300 opacity-80 ${
+                                  status === 'alarm_red'
+                                    ? 'bg-rose-600'
+                                    : status === 'warning_yellow'
+                                    ? 'bg-amber-500'
+                                    : status === 'success_green'
+                                    ? 'bg-emerald-600'
+                                    : 'bg-blue-600'
+                                }`}
+                              />
+
+                              {/* Label inside the Gantt Bar */}
+                              <div className="relative z-10 flex items-center gap-1.5 text-[10px] font-black truncate drop-shadow-sm">
+                                {isStartedOverdue ? (
+                                  <>
+                                    <Flame className="w-3 h-3 text-white shrink-0 animate-bounce" />
+                                    <span>🚨 NO EMPEZÓ A TIEMPO (0%)</span>
+                                  </>
+                                ) : isOverdue ? (
+                                  <>
+                                    <Flame className="w-3 h-3 text-white shrink-0" />
+                                    <span>🚨 VENCIDO SIN TERMINAR ({consolidatedProgress}%)</span>
+                                  </>
+                                ) : consolidatedProgress >= 100 ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-white shrink-0" />
+                                    <span>✅ CUMPLIDO (100%)</span>
+                                  </>
+                                ) : consolidatedProgress > 0 ? (
+                                  <span>EN CURSO ({consolidatedProgress}%)</span>
+                                ) : (
+                                  <span>PROGRAMADO (0%)</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* VIEW MODE 2: CLASSIC NODE TIMELINE TRACK                 */}
+            {/* ======================================================== */}
+            {timelineViewMode === 'nodes' && (
+              <div
+                ref={scrollContainerRef}
+                style={{
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}
+                className="no-scrollbar relative pt-6 pb-3 px-3 w-full rounded-xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/90 dark:border-slate-700/80 select-none transition-colors"
+              >
+                <div
+                  style={{ minWidth: `${Math.max(560, calculatedResults.length * 135)}px` }}
+                  className="relative flex items-start justify-between gap-4 px-6"
+                >
+                  {/* Continuous line */}
+                  <div className="absolute top-8 left-8 right-8 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full z-0" />
+
+                  {calculatedResults.map((result, idx) => {
+                    const { milestone, status, isPulsing, consolidatedProgress, minRequired } = result;
+                    const isSelected = selectedMilestoneId === milestone.id;
+                    const isTodayMilestone = idx === closestIndex;
+
+                    let nodeStyles = 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300';
+                    let statusDot = 'bg-slate-400';
+
+                    if (status === 'alarm_red') {
+                      nodeStyles = 'bg-rose-600 border-rose-700 text-white shadow-md ring-4 ring-rose-300/80 dark:ring-rose-900/60';
+                      statusDot = 'bg-rose-500';
+                    } else if (status === 'warning_yellow') {
+                      nodeStyles = 'bg-amber-400 border-amber-500 text-slate-950 shadow-sm ring-2 ring-amber-200 dark:ring-amber-900/60';
+                      statusDot = 'bg-amber-500';
+                    } else if (status === 'success_green') {
+                      nodeStyles = 'bg-emerald-600 border-emerald-700 text-white shadow-xs ring-2 ring-emerald-200 dark:ring-emerald-900/60';
+                      statusDot = 'bg-emerald-500';
+                    } else {
+                      nodeStyles = 'bg-blue-600 border-blue-700 text-white shadow-xs ring-1 ring-blue-200 dark:ring-blue-900/60';
+                      statusDot = 'bg-blue-500';
+                    }
+
+                    return (
                       <div
-                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-mono font-black text-xs transition-all relative ${nodeStyles} ${
-                          isPulsing ? 'animate-pulse' : ''
-                        } ${isSelected ? 'scale-115 ring-4 ring-slate-900 dark:ring-amber-400' : ''}`}
-                        title={`${milestone.name} - ${result.statusLabel}`}
+                        key={milestone.id}
+                        ref={isTodayMilestone ? todayMilestoneMarkerRef : undefined}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMilestoneId(isSelected ? null : milestone.id);
+                          setShowUnitsBreakdown(false);
+                        }}
+                        className="flex flex-col items-center cursor-pointer group w-28 flex-shrink-0 text-center transition-transform hover:scale-105 relative"
                       >
-                        {status === 'success_green' ? (
-                          <Check className="w-4 h-4 stroke-[3]" />
-                        ) : status === 'alarm_red' ? (
-                          <Flame className="w-4 h-4 text-white" />
-                        ) : status === 'warning_yellow' ? (
-                          <AlertTriangle className="w-3.5 h-3.5 text-slate-950" />
-                        ) : (
-                          <span className="text-[11px]">{idx + 1}</span>
+                        {/* Marker for today if closest */}
+                        {isTodayMilestone && (
+                          <div className="absolute -top-6 flex flex-col items-center z-20 pointer-events-none">
+                            <span className="bg-slate-950 text-amber-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-md border border-amber-500/70 flex items-center gap-1">
+                              <MapPin className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                              HOY
+                            </span>
+                            <div className="w-0.5 h-2 bg-amber-500"></div>
+                          </div>
                         )}
 
-                        <span
-                          className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-white dark:border-slate-900 ${statusDot} ${
-                            isPulsing ? 'animate-ping' : ''
-                          }`}
-                        />
-                      </div>
+                        {/* Node circle */}
+                        <div
+                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-mono font-black text-xs transition-all relative ${nodeStyles} ${
+                            isPulsing ? 'animate-pulse' : ''
+                          } ${isSelected ? 'scale-115 ring-4 ring-slate-900 dark:ring-amber-400' : ''}`}
+                          title={`${milestone.name} - ${result.statusLabel}`}
+                        >
+                          {status === 'success_green' ? (
+                            <Check className="w-4 h-4 stroke-[3]" />
+                          ) : status === 'alarm_red' ? (
+                            <Flame className="w-4 h-4 text-white" />
+                          ) : status === 'warning_yellow' ? (
+                            <AlertTriangle className="w-3.5 h-3.5 text-slate-950" />
+                          ) : (
+                            <span className="text-[11px]">{idx + 1}</span>
+                          )}
 
-                      {/* Label & Progress */}
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full">
-                        {result.targetDateFormatted}
-                      </span>
-                      <span
-                        className={`text-[11px] font-black leading-tight line-clamp-1 group-hover:text-amber-500 transition-colors ${
-                          status === 'alarm_red'
-                            ? 'text-rose-700 dark:text-rose-400 font-black'
-                            : status === 'success_green'
-                            ? 'text-emerald-700 dark:text-emerald-400 font-bold'
-                            : 'text-slate-800 dark:text-slate-200'
-                        }`}
-                        title={milestone.name}
-                      >
-                        {milestone.name}
-                      </span>
-                      <span
-                        className={`text-[10px] font-mono font-bold mt-0.5 px-1.5 py-0.2 rounded transition-colors ${
-                          consolidatedProgress >= minRequired
-                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800'
-                            : status === 'alarm_red'
-                            ? 'text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800'
-                            : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        {consolidatedProgress}% / {minRequired}%
-                      </span>
-                    </div>
-                  );
-                })}
+                          <span
+                            className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-white dark:border-slate-900 ${statusDot} ${
+                              isPulsing ? 'animate-ping' : ''
+                            }`}
+                          />
+                        </div>
+
+                        {/* Label & Progress */}
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-1.5 truncate max-w-full">
+                          {result.targetDateFormatted}
+                        </span>
+                        <span
+                          className={`text-[11px] font-black leading-tight line-clamp-1 group-hover:text-amber-500 transition-colors ${
+                            status === 'alarm_red'
+                              ? 'text-rose-700 dark:text-rose-400 font-black'
+                              : status === 'success_green'
+                              ? 'text-emerald-700 dark:text-emerald-400 font-bold'
+                              : 'text-slate-800 dark:text-slate-200'
+                          }`}
+                          title={milestone.name}
+                        >
+                          {milestone.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono font-bold mt-0.5 px-1.5 py-0.2 rounded transition-colors ${
+                            consolidatedProgress >= minRequired
+                              ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800'
+                              : status === 'alarm_red'
+                              ? 'text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800'
+                              : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {consolidatedProgress}% / {minRequired}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -733,7 +1001,7 @@ export function ProjectTimeline({
           </button>
 
           <div className="flex items-start justify-between pr-6 gap-2">
-            <div>
+            <div className="space-y-1">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md flex items-center gap-1 ${
@@ -752,9 +1020,24 @@ export function ProjectTimeline({
                   {activeResult.statusLabel}
                 </span>
 
+                {/* Building Part & Trade badges */}
+                {activeResult.milestone.buildingPart && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-1">
+                    <Building2 className="w-2.5 h-2.5 text-amber-400" />
+                    {activeResult.milestone.buildingPart}
+                  </span>
+                )}
+
+                {(activeResult.milestone.tradeCategory || activeResult.milestone.linkedTradeId) && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-950/60 text-amber-300 border border-amber-800/60 flex items-center gap-1">
+                    <Wrench className="w-2.5 h-2.5 text-amber-400" />
+                    {activeResult.milestone.tradeCategory || activeResult.milestone.linkedTradeId}
+                  </span>
+                )}
+
                 <span className="text-[11px] text-slate-300 flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-amber-400" />
-                  Fecha límite: <strong className="text-white">{activeResult.targetDateFormatted}</strong>
+                  Límite: <strong className="text-white">{activeResult.targetDateFormatted}</strong>
                 </span>
 
                 {activeResult.isOverdue ? (
@@ -772,27 +1055,103 @@ export function ProjectTimeline({
                 )}
               </div>
 
-              <h5 className="text-sm font-black text-white mt-1.5">
+              <h5 className="text-sm font-black text-white mt-1">
                 {activeResult.milestone.name}
               </h5>
 
-              <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-1">
-                <Layers className="w-3 h-3 text-amber-400" />
-                Vinculado a:{' '}
-                <span className="text-amber-300 font-bold">
-                  {activeResult.milestone.linkedItemName
-                    ? `Ítem "${activeResult.milestone.linkedItemName}"`
-                    : `Gremio completo (${activeResult.milestone.linkedTradeId})`}
-                </span>
-              </p>
+              {/* Start Date */}
+              {activeResult.milestone.startDate && (
+                <p className="text-xs text-slate-300 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-blue-400" />
+                  Fecha de inicio prevista: <strong className="text-white">{activeResult.startDateFormatted}</strong>
+                </p>
+              )}
             </div>
           </div>
 
+          {/* Alarm Warning Alert Banners */}
+          {activeResult.isStartedOverdue && (
+            <div className="mt-2.5 p-2 bg-rose-950/80 border border-rose-500 rounded-lg text-xs text-rose-200 flex items-start gap-2">
+              <Flame className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <strong className="text-rose-100 block font-black">ALARMA: NO EMPEZÓ A TIEMPO</strong>
+                <span>
+                  Debía haber comenzado el {activeResult.startDateFormatted} y aún registra 0% de avance.
+                  Ajusta el porcentaje abajo para indicar que ya se inició y apagar la alarma.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {activeResult.isOverdue && !activeResult.isStartedOverdue && (
+            <div className="mt-2.5 p-2 bg-rose-950/80 border border-rose-500 rounded-lg text-xs text-rose-200 flex items-start gap-2">
+              <Flame className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-pulse" />
+              <div>
+                <strong className="text-rose-100 block font-black">ALARMA: VENCIDO SIN FINALIZAR</strong>
+                <span>
+                  La fecha límite ({activeResult.targetDateFormatted}) se cumplió y el hito aún no alcanza el 100% de culminación.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Direct Percentage Adjuster inside the Popover */}
+          {onUpdateMilestoneProgress && (
+            <div className="mt-3 bg-slate-800/90 p-2.5 rounded-lg border border-slate-700 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200">
+                  Ajustar Porcentaje de Avance Directo:
+                </span>
+                <span className="font-mono font-black text-amber-400 text-sm">
+                  {activeResult.consolidatedProgress}%
+                </span>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex items-center justify-between gap-1 flex-wrap">
+                {[0, 25, 50, 75, 100].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => onUpdateMilestoneProgress(project.id, activeResult.milestone.id, val)}
+                    className={`px-2 py-1 rounded text-xs font-black transition-colors ${
+                      activeResult.consolidatedProgress === val
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                    }`}
+                  >
+                    {val === 0 ? '0%' : val === 100 ? '100% OK' : `${val}%`}
+                  </button>
+                ))}
+
+                {/* Step adjusters */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateMilestoneProgress(project.id, activeResult.milestone.id, Math.max(0, activeResult.consolidatedProgress - 10))}
+                    className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-black"
+                    title="-10%"
+                  >
+                    -10%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateMilestoneProgress(project.id, activeResult.milestone.id, Math.min(100, activeResult.consolidatedProgress + 10))}
+                    className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black"
+                    title="+10%"
+                  >
+                    +10%
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Progress comparison */}
-          <div className="mt-3 bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 space-y-1.5">
+          <div className="mt-2.5 bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 space-y-1.5">
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="text-slate-300">
-                Avance Consolidado del Complejo:
+                Progreso Físico Consolidado:
               </span>
               <span className="text-amber-400 font-mono font-black text-sm">
                 {activeResult.consolidatedProgress}%{' '}
@@ -802,12 +1161,7 @@ export function ProjectTimeline({
               </span>
             </div>
 
-            <div className="w-full bg-slate-700 h-2.5 rounded-full overflow-hidden relative">
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-white z-20"
-                style={{ left: `${activeResult.minRequired}%` }}
-                title={`Meta: ${activeResult.minRequired}%`}
-              />
+            <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden relative">
               <div
                 className={`h-full transition-all duration-300 ${
                   activeResult.status === 'alarm_red'
@@ -819,28 +1173,29 @@ export function ProjectTimeline({
                 style={{ width: `${activeResult.consolidatedProgress}%` }}
               />
             </div>
-
-            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-              <span>
-                Completadas: <strong className="text-emerald-400">{activeResult.completedUnits}</strong> de {activeResult.totalUnits} unidades
-              </span>
-              <span>
-                En curso: <strong className="text-amber-300">{activeResult.inProgressUnits}</strong> • Pendientes:{' '}
-                <strong className="text-rose-400">{activeResult.pendingUnits}</strong>
-              </span>
-            </div>
           </div>
 
           {/* Action buttons inside card */}
           <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-700/80">
-            <button
-              type="button"
-              onClick={() => setShowUnitsBreakdown(prev => !prev)}
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              {showUnitsBreakdown ? 'Ocultar desglose por unidad' : 'Ver detalle de unidades'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowUnitsBreakdown(prev => !prev)}
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                {showUnitsBreakdown ? 'Ocultar unidades' : 'Ver detalle por unidad'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenMilestonesConfig(project.id)}
+                className="text-xs font-bold text-slate-300 hover:text-white underline flex items-center gap-1 ml-2"
+              >
+                <Pencil className="w-3 h-3 text-amber-400" />
+                Editar Hito Completo
+              </button>
+            </div>
 
             {onToggleManualMilestone && (
               <button
@@ -858,7 +1213,7 @@ export function ProjectTimeline({
                   </>
                 ) : (
                   <>
-                    <Check className="w-3.5 h-3.5" /> Forzar cumplimiento manual
+                    <Check className="w-3.5 h-3.5" /> Forzar 100% OK
                   </>
                 )}
               </button>

@@ -46,6 +46,7 @@ interface UnitsViewProps {
   onExportExcel?: (projectId: string, unitId?: string) => void;
   onOpenMilestonesConfig: (projectId: string) => void;
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
+  onUpdateMilestoneProgress?: (projectId: string, milestoneId: string, percentage: number) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
   onOpenUnitBlueprints?: (unit: Unit) => void;
@@ -67,6 +68,7 @@ export function UnitsView({
   onExportExcel,
   onOpenMilestonesConfig,
   onToggleManualMilestone,
+  onUpdateMilestoneProgress,
   onUpdateProjectDates,
   onEditProject,
   onOpenUnitBlueprints,
@@ -386,6 +388,7 @@ export function UnitsView({
             compact={false}
             onOpenMilestonesConfig={onOpenMilestonesConfig}
             onToggleManualMilestone={onToggleManualMilestone}
+            onUpdateMilestoneProgress={onUpdateMilestoneProgress}
             onUpdateProjectDates={onUpdateProjectDates}
           />
         </div>

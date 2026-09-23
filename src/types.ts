@@ -73,11 +73,16 @@ export interface Unit {
 export interface Milestone {
   id: string;
   name: string;
-  targetDate: string; // YYYY-MM-DD
-  linkType: 'item' | 'trade';
-  linkedTradeId: string;
+  startDate?: string; // YYYY-MM-DD
+  targetDate: string; // YYYY-MM-DD (fecha límite o fin estimada)
+  endDate?: string; // alias para compatibilidad
+  buildingPart?: string; // e.g. 'Subsuelo', 'Planta Baja', 'Piso 1', 'Fachada', 'Estructura Global', etc.
+  tradeCategory?: string; // e.g. 'Albañilería', 'Estructura', o nuevo rubro personalizado
+  progressPercentage?: number; // 0 a 100: avance físico directo
+  linkType?: 'item' | 'trade' | 'direct';
+  linkedTradeId?: string;
   linkedItemName?: string; // specific item title, or blank for all trade
-  minPercentageRequired: number; // default 100
+  minPercentageRequired?: number; // default 100
   manualCompleted?: boolean;
   notes?: string;
 }
