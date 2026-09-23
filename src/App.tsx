@@ -946,6 +946,52 @@ export default function App() {
     });
   };
 
+  // Edit / rename checklist item and persist immediately to Supabase Cloud
+  const handleEditItem = (tradeId: string, itemId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || !selectedProjectId || !selectedUnitId) return;
+
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== selectedUnitId) return u;
+            return {
+              ...u,
+              trades: u.trades.map(t => {
+                const isMatch = t.id === tradeId || (t.name && t.name.toLowerCase().trim() === tradeId?.toLowerCase().trim()) || (t.items && t.items.some(i => i.id === itemId));
+                if (!isMatch) return t;
+                return {
+                  ...t,
+                  items: t.items.map(item => {
+                    if (item.id !== itemId) return item;
+                    return {
+                      ...item,
+                      name: trimmed
+                    };
+                  })
+                };
+              })
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast(`Ítem modificado: "${trimmed}"`, 'Check');
+    });
+  };
+
   // Add custom checklist item to trade (smart selector: current unit or replicated across selected active projects)
   const handleAddItem = (
     tradeId: string,
@@ -1799,6 +1845,7 @@ export default function App() {
               onToggleItem={handleToggleItem}
               onUpdateItemProgress={handleUpdateItemProgress}
               onDeleteItem={handleDeleteItem}
+              onEditItem={handleEditItem}
               onAddItem={handleAddItem}
               onSaveComment={handleSaveItemComment}
               onSaveObservation={handleSaveObservation}

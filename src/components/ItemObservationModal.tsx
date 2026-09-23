@@ -13,7 +13,8 @@ import {
   Check,
   ShieldAlert,
   Info,
-  Download
+  Download,
+  Pencil
 } from 'lucide-react';
 import { InspectionItem } from '../types';
 import { compressImageFile } from '../utils/calculations';
@@ -33,6 +34,7 @@ interface ItemObservationModalProps {
   ) => void;
   onAddPhoto: (tradeId: string, itemId: string, dataUrl: string) => void;
   onDeletePhoto: (tradeId: string, itemId: string, photoId: string) => void;
+  onEditItem?: (tradeId: string, itemId: string, newName: string) => void;
 }
 
 export function ItemObservationModal({
@@ -43,12 +45,16 @@ export function ItemObservationModal({
   onClose,
   onSaveObservation,
   onAddPhoto,
-  onDeletePhoto
+  onDeletePhoto,
+  onEditItem
 }: ItemObservationModalProps) {
   const [commentDraft, setCommentDraft] = useState('');
   const [severityDraft, setSeverityDraft] = useState<'low' | 'medium' | 'high' | undefined>(undefined);
   const [isCompressing, setIsCompressing] = useState(false);
   const [activePhotoPreview, setActivePhotoPreview] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [currentName, setCurrentName] = useState(item?.name || '');
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +65,7 @@ export function ItemObservationModal({
     if (item) {
       setCommentDraft(item.comment || '');
       setSeverityDraft(item.severity);
+      setCurrentName(item.name);
     }
   }, [item]);
 
@@ -149,9 +156,68 @@ export function ItemObservationModal({
                 </span>
               )}
             </div>
-            <h3 className="font-bold text-white text-sm truncate mt-1">
-              {item.name}
-            </h3>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const trimmed = titleDraft.trim();
+                      if (trimmed && onEditItem) {
+                        onEditItem(tradeId, item.id, trimmed);
+                        setCurrentName(trimmed);
+                      }
+                      setIsEditingTitle(false);
+                    }
+                    if (e.key === 'Escape') setIsEditingTitle(false);
+                  }}
+                  className="flex-1 bg-slate-950 border-2 border-[#00f2fe] rounded-lg px-2 py-0.5 text-xs text-white font-bold focus:outline-none shadow-sm"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trimmed = titleDraft.trim();
+                    if (trimmed && onEditItem) {
+                      onEditItem(tradeId, item.id, trimmed);
+                      setCurrentName(trimmed);
+                    }
+                    setIsEditingTitle(false);
+                  }}
+                  className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-xs"
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTitle(false)}
+                  className="p-1 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-1">
+                <h3 className="font-bold text-white text-sm truncate">
+                  {currentName}
+                </h3>
+                {onEditItem && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitleDraft(currentName);
+                      setIsEditingTitle(true);
+                    }}
+                    className="p-1 rounded-md text-slate-400 hover:text-[#00f2fe] hover:bg-slate-800 transition-colors"
+                    title="Editar nombre de la tarea"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <button

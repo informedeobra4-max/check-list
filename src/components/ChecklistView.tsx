@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   FileText,
   Check,
+  X,
   Camera,
   Trash2,
   Plus,
@@ -61,6 +62,7 @@ interface ChecklistViewProps {
   onToggleItem: (tradeId: string, itemId: string) => void;
   onUpdateItemProgress: (tradeId: string, itemId: string, percentage: number) => void;
   onDeleteItem: (tradeId: string, itemId: string) => void;
+  onEditItem?: (tradeId: string, itemId: string, newName: string) => void;
   onAddItem: (tradeId: string, itemName: string, scopeTarget?: 'current_unit' | 'all_units') => void;
   onSaveComment: (tradeId: string, itemId: string, comment: string) => void;
   onSaveObservation?: (
@@ -92,6 +94,7 @@ export function ChecklistView({
   onToggleItem,
   onUpdateItemProgress,
   onDeleteItem,
+  onEditItem,
   onAddItem,
   onSaveComment,
   onOpenPhotoViewer,
@@ -133,6 +136,22 @@ export function ChecklistView({
     tradeName: string;
     itemName: string;
   } | null>(null);
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemNameDraft, setEditingItemNameDraft] = useState<string>('');
+
+  const handleStartEditItem = (item: InspectionItem) => {
+    setEditingItemId(item.id);
+    setEditingItemNameDraft(item.name);
+  };
+
+  const handleSaveEditItem = (tradeId: string, itemId: string) => {
+    const trimmed = editingItemNameDraft.trim();
+    if (trimmed && onEditItem) {
+      onEditItem(tradeId, itemId, trimmed);
+    }
+    setEditingItemId(null);
+  };
 
   const unitTradesList = useMemo(() => {
     const map = new Map<string, Trade>();
@@ -809,54 +828,93 @@ export function ChecklistView({
                           >
                             {/* [Izquierda - Contenido principal] */}
                             <div className="flex-1 min-w-0 pr-1 text-left">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  style={{ whiteSpace: 'normal', wordBreak: 'normal' }}
-                                  className={`text-xs sm:text-sm font-bold leading-snug text-left ${
-                                    isComplete
-                                      ? 'text-emerald-300'
-                                      : isPartial
-                                      ? 'text-white'
-                                      : 'text-slate-200'
-                                  }`}
+                              {editingItemId === item.id ? (
+                                <div
+                                  className="flex items-center gap-1.5 w-full my-1 py-0.5"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  {item.name}
-                                </span>
-
-                                {/* Severity Badges */}
-                                {item.severity === 'high' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-rose-950/60 text-rose-300 border border-rose-800 animate-pulse">
-                                    <Flame className="w-2.5 h-2.5 text-rose-400" />
-                                    Crítico
-                                  </span>
-                                )}
-                                {item.severity === 'medium' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-950/60 text-amber-300 border border-amber-800">
-                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
-                                    Medio
-                                  </span>
-                                )}
-                                {item.severity === 'low' && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950/60 text-emerald-300 border border-emerald-800">
-                                    Leve
-                                  </span>
-                                )}
-
-                                {/* Insignia verde si tiene nota/comentario */}
-                                {hasComment && (
-                                  <span
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
+                                  <input
+                                    type="text"
+                                    value={editingItemNameDraft}
+                                    onChange={(e) => setEditingItemNameDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveEditItem(trade.id, item.id);
+                                      if (e.key === 'Escape') setEditingItemId(null);
                                     }}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/80 cursor-pointer hover:bg-emerald-900/80 transition-colors shadow-2xs"
-                                    title={`Nota guardada: "${item.comment}"`}
+                                    className="flex-1 min-w-0 bg-[#0e1422] border-2 border-[#00f2fe] rounded-lg px-2.5 py-1 text-xs sm:text-sm text-white font-bold focus:outline-none shadow-[0_0_10px_rgba(0,242,254,0.25)]"
+                                    placeholder="Nombre de la tarea..."
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveEditItem(trade.id, item.id)}
+                                    className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg text-xs flex items-center gap-1 transition-all active:scale-95 shadow-sm shrink-0"
+                                    title="Guardar nombre"
                                   >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
-                                    <span>Nota</span>
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    <span className="hidden xs:inline">Guardar</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingItemId(null)}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all shrink-0"
+                                    title="Cancelar"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span
+                                    onDoubleClick={() => !unit.isLocked && onEditItem && handleStartEditItem(item)}
+                                    style={{ whiteSpace: 'normal', wordBreak: 'normal' }}
+                                    className={`text-xs sm:text-sm font-bold leading-snug text-left ${
+                                      isComplete
+                                        ? 'text-emerald-300'
+                                        : isPartial
+                                        ? 'text-white'
+                                        : 'text-slate-200'
+                                    }`}
+                                    title={!unit.isLocked && onEditItem ? "Tocar lápiz o doble clic para editar" : undefined}
+                                  >
+                                    {item.name}
                                   </span>
-                                )}
-                              </div>
+
+                                  {/* Severity Badges */}
+                                  {item.severity === 'high' && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-rose-950/60 text-rose-300 border border-rose-800 animate-pulse">
+                                      <Flame className="w-2.5 h-2.5 text-rose-400" />
+                                      Crítico
+                                    </span>
+                                  )}
+                                  {item.severity === 'medium' && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-950/60 text-amber-300 border border-amber-800">
+                                      <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
+                                      Medio
+                                    </span>
+                                  )}
+                                  {item.severity === 'low' && (
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-950/60 text-emerald-300 border border-emerald-800">
+                                      Leve
+                                    </span>
+                                  )}
+
+                                  {/* Insignia verde si tiene nota/comentario */}
+                                  {hasComment && (
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
+                                      }}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/80 cursor-pointer hover:bg-emerald-900/80 transition-colors shadow-2xs"
+                                      title={`Nota guardada: "${item.comment}"`}
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                                      <span>Nota</span>
+                                    </span>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Si tiene notas u observaciones */}
                               {hasComment && (
@@ -1035,6 +1093,21 @@ export function ChecklistView({
                                   <span className="text-[11px] font-mono font-black">{photoCount}</span>
                                 )}
                               </button>
+
+                              {/* Botón para editar nombre de la tarea / ítem */}
+                              {!unit.isLocked && onEditItem && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartEditItem(item);
+                                  }}
+                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-[#00f2fe] hover:bg-[#00f2fe]/10 flex items-center justify-center flex-shrink-0 active:scale-90 transition-colors"
+                                  title="Editar nombre de la tarea"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
 
                               {/* Tacho de basura para eliminar el ítem */}
                               {!unit.isLocked && (
@@ -1254,6 +1327,7 @@ export function ChecklistView({
               onDeletePhoto(tradeId, itemId, photoId);
             }
           }}
+          onEditItem={onEditItem}
         />
       )}
       {/* Floating Blueprint Quick-Access Action Button */}
