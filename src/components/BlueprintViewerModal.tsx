@@ -16,6 +16,7 @@ import {
   Plus
 } from 'lucide-react';
 import { BlueprintDocument } from '../types';
+import { uploadFileToDrive } from '../lib/driveUpload';
 
 interface BlueprintViewerModalProps {
   isOpen: boolean;
@@ -69,18 +70,36 @@ export function BlueprintViewerModal({
     if (!file) return;
 
     setIsUploading(true);
-    const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const isImg = file.type.startsWith('image/');
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setNewDocUrl(dataUrl);
+    reader.onload = async (event) => {
+      const rawDataUrl = event.target?.result as string;
+      if (rawDataUrl) {
         if (!newDocName.trim()) {
           setNewDocName(file.name.replace(/\.[^/.]+$/, ''));
         }
         setNewDocType(isPdf ? 'pdf' : isImg ? 'image' : 'link');
+
+        // Intentar subir a Google Drive directamente para guardar solo el enlace en Supabase
+        try {
+          const uploadRes = await uploadFileToDrive({
+            base64: rawDataUrl,
+            filename: file.name,
+            mimeType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg')
+          });
+
+          if (uploadRes.success && uploadRes.url) {
+            setNewDocUrl(uploadRes.url);
+          } else {
+            console.warn('Aviso Google Drive en planos:', uploadRes.error);
+            setNewDocUrl(rawDataUrl);
+          }
+        } catch (err) {
+          console.warn('Error al subir plano a Drive:', err);
+          setNewDocUrl(rawDataUrl);
+        }
       }
       setIsUploading(false);
     };

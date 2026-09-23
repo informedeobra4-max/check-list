@@ -26,6 +26,7 @@ import { CloudSetupModal } from './components/CloudSetupModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { BlueprintDocument } from './types';
 import { SplashScreen } from './components/SplashScreen';
+import { uploadFileToDrive, isDriveUrl } from './lib/driveUpload';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V4';
@@ -1183,6 +1184,27 @@ export default function App() {
   const handleAddPhoto = async (tradeId: string, itemId: string, dataUrl: string) => {
     if (!selectedProjectId || !selectedUnitId) return;
 
+    let finalDataUrl = dataUrl;
+
+    // Si es un payload base64 local, subir a Google Drive para guardar solo la URL ligera
+    if (dataUrl && dataUrl.startsWith('data:') && !isDriveUrl(dataUrl)) {
+      showToast('Subiendo foto a Google Drive...', 'Camera');
+      try {
+        const uploadRes = await uploadFileToDrive({
+          base64: dataUrl,
+          filename: `inspeccion_${tradeId}_${itemId}_${Date.now()}.jpg`,
+          mimeType: 'image/jpeg'
+        });
+        if (uploadRes.success && uploadRes.url) {
+          finalDataUrl = uploadRes.url;
+        } else if (uploadRes.error) {
+          console.warn('Google Drive aviso:', uploadRes.error);
+        }
+      } catch (err) {
+        console.warn('Error al subir a Google Drive:', err);
+      }
+    }
+
     const now = new Date();
     const dateString = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -1190,7 +1212,7 @@ export default function App() {
 
     const newPhoto = {
       id: `ph_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      dataUrl,
+      dataUrl: finalDataUrl,
       timestamp
     };
 
@@ -1232,7 +1254,8 @@ export default function App() {
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
       if (res.success) {
-        showToast('Foto guardada en la Nube Supabase', 'Check');
+        const isDrive = isDriveUrl(finalDataUrl);
+        showToast(isDrive ? 'Foto guardada en Google Drive y Supabase' : 'Foto guardada en la Nube Supabase', 'Check');
       } else {
         showToast('Foto guardada localmente (sincronizando...)', 'AlertCircle');
       }
@@ -1347,7 +1370,28 @@ export default function App() {
   };
 
   // Save Croquis sketch to unit and sync to Supabase Cloud
-  const handleSaveSketch = (projectId: string, unitId: string, sketch: SketchDocument) => {
+  const handleSaveSketch = async (projectId: string, unitId: string, sketch: SketchDocument) => {
+    let finalSketch = { ...sketch };
+
+    // Si el croquis es una imagen base64, subir a Google Drive
+    if (sketch.dataUrl && sketch.dataUrl.startsWith('data:') && !isDriveUrl(sketch.dataUrl)) {
+      showToast('Guardando croquis en Google Drive...', 'PenTool');
+      try {
+        const uploadRes = await uploadFileToDrive({
+          base64: sketch.dataUrl,
+          filename: `croquis_${(sketch.projectName || 'obra').replace(/\s+/g, '_')}_${(sketch.unitName || 'unidad').replace(/\s+/g, '_')}_${Date.now()}.png`,
+          mimeType: 'image/png'
+        });
+        if (uploadRes.success && uploadRes.url) {
+          finalSketch.dataUrl = uploadRes.url;
+        } else if (uploadRes.error) {
+          console.warn('Google Drive croquis aviso:', uploadRes.error);
+        }
+      } catch (err) {
+        console.warn('Error subiendo croquis a Drive:', err);
+      }
+    }
+
     let updatedProjectsList: Project[] = [];
     setProjects(prev => {
       const updated = prev.map(proj => {
@@ -1358,7 +1402,7 @@ export default function App() {
             if (u.id !== unitId) return u;
             return {
               ...u,
-              sketches: [sketch, ...(u.sketches || [])]
+              sketches: [finalSketch, ...(u.sketches || [])]
             };
           })
         };
@@ -1370,7 +1414,13 @@ export default function App() {
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
-      showToast(`Croquis guardado en ${sketch.unitName || 'la unidad'} (${sketch.projectName || 'Obra'}) y en la Nube`, 'Check');
+      const isDrive = isDriveUrl(finalSketch.dataUrl);
+      showToast(
+        isDrive
+          ? `Croquis guardado en Google Drive y Nube (${finalSketch.unitName || 'Unidad'})`
+          : `Croquis guardado en ${finalSketch.unitName || 'la unidad'} (${finalSketch.projectName || 'Obra'}) y en la Nube`,
+        'Check'
+      );
     });
   };
 
