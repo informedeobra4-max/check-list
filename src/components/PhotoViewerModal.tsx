@@ -119,10 +119,13 @@ export function PhotoViewerModal({
         <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-slate-900">
           {/* Observation Note if exists */}
           {item.comment && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200 flex items-start gap-2 shadow-xs">
-              <MessageSquare className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="bg-emerald-950/20 border border-emerald-500/40 rounded-xl p-3 text-xs text-emerald-200 flex items-start gap-2 shadow-xs">
+              <div className="relative mt-0.5 flex-shrink-0">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+              </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">
+                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block">
                   Observación Técnica Registrada:
                 </span>
                 <p className="mt-0.5 text-slate-200 leading-relaxed font-medium">

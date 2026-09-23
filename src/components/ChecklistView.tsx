@@ -779,6 +779,7 @@ export function ChecklistView({
                       const isComplete = item.completed || currentPct === 100;
                       const isPartial = !isComplete && currentPct > 0;
                       const isItemActive = activeItemId === item.id;
+                      const hasComment = Boolean(item.comment && item.comment.trim());
 
                       return (
                         <div
@@ -840,21 +841,39 @@ export function ChecklistView({
                                     Leve
                                   </span>
                                 )}
+
+                                {/* Insignia verde si tiene nota/comentario */}
+                                {hasComment && (
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
+                                    }}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/80 cursor-pointer hover:bg-emerald-900/80 transition-colors shadow-2xs"
+                                    title={`Nota guardada: "${item.comment}"`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                                    <span>Nota</span>
+                                  </span>
+                                )}
                               </div>
 
                               {/* Si tiene notas u observaciones */}
-                              {item.comment && (
+                              {hasComment && (
                                 <div
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
                                   }}
                                   style={{ whiteSpace: 'normal', wordBreak: 'normal' }}
-                                  className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-400 hover:text-[#00f2fe] cursor-pointer group/note"
+                                  className="mt-1 flex items-start gap-1.5 text-[11px] text-slate-300 hover:text-emerald-300 cursor-pointer group/note"
                                   title="Tocar para editar nota, severidad o fotos"
                                 >
-                                  <MessageSquareText className="w-3.5 h-3.5 text-[#00f2fe] mt-0.5 flex-shrink-0" />
-                                  <span className="text-slate-400 group-hover/note:text-slate-200 leading-tight">
+                                  <div className="relative mt-0.5 flex-shrink-0">
+                                    <MessageSquareText className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_#10b981]" />
+                                  </div>
+                                  <span className="text-slate-300 group-hover/note:text-white leading-tight">
                                     {item.comment}
                                   </span>
                                 </div>
@@ -888,25 +907,37 @@ export function ChecklistView({
                               style={{ flexShrink: 0 }}
                               className="flex items-center gap-1.5 sm:gap-2"
                             >
-                              {/* Botón de nota/comentario y severidad */}
+                              {/* Botón de nota/comentario y severidad con puntito verde */}
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setObservationModalItem({ tradeId: trade.id, tradeName: trade.name, item });
                                 }}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${
-                                  item.comment || item.severity
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 flex-shrink-0 relative ${
+                                  hasComment
+                                    ? 'bg-[#122438] text-emerald-400 border border-emerald-500/70 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                                    : item.severity
                                     ? 'bg-[#1a2942] text-[#00f2fe] border border-[#00f2fe]/60 shadow-[0_0_10px_rgba(0,242,254,0.2)]'
                                     : 'bg-[#162238] text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500'
                                 }`}
-                                title={item.comment ? 'Ver o editar observación técnica y fotos' : 'Agregar observación o foto'}
+                                title={hasComment ? `Nota guardada: "${item.comment}"` : 'Agregar observación o foto'}
                               >
-                                <MessageSquare
-                                  className={`w-3.5 h-3.5 ${
-                                    item.comment || item.severity ? 'text-[#00f2fe]' : 'text-slate-400'
-                                  }`}
-                                />
+                                <div className="relative flex items-center justify-center">
+                                  <MessageSquare
+                                    className={`w-3.5 h-3.5 ${
+                                      hasComment ? 'text-emerald-400' : (item.severity ? 'text-[#00f2fe]' : 'text-slate-400')
+                                    }`}
+                                  />
+                                </div>
+
+                                {/* Puntito verde visible que indica que hay una nota */}
+                                {hasComment && (
+                                  <span
+                                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#131b2c] shadow-[0_0_8px_rgba(52,211,153,1)]"
+                                    title="Hay una nota registrada en este ítem"
+                                  />
+                                )}
                               </button>
 
                               {/* Control de porcentaje: Cuadro numérico compacto */}
@@ -1030,7 +1061,12 @@ export function ChecklistView({
                             >
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-black text-white flex items-center gap-1.5">
-                                  <MessageSquare className="w-3.5 h-3.5 text-[#00f2fe]" />
+                                  <span className="relative flex items-center">
+                                    <MessageSquare className={`w-3.5 h-3.5 ${hasComment ? 'text-emerald-400' : 'text-[#00f2fe]'}`} />
+                                    {hasComment && (
+                                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                                    )}
+                                  </span>
                                   {item.comment ? 'Editar Observación' : 'Nueva Observación / Comentario'}
                                 </span>
                                 {item.comment && (

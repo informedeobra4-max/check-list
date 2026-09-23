@@ -228,7 +228,12 @@ export function ItemObservationModal({
           <div>
             <label className="block text-xs font-black text-slate-300 mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                <span className="relative flex items-center">
+                  <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                  {Boolean(commentDraft && commentDraft.trim()) && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" />
+                  )}
+                </span>
                 Detalle Técnico u Observación
               </span>
               {commentDraft && (
