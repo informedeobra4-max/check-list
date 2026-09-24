@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress, hexToRgba } from './utils/calculations';
 import { Header } from './components/Header';
@@ -111,6 +111,7 @@ export function sanitizeProjectTrades(project: Project): Project {
   if (!project || !project.units) return project;
   return {
     ...project,
+    calendarEvents: project.calendarEvents || [],
     units: project.units.map(unit => {
       if (!unit || !unit.trades) return unit;
       const seen = new Map<string, Trade>();
@@ -191,6 +192,16 @@ export default function App() {
                 p.milestones = initialMock.milestones;
               } else {
                 p.milestones = [];
+              }
+            }
+
+            // Ensure calendarEvents exist if loaded from storage
+            if (!p.calendarEvents || p.calendarEvents.length === 0) {
+              const initialMock = getInitialMockData().find(m => m.id === p.id);
+              if (initialMock && initialMock.calendarEvents && initialMock.calendarEvents.length > 0) {
+                p.calendarEvents = initialMock.calendarEvents;
+              } else {
+                p.calendarEvents = [];
               }
             }
           });
@@ -1762,6 +1773,78 @@ export default function App() {
     showToast('Cronograma de obra actualizado', 'Calendar');
   };
 
+  // Calendar Event handlers (strictly isolated by project and cloud synchronized)
+  const handleSaveCalendarEvent = (projectId: string, event: ProjectCalendarEvent) => {
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        const currentEvents = proj.calendarEvents || [];
+        const exists = currentEvents.some(e => e.id === event.id);
+        const newEvents = exists
+          ? currentEvents.map(e => e.id === event.id ? event : e)
+          : [...currentEvents, event];
+        return {
+          ...proj,
+          calendarEvents: newEvents
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+    });
+  };
+
+  const handleDeleteCalendarEvent = (projectId: string, eventId: string) => {
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        return {
+          ...proj,
+          calendarEvents: (proj.calendarEvents || []).filter(e => e.id !== eventId)
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+    });
+  };
+
+  const handleToggleCalendarEvent = (projectId: string, eventId: string) => {
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== projectId) return proj;
+        return {
+          ...proj,
+          calendarEvents: (proj.calendarEvents || []).map(e => {
+            if (e.id !== eventId) return e;
+            return {
+              ...e,
+              completed: !e.completed
+            };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+    });
+  };
+
   // Reset to Mock Data
   const handleResetData = () => {
     if (confirm('¿Restablecer datos de prueba de ejemplo? Se reiniciarán las obras y fotos de muestra.')) {
@@ -1882,6 +1965,10 @@ export default function App() {
             onToggleManualMilestone={handleToggleManualMilestone}
             onUpdateProjectDates={handleUpdateProjectDates}
             onEditProject={(proj) => setEditingProject(proj)}
+            onSaveCalendarEvent={handleSaveCalendarEvent}
+            onDeleteCalendarEvent={handleDeleteCalendarEvent}
+            onToggleCalendarEvent={handleToggleCalendarEvent}
+            onShowToast={showToast}
           />
         )}
 

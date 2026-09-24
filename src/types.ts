@@ -93,6 +93,22 @@ export interface ProjectCustomService {
   number: string;
 }
 
+export type CalendarEventType = 'task' | 'alarm' | 'event';
+
+export interface ProjectCalendarEvent {
+  id: string;
+  projectId: string; // Garantiza vinculación exclusiva a cada obra
+  title: string;
+  description?: string;
+  date: string; // Formato YYYY-MM-DD
+  time?: string; // Formato HH:mm
+  type: CalendarEventType; // 'task' (Tarea técnica) | 'alarm' (Alarma / Vencimiento) | 'event' (Evento / Reunión)
+  priority?: 'low' | 'medium' | 'high' | 'urgent'; // Baja, Media, Alta, Urgente
+  completed?: boolean;
+  color?: string;
+  createdAt?: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -109,6 +125,7 @@ export interface Project {
   floorsConfig?: FloorConfig[];
   customServices?: ProjectCustomService[];
   milestones?: Milestone[];
+  calendarEvents?: ProjectCalendarEvent[]; // Tareas, eventos y alarmas independientes por obra
   units: Unit[];
 }
 

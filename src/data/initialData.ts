@@ -165,6 +165,41 @@ export function getInitialMockData(): Project[] {
           notes: 'Instalación de marcos y hojas principales'
         }
       ],
+      calendarEvents: [
+        {
+          id: 'cal_pla_1',
+          projectId: 'proj_parque_los_andes',
+          title: 'Hormigonado de losa sobre 2do nivel',
+          description: 'Colada de hormigón elaborado H-25 con bomba pluma. Verificar encofrados y armaduras previamente.',
+          date: '2026-09-24',
+          time: '09:30',
+          type: 'task',
+          priority: 'urgent',
+          completed: false
+        },
+        {
+          id: 'cal_pla_2',
+          projectId: 'proj_parque_los_andes',
+          title: 'Alarma: Acopio cañerías termofusión',
+          description: 'Llegada de camión con cañerías y accesorios de plomería para montantes principales.',
+          date: '2026-09-26',
+          time: '14:00',
+          type: 'alarm',
+          priority: 'high',
+          completed: false
+        },
+        {
+          id: 'cal_pla_3',
+          projectId: 'proj_parque_los_andes',
+          title: 'Reunión de avance con Dirección de Obra',
+          description: 'Revisión técnica de cómputo y verificación de certificaciones con Msc. Arq. Agustín Arrieta.',
+          date: '2026-09-29',
+          time: '15:30',
+          type: 'event',
+          priority: 'medium',
+          completed: false
+        }
+      ],
       units: [
         { id: 'unit_101', name: 'Depto 1-1', type: 'unit', trades: p1Trades1 },
         { id: 'unit_102', name: 'Depto 1-2', type: 'unit', trades: p1Trades2 },
@@ -204,6 +239,41 @@ export function getInitialMockData(): Project[] {
           linkedItemName: 'Montaje de sanitarios',
           minPercentageRequired: 60,
           notes: 'Prueba de desagües cloacales'
+        }
+      ],
+      calendarEvents: [
+        {
+          id: 'cal_pa_1',
+          projectId: 'proj_parque_agustin',
+          title: 'Alarma: Inspección de cañerías con AYSAM',
+          description: 'Prueba hidráulica reglamentaria y firma de acta para habilitación de acometida.',
+          date: '2026-09-24',
+          time: '11:00',
+          type: 'alarm',
+          priority: 'urgent',
+          completed: false
+        },
+        {
+          id: 'cal_pa_2',
+          projectId: 'proj_parque_agustin',
+          title: 'Colocación de premarcos de aluminio',
+          description: 'Instalación de marcos en vanos exteriores de Depto 1-1 y 1-2.',
+          date: '2026-09-27',
+          time: '08:30',
+          type: 'task',
+          priority: 'high',
+          completed: false
+        },
+        {
+          id: 'cal_pa_3',
+          projectId: 'proj_parque_agustin',
+          title: 'Inspección estructural municipal',
+          description: 'Verificación en terreno del inspector municipal de obras privadas.',
+          date: '2026-09-30',
+          time: '14:00',
+          type: 'event',
+          priority: 'medium',
+          completed: false
         }
       ],
       units: [

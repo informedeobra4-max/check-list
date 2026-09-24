@@ -17,11 +17,13 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { Project, StatusFilter } from '../types';
+import { Project, StatusFilter, ProjectCalendarEvent } from '../types';
 import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea, hexToRgba } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 import { ExecutiveGaugeChart } from './ExecutiveGaugeChart';
 import { ExecutiveTimeline } from './ExecutiveTimeline';
+import { ProjectCalendarCard } from './ProjectCalendarCard';
+import { ProjectCalendarModal } from './ProjectCalendarModal';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -39,6 +41,10 @@ interface DashboardViewProps {
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
+  onSaveCalendarEvent?: (projectId: string, event: ProjectCalendarEvent) => void;
+  onDeleteCalendarEvent?: (projectId: string, eventId: string) => void;
+  onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
+  onShowToast?: (msg: string, icon?: string) => void;
 }
 
 export function DashboardView({
@@ -56,13 +62,46 @@ export function DashboardView({
   onOpenMilestonesConfig,
   onToggleManualMilestone,
   onUpdateProjectDates,
-  onEditProject
+  onEditProject,
+  onSaveCalendarEvent,
+  onDeleteCalendarEvent,
+  onToggleCalendarEvent,
+  onShowToast
 }: DashboardViewProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [hoverTriggers, setHoverTriggers] = useState<Record<string, number>>({});
+
+  // State for project calendar modal (strictly isolated per project)
+  const [calendarModalState, setCalendarModalState] = useState<{
+    isOpen: boolean;
+    projectId: string | null;
+    initialDate?: string;
+    selectedEventId?: string;
+  }>({
+    isOpen: false,
+    projectId: null
+  });
+
+  const handleOpenCalendarModal = (projectId: string, initialDate?: string, selectedEventId?: string) => {
+    setCalendarModalState({
+      isOpen: true,
+      projectId,
+      initialDate,
+      selectedEventId
+    });
+  };
+
+  const handleCloseCalendarModal = () => {
+    setCalendarModalState({
+      isOpen: false,
+      projectId: null
+    });
+  };
+
+  const activeCalendarProject = projects.find(p => p.id === calendarModalState.projectId) || null;
 
   // Compute status and progress for each project
   const projectsWithProgress = projects.map(project => {
@@ -409,59 +448,13 @@ export function DashboardView({
                       </div>
                     </div>
 
-                    {/* Right Box: Deptos Terminados */}
-                    <div className="bg-[#0f172a]/80 rounded-2xl p-3 border border-slate-800/90 flex flex-col justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                        Deptos Terminados
-                      </span>
-
-                      <div className="flex items-center justify-between gap-3 my-auto py-1">
-                        <div className="flex-1 space-y-2">
-                          {/* Horizontal Capsule Bar */}
-                          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${deptosPercent}%`,
-                                background: `linear-gradient(to right, #34d399, ${neonColor})`
-                              }}
-                            />
-                          </div>
-
-                          {/* Deptos Numbers */}
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-base font-black text-white tracking-tight">
-                              {completedDeptos}
-                            </span>
-                            <span className="text-xs text-slate-400 font-bold">
-                              / {totalDeptos} deptos ({deptosPercent}%)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Mini Circular Distribution Graphic */}
-                        <div className="w-11 h-11 flex-shrink-0 relative">
-                          <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                            <circle cx="18" cy="18" r="12" fill="none" stroke="#1e293b" strokeWidth="6" />
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="12"
-                              fill="none"
-                              stroke={deptosPercent > 0 ? '#10b981' : neonColor}
-                              strokeWidth="6"
-                              strokeDasharray="75.4"
-                              strokeDashoffset={75.4 - (deptosPercent / 100) * 75.4}
-                              strokeLinecap="round"
-                              className="transition-all duration-500"
-                            />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white">
-                            {deptosPercent}%
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Right Box: Calendario Interactivo de Obra */}
+                    <ProjectCalendarCard
+                      project={project}
+                      neonColor={neonColor}
+                      onOpenCalendarModal={handleOpenCalendarModal}
+                      onToggleCalendarEvent={onToggleCalendarEvent}
+                    />
                   </div>
 
                   {/* Lower Section: Cronograma Detallado */}
@@ -553,6 +546,28 @@ export function DashboardView({
           })
         )}
       </div>
+
+      {/* Modal de Agenda / Calendario Interactivo por Obra */}
+      {calendarModalState.isOpen && activeCalendarProject && (
+        <ProjectCalendarModal
+          isOpen={calendarModalState.isOpen}
+          project={activeCalendarProject}
+          initialDate={calendarModalState.initialDate}
+          selectedEventId={calendarModalState.selectedEventId}
+          neonColor={neonColor}
+          onClose={handleCloseCalendarModal}
+          onSaveEvent={(projId, evt) => {
+            if (onSaveCalendarEvent) onSaveCalendarEvent(projId, evt);
+          }}
+          onDeleteEvent={(projId, evtId) => {
+            if (onDeleteCalendarEvent) onDeleteCalendarEvent(projId, evtId);
+          }}
+          onToggleEventCompleted={(projId, evtId) => {
+            if (onToggleCalendarEvent) onToggleCalendarEvent(projId, evtId);
+          }}
+          onShowToast={onShowToast || (() => {})}
+        />
+      )}
     </section>
   );
 }
