@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Calendar as CalendarIcon,
@@ -70,41 +70,58 @@ export function ProjectCalendarModal({
   const [type, setType] = useState<CalendarEventType>('task');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
 
-  // Sync state when modal opens or initial props change
+  // Track open state transitions to only initialize when modal transitions to open
+  const prevIsOpenRef = useRef(false);
+  const prevSelectedEventIdRef = useRef<string | undefined>(undefined);
+
+  // Sync state when modal opens or selected event changes
   useEffect(() => {
     if (isOpen) {
-      const activeDate = initialDate || (() => {
-        const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      })();
-      setFilterDate(activeDate);
-      setDate(activeDate);
-      setViewScope('day');
-      setTypeFilter('all');
+      const isJustOpened = !prevIsOpenRef.current;
+      const isEventSelectionChanged = selectedEventId !== prevSelectedEventIdRef.current;
 
-      if (selectedEventId && project) {
-        const evt = (project.calendarEvents || []).find(e => e.id === selectedEventId);
-        if (evt) {
-          setEditingEventId(evt.id);
-          setTitle(evt.title);
-          setDescription(evt.description || '');
-          setDate(evt.date);
-          setTime(evt.time || '');
-          setType(evt.type);
-          setPriority(evt.priority || 'medium');
-          setFilterDate(evt.date);
-          return;
+      if (isJustOpened || isEventSelectionChanged) {
+        prevSelectedEventIdRef.current = selectedEventId;
+
+        const activeDate = initialDate || (() => {
+          const now = new Date();
+          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        })();
+
+        if (isJustOpened) {
+          setFilterDate(activeDate);
+          setDate(activeDate);
+          setViewScope('day');
+          setTypeFilter('all');
+        }
+
+        if (selectedEventId && project) {
+          const evt = (project.calendarEvents || []).find(e => e.id === selectedEventId);
+          if (evt) {
+            setEditingEventId(evt.id);
+            setTitle(evt.title);
+            setDescription(evt.description || '');
+            setDate(evt.date);
+            setTime(evt.time || '');
+            setType(evt.type);
+            setPriority(evt.priority || 'medium');
+            setFilterDate(evt.date);
+            return;
+          }
+        }
+
+        if (isJustOpened) {
+          // Reset form
+          setEditingEventId(null);
+          setTitle('');
+          setDescription('');
+          setTime('');
+          setType('task');
+          setPriority('medium');
         }
       }
-
-      // Reset form
-      setEditingEventId(null);
-      setTitle('');
-      setDescription('');
-      setTime('');
-      setType('task');
-      setPriority('medium');
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen, initialDate, selectedEventId, project]);
 
   if (!isOpen || !project) return null;
@@ -152,27 +169,35 @@ export function ProjectCalendarModal({
       return;
     }
 
+    const targetDate = date || filterDate;
+
+    const existingEvt = editingEventId ? events.find(e => e.id === editingEventId) : null;
     const payload: ProjectCalendarEvent = {
       id: editingEventId || `calevt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       projectId: project.id,
       title: cleanTitle,
       description: description.trim() || undefined,
-      date: date || filterDate,
+      date: targetDate,
       time: time || undefined,
       type,
       priority,
-      completed: editingEventId ? (events.find(e => e.id === editingEventId)?.completed ?? false) : false,
-      createdAt: editingEventId ? undefined : new Date().toISOString()
+      completed: existingEvt ? existingEvt.completed : false,
+      createdAt: existingEvt?.createdAt || new Date().toISOString()
     };
 
     onSaveEvent(project.id, payload);
     onShowToast(
-      editingEventId ? '¡Elemento actualizado con éxito!' : '¡Nueva tarea/alarma guardada en la obra!',
+      editingEventId ? '¡Elemento actualizado con éxito!' : '¡Nueva tarea/alarma guardada en la Nube y en Drive!',
       'Check'
     );
 
-    // Keep form ready for next item or reset
-    handleCancelEdit();
+    // Keep viewing on the date of the saved event so user sees it right away!
+    setFilterDate(targetDate);
+    setDate(targetDate);
+    setEditingEventId(null);
+    setTitle('');
+    setDescription('');
+    setTime('');
   };
 
   const handleDelete = (eventId: string, eventTitle: string) => {

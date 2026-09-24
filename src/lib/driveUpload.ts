@@ -102,3 +102,35 @@ export async function uploadFileToDrive(options: UploadOptions): Promise<UploadR
     };
   }
 }
+
+/**
+ * Realiza un respaldo en formato JSON de la agenda, eventos y alarmas de una obra
+ * y lo guarda directamente en Google Drive.
+ */
+export async function backupCalendarEventsToDrive(projectName: string, events: any[]): Promise<UploadResponse> {
+  try {
+    const payload = {
+      project: projectName,
+      backupDate: new Date().toISOString(),
+      eventsCount: events.length,
+      events: events
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const base64Data = typeof window !== 'undefined'
+      ? btoa(unescape(encodeURIComponent(jsonStr)))
+      : Buffer.from(jsonStr).toString('base64');
+
+    const cleanName = (projectName || 'Obra').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `Agenda_${cleanName}_backup.json`;
+
+    return await uploadFileToDrive({
+      base64: `data:application/json;base64,${base64Data}`,
+      filename,
+      mimeType: 'application/json'
+    });
+  } catch (err: any) {
+    console.warn('Aviso backup calendario a Google Drive:', err);
+    return { success: false, url: '', error: err?.message };
+  }
+}
+

@@ -24,9 +24,9 @@ import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { BlueprintDocument } from './types';
+import { BlueprintDocument, ProjectCalendarEvent } from './types';
 import { SplashScreen } from './components/SplashScreen';
-import { uploadFileToDrive, isDriveUrl } from './lib/driveUpload';
+import { uploadFileToDrive, isDriveUrl, backupCalendarEventsToDrive } from './lib/driveUpload';
 
 const STORAGE_KEY_PROJECTS = 'CONTROL_AVANCE_OBRA_V3';
 const STORAGE_KEY_LOGOS = 'CONTROL_AVANCE_LOGOS_V4';
@@ -150,6 +150,28 @@ export function sanitizeProjectTrades(project: Project): Project {
       };
     })
   };
+}
+
+export function mergeProjectsWithLocalCalendarEvents(remoteProjects: Project[], localProjects: Project[]): Project[] {
+  if (!localProjects || localProjects.length === 0) return remoteProjects;
+  return remoteProjects.map(remoteProj => {
+    const localProj = localProjects.find(lp => lp.id === remoteProj.id);
+    if (!localProj) return remoteProj;
+
+    const remoteEvents = remoteProj.calendarEvents || [];
+    const localEvents = localProj.calendarEvents || [];
+    if (localEvents.length === 0) return { ...remoteProj, calendarEvents: remoteEvents };
+
+    // Non-destructive merge: start with local events, add/update with remote events
+    const eventMap = new Map<string, ProjectCalendarEvent>();
+    localEvents.forEach(e => eventMap.set(e.id, e));
+    remoteEvents.forEach(e => eventMap.set(e.id, e));
+
+    return {
+      ...remoteProj,
+      calendarEvents: Array.from(eventMap.values())
+    };
+  });
 }
 
 export default function App() {
@@ -633,10 +655,13 @@ export default function App() {
           // Realtime push subscription
           unsubscribe = subscribeToCloudData(
             (cloudProjects) => {
-              // Protect recently edited local data from being overwritten by delayed push events
-              if (Date.now() - lastLocalEditTimeRef.current < 4000) return;
+              // Protect recently edited local data from being overwritten by delayed push events (12 seconds grace)
+              if (Date.now() - lastLocalEditTimeRef.current < 12000) return;
               isRemoteUpdateRef.current = true;
-              setProjects(cloudProjects.map(sanitizeProjectTrades));
+              setProjects(prev => {
+                const sanitized = cloudProjects.map(sanitizeProjectTrades);
+                return mergeProjectsWithLocalCalendarEvents(sanitized, prev);
+              });
             },
             (cloudLogos) => {
               isRemoteUpdateRef.current = true;
@@ -656,8 +681,8 @@ export default function App() {
 
     // Auto-refresh when tab is focused / unlocked on mobile or notebook
     const handleVisibilityOrFocus = async () => {
-      // If user recently made a change (within 4s), do NOT pull and overwrite local unsaved changes
-      if (Date.now() - lastLocalEditTimeRef.current < 4000) return;
+      // If user recently made a change (within 12s), do NOT pull and overwrite local unsaved changes
+      if (Date.now() - lastLocalEditTimeRef.current < 12000) return;
 
       if (document.visibilityState === 'visible') {
         try {
@@ -666,9 +691,10 @@ export default function App() {
             if (res.projects && res.projects.length > 0) {
               const sanitizedCloudProjects = res.projects.map(sanitizeProjectTrades);
               setProjects(prev => {
-                if (JSON.stringify(prev) !== JSON.stringify(sanitizedCloudProjects)) {
+                const merged = mergeProjectsWithLocalCalendarEvents(sanitizedCloudProjects, prev);
+                if (JSON.stringify(prev) !== JSON.stringify(merged)) {
                   isRemoteUpdateRef.current = true;
-                  return sanitizedCloudProjects;
+                  return merged;
                 }
                 return prev;
               });
@@ -1773,17 +1799,23 @@ export default function App() {
     showToast('Cronograma de obra actualizado', 'Calendar');
   };
 
-  // Calendar Event handlers (strictly isolated by project and cloud synchronized)
+  // Calendar Event handlers (strictly isolated by project, cloud synchronized, and backed up to Google Drive)
   const handleSaveCalendarEvent = (projectId: string, event: ProjectCalendarEvent) => {
+    lastLocalEditTimeRef.current = Date.now();
     let updatedProjectsList: Project[] = [];
+    let targetProjectName = '';
+    let targetProjectEvents: ProjectCalendarEvent[] = [];
+
     setProjects(prev => {
       const updated = prev.map(proj => {
         if (proj.id !== projectId) return proj;
+        targetProjectName = proj.name;
         const currentEvents = proj.calendarEvents || [];
         const exists = currentEvents.some(e => e.id === event.id);
         const newEvents = exists
           ? currentEvents.map(e => e.id === event.id ? event : e)
           : [...currentEvents, event];
+        targetProjectEvents = newEvents;
         return {
           ...proj,
           calendarEvents: newEvents
@@ -1793,56 +1825,102 @@ export default function App() {
       return updated;
     });
 
+    // Guardar inmediatamente en localStorage local
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on calendar save:', e);
+    }
+
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
     });
+
+    // Respaldar también en Google Drive automáticamente
+    if (targetProjectName && targetProjectEvents.length > 0) {
+      backupCalendarEventsToDrive(targetProjectName, targetProjectEvents);
+    }
   };
 
   const handleDeleteCalendarEvent = (projectId: string, eventId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     let updatedProjectsList: Project[] = [];
+    let targetProjectName = '';
+    let targetProjectEvents: ProjectCalendarEvent[] = [];
+
     setProjects(prev => {
       const updated = prev.map(proj => {
         if (proj.id !== projectId) return proj;
+        targetProjectName = proj.name;
+        const newEvents = (proj.calendarEvents || []).filter(e => e.id !== eventId);
+        targetProjectEvents = newEvents;
         return {
           ...proj,
-          calendarEvents: (proj.calendarEvents || []).filter(e => e.id !== eventId)
+          calendarEvents: newEvents
         };
       });
       updatedProjectsList = updated;
       return updated;
     });
 
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on calendar delete:', e);
+    }
+
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
     });
+
+    if (targetProjectName) {
+      backupCalendarEventsToDrive(targetProjectName, targetProjectEvents);
+    }
   };
 
   const handleToggleCalendarEvent = (projectId: string, eventId: string) => {
+    lastLocalEditTimeRef.current = Date.now();
     let updatedProjectsList: Project[] = [];
+    let targetProjectName = '';
+    let targetProjectEvents: ProjectCalendarEvent[] = [];
+
     setProjects(prev => {
       const updated = prev.map(proj => {
         if (proj.id !== projectId) return proj;
+        targetProjectName = proj.name;
+        const newEvents = (proj.calendarEvents || []).map(e => {
+          if (e.id !== eventId) return e;
+          return {
+            ...e,
+            completed: !e.completed
+          };
+        });
+        targetProjectEvents = newEvents;
         return {
           ...proj,
-          calendarEvents: (proj.calendarEvents || []).map(e => {
-            if (e.id !== eventId) return e;
-            return {
-              ...e,
-              completed: !e.completed
-            };
-          })
+          calendarEvents: newEvents
         };
       });
       updatedProjectsList = updated;
       return updated;
     });
 
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on calendar toggle:', e);
+    }
+
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
     });
+
+    if (targetProjectName) {
+      backupCalendarEventsToDrive(targetProjectName, targetProjectEvents);
+    }
   };
 
   // Reset to Mock Data
