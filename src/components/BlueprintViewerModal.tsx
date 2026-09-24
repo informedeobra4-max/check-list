@@ -83,8 +83,8 @@ export function BlueprintViewerModal({
     setUploadStatusText('Capturando y optimizando foto del plano...');
 
     try {
-      // Comprimir manteniendo alta resolución (1920px, 0.85) para nitidez de planos
-      const compressedDataUrl = await compressImageFile(file, 1920, 0.85);
+      // Comprimir manteniendo excelente resolución técnica (1600px, 0.80) para planos nítidos y subida inmediata
+      const compressedDataUrl = await compressImageFile(file, 1600, 0.80);
 
       if (!newDocName.trim()) {
         const dateStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
@@ -93,7 +93,7 @@ export function BlueprintViewerModal({
       }
       setNewDocType('image');
 
-      setUploadStatusText('Guardando en Google Drive...');
+      setUploadStatusText('Subiendo plano a tu cuenta de Google Drive...');
       const cleanFileName = `Plano_${unitName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.jpg`;
       const uploadRes = await uploadFileToDrive({
         base64: compressedDataUrl,
@@ -104,6 +104,7 @@ export function BlueprintViewerModal({
       if (uploadRes.success && uploadRes.url) {
         setNewDocUrl(uploadRes.url);
       } else {
+        console.warn('Aviso Google Drive en captura:', uploadRes.error);
         setNewDocUrl(compressedDataUrl);
       }
     } catch (err) {
@@ -136,7 +137,7 @@ export function BlueprintViewerModal({
       let finalDataUrl = '';
       if (isImg) {
         setUploadStatusText('Optimizando imagen...');
-        finalDataUrl = await compressImageFile(file, 1920, 0.85);
+        finalDataUrl = await compressImageFile(file, 1600, 0.80);
       } else {
         setUploadStatusText('Leyendo archivo...');
         finalDataUrl = await new Promise<string>((resolve, reject) => {
@@ -147,7 +148,7 @@ export function BlueprintViewerModal({
         });
       }
 
-      setUploadStatusText('Guardando en Google Drive...');
+      setUploadStatusText('Subiendo archivo a tu cuenta de Google Drive...');
       const uploadRes = await uploadFileToDrive({
         base64: finalDataUrl,
         filename: file.name,
@@ -157,6 +158,7 @@ export function BlueprintViewerModal({
       if (uploadRes.success && uploadRes.url) {
         setNewDocUrl(uploadRes.url);
       } else {
+        console.warn('Aviso Google Drive en carga de archivo:', uploadRes.error);
         setNewDocUrl(finalDataUrl);
       }
     } catch (err) {

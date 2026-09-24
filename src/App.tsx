@@ -24,7 +24,7 @@ import { Toast } from './components/Toast';
 import { loadCloudData, saveProjectsToCloud, saveLogosToCloud, subscribeToCloudData, CloudSyncStatus } from './lib/supabase';
 import { CloudSetupModal } from './components/CloudSetupModal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { BlueprintDocument, ProjectCalendarEvent } from './types';
+import { BlueprintDocument, ProjectCalendarEvent, SketchDocument } from './types';
 import { SplashScreen } from './components/SplashScreen';
 import { uploadFileToDrive, isDriveUrl, backupCalendarEventsToDrive } from './lib/driveUpload';
 
@@ -74,7 +74,8 @@ const createLightweightProjectsForLocal = (projs: Project[]): any[] => {
         unitId: s.unitId,
         unitName: s.unitName,
         projectId: s.projectId,
-        projectName: s.projectName
+        projectName: s.projectName,
+        dataUrl: s.dataUrl?.startsWith('http') ? s.dataUrl : ''
       })) || [],
       blueprints: u.blueprints?.map(b => ({
         id: b.id,
@@ -82,14 +83,18 @@ const createLightweightProjectsForLocal = (projs: Project[]): any[] => {
         category: b.category,
         type: b.type,
         uploadedAt: b.uploadedAt,
-        url: b.type === 'image' && b.url?.startsWith('data:') ? '' : b.url,
+        url: b.url?.startsWith('data:') ? '' : b.url,
         cadViewerUrl: b.cadViewerUrl
       })) || [],
       trades: u.trades?.map(t => ({
         ...t,
         items: t.items?.map(i => ({
           ...i,
-          photos: i.photos?.map(ph => ({ id: ph.id, timestamp: ph.timestamp })) || []
+          photos: i.photos?.map(ph => ({
+            id: ph.id,
+            timestamp: ph.timestamp,
+            dataUrl: ph.dataUrl?.startsWith('http') ? ph.dataUrl : ''
+          })) || []
         }))
       }))
     }))
@@ -152,24 +157,70 @@ export function sanitizeProjectTrades(project: Project): Project {
   };
 }
 
-export function mergeProjectsWithLocalCalendarEvents(remoteProjects: Project[], localProjects: Project[]): Project[] {
+export function mergeProjectsWithLocalState(remoteProjects: Project[], localProjects: Project[]): Project[] {
   if (!localProjects || localProjects.length === 0) return remoteProjects;
+
   return remoteProjects.map(remoteProj => {
     const localProj = localProjects.find(lp => lp.id === remoteProj.id);
     if (!localProj) return remoteProj;
 
-    const remoteEvents = remoteProj.calendarEvents || [];
-    const localEvents = localProj.calendarEvents || [];
-    if (localEvents.length === 0) return { ...remoteProj, calendarEvents: remoteEvents };
+    // 1. Merge Calendar Events by ID non-destructively
+    const mergedEventsMap = new Map<string, ProjectCalendarEvent>();
+    (localProj.calendarEvents || []).forEach(e => mergedEventsMap.set(e.id, e));
+    (remoteProj.calendarEvents || []).forEach(e => mergedEventsMap.set(e.id, e));
 
-    // Non-destructive merge: start with local events, add/update with remote events
-    const eventMap = new Map<string, ProjectCalendarEvent>();
-    localEvents.forEach(e => eventMap.set(e.id, e));
-    remoteEvents.forEach(e => eventMap.set(e.id, e));
+    // 2. Merge Units (preserving local blueprints, sketches, and inspection photos)
+    const mergedUnits = (remoteProj.units || []).map(remoteUnit => {
+      const localUnit = (localProj.units || []).find(lu => lu.id === remoteUnit.id);
+      if (!localUnit) return remoteUnit;
+
+      // Blueprints: merge by ID non-destructively
+      const bpMap = new Map<string, BlueprintDocument>();
+      (localUnit.blueprints || []).forEach(b => bpMap.set(b.id, b));
+      (remoteUnit.blueprints || []).forEach(b => bpMap.set(b.id, b));
+
+      // Sketches: merge by ID non-destructively
+      const sketchMap = new Map<string, SketchDocument>();
+      (localUnit.sketches || []).forEach(s => sketchMap.set(s.id, s));
+      (remoteUnit.sketches || []).forEach(s => sketchMap.set(s.id, s));
+
+      // Trades & Items: merge photos by ID non-destructively
+      const mergedTrades = (remoteUnit.trades || []).map(remoteTrade => {
+        const localTrade = (localUnit.trades || []).find(lt => lt.id === remoteTrade.id);
+        if (!localTrade) return remoteTrade;
+
+        const mergedItems = (remoteTrade.items || []).map(remoteItem => {
+          const localItem = (localTrade.items || []).find(li => li.id === remoteItem.id);
+          if (!localItem) return remoteItem;
+
+          const photoMap = new Map<string, { id: string; dataUrl: string; timestamp: string }>();
+          (localItem.photos || []).forEach(ph => photoMap.set(ph.id, ph));
+          (remoteItem.photos || []).forEach(ph => photoMap.set(ph.id, ph));
+
+          return {
+            ...remoteItem,
+            photos: Array.from(photoMap.values())
+          };
+        });
+
+        return {
+          ...remoteTrade,
+          items: mergedItems
+        };
+      });
+
+      return {
+        ...remoteUnit,
+        blueprints: Array.from(bpMap.values()),
+        sketches: Array.from(sketchMap.values()),
+        trades: mergedTrades
+      };
+    });
 
     return {
       ...remoteProj,
-      calendarEvents: Array.from(eventMap.values())
+      calendarEvents: Array.from(mergedEventsMap.values()),
+      units: mergedUnits
     };
   });
 }
@@ -660,7 +711,7 @@ export default function App() {
               isRemoteUpdateRef.current = true;
               setProjects(prev => {
                 const sanitized = cloudProjects.map(sanitizeProjectTrades);
-                return mergeProjectsWithLocalCalendarEvents(sanitized, prev);
+                return mergeProjectsWithLocalState(sanitized, prev);
               });
             },
             (cloudLogos) => {
@@ -691,7 +742,7 @@ export default function App() {
             if (res.projects && res.projects.length > 0) {
               const sanitizedCloudProjects = res.projects.map(sanitizeProjectTrades);
               setProjects(prev => {
-                const merged = mergeProjectsWithLocalCalendarEvents(sanitizedCloudProjects, prev);
+                const merged = mergeProjectsWithLocalState(sanitizedCloudProjects, prev);
                 if (JSON.stringify(prev) !== JSON.stringify(merged)) {
                   isRemoteUpdateRef.current = true;
                   return merged;
@@ -1347,6 +1398,7 @@ export default function App() {
   // Add photo to item (from camera, file picker or modal) and persist directly to Supabase Cloud
   const handleAddPhoto = async (tradeId: string, itemId: string, dataUrl: string) => {
     if (!selectedProjectId || !selectedUnitId) return;
+    lastLocalEditTimeRef.current = Date.now();
 
     let finalDataUrl = dataUrl;
 
@@ -1413,6 +1465,12 @@ export default function App() {
       return updated;
     });
 
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on photo save:', e);
+    }
+
     // Sincronizar de inmediato a Supabase Cloud con datos completos
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
@@ -1430,6 +1488,7 @@ export default function App() {
   const handleDeletePhoto = async (tradeId: string, itemId: string, photoId: string) => {
     if (!confirm('¿Eliminar esta fotografía de la inspección?')) return;
     if (!selectedProjectId || !selectedUnitId) return;
+    lastLocalEditTimeRef.current = Date.now();
 
     let updatedProjectsList: Project[] = [];
 
@@ -1463,6 +1522,12 @@ export default function App() {
       updatedProjectsList = updated;
       return updated;
     });
+
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on photo delete:', e);
+    }
 
     // Persist immediately to Supabase Cloud
     setCloudStatus('syncing');
@@ -1535,6 +1600,7 @@ export default function App() {
 
   // Save Croquis sketch to unit and sync to Supabase Cloud
   const handleSaveSketch = async (projectId: string, unitId: string, sketch: SketchDocument) => {
+    lastLocalEditTimeRef.current = Date.now();
     let finalSketch = { ...sketch };
 
     // Si el croquis es una imagen base64, subir a Google Drive
@@ -1575,6 +1641,12 @@ export default function App() {
       return updated;
     });
 
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on sketch save:', e);
+    }
+
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
       setCloudStatus(res.status);
@@ -1591,6 +1663,7 @@ export default function App() {
   // Delete Croquis sketch from unit and sync to Supabase Cloud
   const handleDeleteSketch = (projectId: string, unitId: string, sketchId: string) => {
     if (!confirm('¿Eliminar este croquis del registro de la unidad?')) return;
+    lastLocalEditTimeRef.current = Date.now();
     let updatedProjectsList: Project[] = [];
     setProjects(prev => {
       const updated = prev.map(proj => {
@@ -1609,6 +1682,12 @@ export default function App() {
       updatedProjectsList = updated;
       return updated;
     });
+
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on sketch delete:', e);
+    }
 
     setCloudStatus('syncing');
     saveProjectsToCloud(updatedProjectsList).then(res => {
@@ -1690,53 +1769,112 @@ export default function App() {
   };
 
   // Unit Blueprints Management
-  const handleAddUnitBlueprint = (unitId: string, docData: Omit<BlueprintDocument, 'id' | 'uploadedAt'>) => {
+  const handleAddUnitBlueprint = async (unitId: string, docData: Omit<BlueprintDocument, 'id' | 'uploadedAt'>) => {
+    lastLocalEditTimeRef.current = Date.now();
+    let finalDoc = { ...docData };
+
+    // Si la URL es base64 y aún no se subió a Google Drive, asegurar subida a Drive
+    if (finalDoc.url && finalDoc.url.startsWith('data:') && !isDriveUrl(finalDoc.url)) {
+      showToast('Guardando plano en Google Drive...', 'Compass');
+      try {
+        const uploadRes = await uploadFileToDrive({
+          base64: finalDoc.url,
+          filename: `plano_${finalDoc.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.jpg`,
+          mimeType: 'image/jpeg'
+        });
+        if (uploadRes.success && uploadRes.url) {
+          finalDoc.url = uploadRes.url;
+        }
+      } catch (err) {
+        console.warn('Error subiendo plano a Google Drive en handleAddUnitBlueprint:', err);
+      }
+    }
+
     const newDoc: BlueprintDocument = {
-      ...docData,
+      ...finalDoc,
       id: `bp_${Date.now()}`,
       uploadedAt: new Date().toISOString()
     };
 
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== unitId) return u;
-          const currentBlueprints = u.blueprints || [];
-          const updated = [newDoc, ...currentBlueprints];
-          return { ...u, blueprints: updated };
-        })
-      };
-    }));
+    let updatedProjectsList: Project[] = [];
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== unitId) return u;
+            const currentBlueprints = u.blueprints || [];
+            const updated = [newDoc, ...currentBlueprints];
+            return { ...u, blueprints: updated };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
 
     setActiveBlueprintViewerUnit(prev => {
       if (!prev || prev.id !== unitId) return prev;
       return { ...prev, blueprints: [newDoc, ...(prev.blueprints || [])] };
     });
 
-    showToast('Plano técnico adjuntado con éxito', 'Check');
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on blueprint save:', e);
+    }
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      const isDrive = isDriveUrl(finalDoc.url);
+      showToast(
+        isDrive
+          ? 'Plano técnico guardado en Google Drive y Nube'
+          : 'Plano técnico guardado en la Nube',
+        'Check'
+      );
+    });
   };
 
   const handleDeleteUnitBlueprint = (unitId: string, docId: string) => {
-    setProjects(prev => prev.map(proj => {
-      if (proj.id !== selectedProjectId) return proj;
-      return {
-        ...proj,
-        units: proj.units.map(u => {
-          if (u.id !== unitId) return u;
-          const updated = (u.blueprints || []).filter(d => d.id !== docId);
-          return { ...u, blueprints: updated };
-        })
-      };
-    }));
+    if (!confirm('¿Eliminar este plano técnico?')) return;
+    lastLocalEditTimeRef.current = Date.now();
+    let updatedProjectsList: Project[] = [];
+
+    setProjects(prev => {
+      const updated = prev.map(proj => {
+        if (proj.id !== selectedProjectId) return proj;
+        return {
+          ...proj,
+          units: proj.units.map(u => {
+            if (u.id !== unitId) return u;
+            const updated = (u.blueprints || []).filter(d => d.id !== docId);
+            return { ...u, blueprints: updated };
+          })
+        };
+      });
+      updatedProjectsList = updated;
+      return updated;
+    });
 
     setActiveBlueprintViewerUnit(prev => {
       if (!prev || prev.id !== unitId) return prev;
       return { ...prev, blueprints: (prev.blueprints || []).filter(d => d.id !== docId) };
     });
 
-    showToast('Plano eliminado', 'Trash2');
+    try {
+      localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updatedProjectsList));
+    } catch (e) {
+      console.warn('LocalStorage error on blueprint delete:', e);
+    }
+
+    setCloudStatus('syncing');
+    saveProjectsToCloud(updatedProjectsList).then(res => {
+      setCloudStatus(res.status);
+      showToast('Plano eliminado en la Nube', 'Trash2');
+    });
   };
 
   // Create Unit
@@ -2207,7 +2345,11 @@ export default function App() {
           isOpen={!!activeBlueprintViewerUnit}
           unitName={activeBlueprintViewerUnit.name}
           projectName={selectedProject?.name || ''}
-          blueprints={activeBlueprintViewerUnit.blueprints || []}
+          blueprints={
+            selectedProject?.units.find(u => u.id === activeBlueprintViewerUnit.id)?.blueprints ||
+            activeBlueprintViewerUnit.blueprints ||
+            []
+          }
           onClose={() => setActiveBlueprintViewerUnit(null)}
           onAddBlueprint={(doc) => handleAddUnitBlueprint(activeBlueprintViewerUnit.id, doc)}
           onDeleteBlueprint={(docId) => handleDeleteUnitBlueprint(activeBlueprintViewerUnit.id, docId)}
