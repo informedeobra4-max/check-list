@@ -103,6 +103,15 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     // Reproducir sonido de tilde inmediatamente
     playCheckmarkSound();
 
+    // En tablets, orientar de forma apaisada (landscape) durante el gesto táctil del usuario
+    try {
+      const minSide = Math.min(window.screen.width, window.screen.height);
+      const isTablet = minSide >= 500 || /tablet|ipad|playbook|silk/i.test(navigator.userAgent);
+      if (isTablet && window.screen.orientation && window.screen.orientation.lock) {
+        window.screen.orientation.lock('landscape').catch(() => {});
+      }
+    } catch {}
+
     // Iniciar efecto expansivo
     setIsExiting(true);
 

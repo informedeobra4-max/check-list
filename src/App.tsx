@@ -152,39 +152,6 @@ export function sanitizeProjectTrades(project: Project): Project {
 }
 
 export default function App() {
-  // Theme state: Dark & Light Mode support with persistence in localStorage 'theme_preference'
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_THEME);
-      if (stored === 'dark' || stored === 'light') return stored;
-      if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-    } catch (e) {
-      console.error('Error reading theme preference:', e);
-    }
-    return 'dark'; // Executive Dark Mode by default
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_THEME, theme);
-    } catch (e) {
-      console.error('Error saving theme preference:', e);
-    }
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const handleToggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_PROJECTS);
@@ -314,6 +281,120 @@ export default function App() {
     document.documentElement.style.setProperty('--neon-glow', hexToRgba(activeNeon, 0.38));
     document.documentElement.style.setProperty('--neon-glow-soft', hexToRgba(activeNeon, 0.15));
   }, [localColors]);
+
+  // Tema Día / Noche (Light / Dark)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_THEME);
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {}
+    return 'dark';
+  });
+
+  const handleSetTheme = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    try {
+      localStorage.setItem(STORAGE_KEY_THEME, newTheme);
+    } catch (e) {
+      console.error('Error saving theme preference:', e);
+    }
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+    // Si cambia de tema explícitamente, limpiamos appBackground si tenía un color del tema contrario
+    if (newTheme === 'light' && localColors.appBackground && isDarkColor(localColors.appBackground)) {
+      setLocalColors(prev => ({ ...prev, appBackground: '' }));
+    } else if (newTheme === 'dark' && localColors.appBackground && !isDarkColor(localColors.appBackground)) {
+      setLocalColors(prev => ({ ...prev, appBackground: '' }));
+    }
+    showToast(newTheme === 'dark' ? 'Modo Noche (Oscuro) activado' : 'Modo Día (Claro) activado', newTheme === 'dark' ? 'Moon' : 'Sun');
+  };
+
+  const handleToggleTheme = () => {
+    handleSetTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      if (!localColors.appBackground) {
+        document.documentElement.style.backgroundColor = '#0e1422';
+        document.body.style.backgroundColor = '#0e1422';
+      }
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      if (!localColors.appBackground) {
+        document.documentElement.style.backgroundColor = '#f1f5f9';
+        document.body.style.backgroundColor = '#f1f5f9';
+      }
+    }
+  }, [theme, localColors.appBackground]);
+
+  // Forzar / gestionar orientación apaisada para tablets
+  const handleForceLandscape = async () => {
+    try {
+      if (window.screen.orientation && window.screen.orientation.lock) {
+        await window.screen.orientation.lock('landscape');
+        showToast('Pantalla fijada en modo Apaisado / Horizontal', 'Check');
+        return;
+      } else if (window.screen.orientation && window.screen.orientation.unlock) {
+        window.screen.orientation.unlock();
+        showToast('Giro de pantalla libre', 'RotateCcw');
+        return;
+      }
+    } catch (e) {
+      console.warn('Orientation lock direct failed, trying fallback:', e);
+    }
+
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+        if (window.screen.orientation && window.screen.orientation.lock) {
+          await window.screen.orientation.lock('landscape');
+          showToast('Pantalla fijada en modo Apaisado', 'Check');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen orientation lock failed:', err);
+    }
+
+    showToast('Gira tu tablet de forma horizontal', 'Maximize2');
+  };
+
+  // Detección automática en inicio para tablets: Si la dimensión menor es >= 500px, fijar apaisado
+  useEffect(() => {
+    const autoOrientTablet = async () => {
+      try {
+        const shortest = Math.min(window.screen.width, window.screen.height);
+        const isTablet = shortest >= 500 || /tablet|ipad|playbook|silk/i.test(navigator.userAgent);
+        if (isTablet && window.screen.orientation && window.screen.orientation.lock) {
+          await window.screen.orientation.lock('landscape');
+        }
+      } catch {}
+    };
+
+    autoOrientTablet();
+
+    const onUserTouch = () => {
+      autoOrientTablet();
+      window.removeEventListener('pointerdown', onUserTouch);
+      window.removeEventListener('touchstart', onUserTouch);
+    };
+    window.addEventListener('pointerdown', onUserTouch, { passive: true });
+    window.addEventListener('touchstart', onUserTouch, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', onUserTouch);
+      window.removeEventListener('touchstart', onUserTouch);
+    };
+  }, []);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -1735,9 +1816,13 @@ export default function App() {
       className={`w-full min-h-screen flex flex-col relative pb-20 transition-colors duration-200 ${
         localColors.appBackground
           ? isDarkColor(localColors.appBackground) ? 'text-slate-100' : 'text-slate-900'
-          : 'bg-[#0e1422] text-slate-100'
+          : theme === 'light' ? 'bg-[#f1f5f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
       }`}
-      style={{ backgroundColor: localColors.appBackground || '#0e1422' }}
+      style={{
+        backgroundColor: localColors.appBackground
+          ? localColors.appBackground
+          : theme === 'light' ? '#f1f5f9' : '#0e1422'
+      }}
     >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
@@ -2017,6 +2102,9 @@ export default function App() {
         localPresentationBackground={localColors.presentationBackground}
         localNeonColor={localColors.neonColor || '#00f2fe'}
         initialTarget={logoEditorTarget}
+        theme={theme}
+        onToggleTheme={handleSetTheme}
+        onForceLandscape={handleForceLandscape}
         onClose={() => setIsLogoEditorOpen(false)}
         onSaveLogos={(newLogos, newLocalColors) => {
           setLogos({

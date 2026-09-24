@@ -168,6 +168,22 @@ export function Header({
               </button>
             )}
 
+            {/* Quick Day / Night Theme Toggle */}
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-amber-400 hover:text-amber-300 transition-colors shadow-sm touch-target"
+                title={theme === 'dark' ? 'Cambiar a Modo Día (Luminoso)' : 'Cambiar a Modo Noche (Oscuro)'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-cyan-300" />
+                )}
+              </button>
+            )}
+
             {/* Notification Bell */}
             <div
               className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-slate-300 relative cursor-pointer transition-colors"

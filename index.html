@@ -26,7 +26,7 @@
     <meta name="msapplication-TileColor" content="#0f172a" />
     <meta name="msapplication-TileImage" content="https://checklistvg.netlify.app/icon-512.png?v=5" />
 
-    <link rel="manifest" href="/manifest.json?v=6" />
+    <link rel="manifest" href="/manifest.json?v=8" />
     <link rel="icon" type="image/png" sizes="1024x1024" href="/icon.png?v=5" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5" />
     <link rel="icon" type="image/png" sizes="256x256" href="/icon-256.png?v=5" />
@@ -108,12 +108,30 @@
       })();
     </script>
     <script>
-      // Desbloquear orientación para permitir uso apaisado (landscape) en tablets y PCs
-      try {
-        if (window.screen && window.screen.orientation && window.screen.orientation.unlock) {
-          window.screen.orientation.unlock().catch(function() {});
+      // Optimización de orientación para tablet: detectar tablet y fijar apaisado (landscape)
+      (function() {
+        function enforceLandscapeOnTablet() {
+          try {
+            var minSide = Math.min(window.screen.width, window.screen.height);
+            var isTablet = minSide >= 500 || /tablet|ipad|playbook|silk/i.test(navigator.userAgent);
+            if (window.screen && window.screen.orientation) {
+              if (isTablet && window.screen.orientation.lock) {
+                window.screen.orientation.lock('landscape').catch(function() {
+                  if (window.screen.orientation.unlock) window.screen.orientation.unlock();
+                });
+              } else if (window.screen.orientation.unlock) {
+                window.screen.orientation.unlock();
+              }
+            }
+          } catch(e) {}
         }
-      } catch(e) {}
+        enforceLandscapeOnTablet();
+        window.addEventListener('DOMContentLoaded', enforceLandscapeOnTablet);
+        window.addEventListener('load', enforceLandscapeOnTablet);
+        window.addEventListener('pointerdown', enforceLandscapeOnTablet, { once: true });
+        window.addEventListener('touchstart', enforceLandscapeOnTablet, { once: true });
+        window.addEventListener('click', enforceLandscapeOnTablet, { once: true });
+      })();
     </script>
     <script>
       if ('serviceWorker' in navigator) {
