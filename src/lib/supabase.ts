@@ -56,6 +56,11 @@ export async function loadCloudData(): Promise<{
  */
 export async function saveProjectsToCloud(projects: Project[]): Promise<{ success: boolean; status: CloudSyncStatus; error?: any }> {
   try {
+    if (!projects || !Array.isArray(projects) || projects.length === 0) {
+      console.warn('saveProjectsToCloud: Intento de guardar arreglo de proyectos vacío bloqueado por seguridad.');
+      return { success: false, status: 'synced' };
+    }
+
     const { error } = await supabase
       .from('app_data')
       .upsert({

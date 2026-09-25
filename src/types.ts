@@ -94,20 +94,45 @@ export interface ProjectCustomService {
 }
 
 export type CalendarEventType = 'task' | 'alarm' | 'event';
+export type PMTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed';
+
+export interface PMSubtask {
+  id: string;
+  title: string;
+  completed: boolean;
+  completedAt?: string;
+}
+
+export interface ProjectManagerAlarms {
+  isOverdueStart: boolean; // Tarea que debía haber iniciado y sigue pendiente
+  isUpcomingDeadline: boolean; // Cierre próximo (vence en 72 hs o menos)
+  isCriticalDelay: boolean; // Superó la fecha límite y sigue incompleta
+  daysOverdue: number; // Días de retraso (si vencida)
+  daysUntilDeadline: number; // Días restantes hasta el cierre
+}
 
 export interface ProjectCalendarEvent {
   id: string;
   projectId: string; // Garantiza vinculación exclusiva a cada obra
   title: string;
   description?: string;
-  date: string; // Formato YYYY-MM-DD
+  date: string; // Formato YYYY-MM-DD (fecha límite o fecha de evento)
+  startDate?: string; // Formato YYYY-MM-DD (fecha de inicio programada)
   time?: string; // Formato HH:mm
   type: CalendarEventType; // 'task' (Tarea técnica) | 'alarm' (Alarma / Vencimiento) | 'event' (Evento / Reunión)
   priority?: 'low' | 'medium' | 'high' | 'urgent'; // Baja, Media, Alta, Urgente
+  status?: PMTaskStatus; // 'pending' | 'in_progress' | 'blocked' | 'completed'
   completed?: boolean;
+  assignedTo?: string; // Responsable o encargado de la tarea
+  assignedRole?: string; // Rol o especialidad del responsable (ej. "Director de Obra", "Capataz", "Instalador")
+  subtasks?: PMSubtask[]; // Subtareas interactivas con checklist
+  category?: string; // Rubro o especialidad
   color?: string;
   createdAt?: string;
+  updatedAt?: string; // Timestamp ISO para sincronización multi-dispositivo determinista
 }
+
+export type ProjectManagerTask = ProjectCalendarEvent;
 
 export interface Project {
   id: string;

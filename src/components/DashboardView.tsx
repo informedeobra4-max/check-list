@@ -41,6 +41,7 @@ interface DashboardViewProps {
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
+  onOpenProjectManager?: (projectId: string) => void;
   onSaveCalendarEvent?: (projectId: string, event: ProjectCalendarEvent) => void;
   onDeleteCalendarEvent?: (projectId: string, eventId: string) => void;
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
@@ -63,6 +64,7 @@ export function DashboardView({
   onToggleManualMilestone,
   onUpdateProjectDates,
   onEditProject,
+  onOpenProjectManager,
   onSaveCalendarEvent,
   onDeleteCalendarEvent,
   onToggleCalendarEvent,
@@ -453,6 +455,7 @@ export function DashboardView({
                       project={project}
                       neonColor={neonColor}
                       onOpenCalendarModal={handleOpenCalendarModal}
+                      onOpenProjectManager={onOpenProjectManager}
                       onToggleCalendarEvent={onToggleCalendarEvent}
                     />
                   </div>

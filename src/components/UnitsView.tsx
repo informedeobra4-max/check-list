@@ -24,7 +24,8 @@ import {
   PenTool,
   SlidersHorizontal,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Briefcase
 } from 'lucide-react';
 import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor, hexToRgba } from '../utils/calculations';
@@ -50,6 +51,7 @@ interface UnitsViewProps {
   onUpdateMilestoneProgress?: (projectId: string, milestoneId: string, percentage: number) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
+  onOpenProjectManager?: (projectId: string) => void;
   onOpenUnitBlueprints?: (unit: Unit) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
@@ -72,6 +74,7 @@ export function UnitsView({
   onUpdateMilestoneProgress,
   onUpdateProjectDates,
   onEditProject,
+  onOpenProjectManager,
   onOpenUnitBlueprints,
   onAddTrade,
   onDeleteTrade,
@@ -328,6 +331,23 @@ export function UnitsView({
 
         {/* Action buttons inside project summary */}
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-800/80">
+          {onOpenProjectManager && (
+            <button
+              type="button"
+              onClick={() => onOpenProjectManager(project.id)}
+              className="px-3 py-1.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(6,182,212,0.2)] active:scale-95"
+              title="Abrir módulo integral de Project Manager y Agenda de Obra"
+            >
+              <Briefcase className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Project Manager</span>
+              {project.calendarEvents && project.calendarEvents.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 bg-cyan-500/30 text-cyan-200 text-[10px] rounded-full font-black">
+                  {project.calendarEvents.length}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={() => onOpenReportModal('project', project.id)}
             className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors"

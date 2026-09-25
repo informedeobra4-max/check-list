@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, AlertTriangle, CheckSquare, Clock, Flag, Bell, Sparkles } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, AlertTriangle, CheckSquare, Clock, Flag, Bell, Sparkles, Briefcase, Flame } from 'lucide-react';
 import { Project, ProjectCalendarEvent } from '../types';
 import { hexToRgba } from '../utils/calculations';
+import { calculateProjectPMStats, getTaskAlarms } from '../utils/pmCalculations';
 
 interface ProjectCalendarCardProps {
   project: Project;
   neonColor?: string;
   onOpenCalendarModal: (projectId: string, initialDate?: string, selectedEventId?: string) => void;
+  onOpenProjectManager?: (projectId: string) => void;
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
 }
 
@@ -21,6 +23,7 @@ export function ProjectCalendarCard({
   project,
   neonColor = '#00f2fe',
   onOpenCalendarModal,
+  onOpenProjectManager,
   onToggleCalendarEvent
 }: ProjectCalendarCardProps) {
   // Current real date or project base date
@@ -31,6 +34,11 @@ export function ProjectCalendarCard({
     const d = String(now.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }, [now]);
+
+  // Project Manager stats calculation
+  const pmStats = useMemo(() => {
+    return calculateProjectPMStats(project.calendarEvents || [], todayStr);
+  }, [project.calendarEvents, todayStr]);
 
   // Calendar month/year navigation state
   const [viewDate, setViewDate] = useState<Date>(() => {
@@ -178,6 +186,21 @@ export function ProjectCalendarCard({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
+            {onOpenProjectManager && (
+              <button
+                type="button"
+                onClick={() => onOpenProjectManager(project.id)}
+                className="px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 transition-all shadow-xs active:scale-95 bg-slate-800 text-slate-200 hover:text-white hover:bg-slate-700 border border-slate-700"
+                title="Abrir módulo Project Manager profesional de esta obra"
+              >
+                <Briefcase className="w-3 h-3 text-cyan-400" />
+                <span>PM</span>
+                {pmStats.criticalDelayCount > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onOpenCalendarModal(project.id, selectedDateStr)}
@@ -191,13 +214,27 @@ export function ProjectCalendarCard({
           </div>
         </div>
 
-        {/* Month Stats Indicators Pill */}
-        <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1.5 border-b border-slate-800/80 mb-2">
+        {/* Month Stats Indicators Pill & PM Badges */}
+        <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1.5 border-b border-slate-800/80 mb-2 flex-wrap gap-1">
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
-              <span className="font-semibold">{monthStats.alarmCount} alarmas</span>
-            </span>
+            {pmStats.criticalDelayCount > 0 && (
+              <span
+                onClick={() => onOpenProjectManager && onOpenProjectManager(project.id)}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse"
+                title="Ver tareas con retraso crítico en Project Manager"
+              >
+                <Flame className="w-3 h-3 text-rose-400" />
+                <span>{pmStats.criticalDelayCount} críticas</span>
+              </span>
+            )}
+
+            {pmStats.upcomingDeadlineCount > 0 && (
+              <span className="flex items-center gap-1 text-amber-400 font-bold">
+                <Clock className="w-3 h-3 text-amber-400" />
+                <span>{pmStats.upcomingDeadlineCount} próx.</span>
+              </span>
+            )}
+
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span>
               <span className="font-semibold">{monthStats.taskCount} tareas</span>
@@ -234,6 +271,7 @@ export function ProjectCalendarCard({
 
             const dayEvts = eventsByDate.get(dateStr) || [];
             const dayMilestones = milestonesByDate.get(dateStr) || [];
+            const hasCritical = dayEvts.some(e => getTaskAlarms(e, todayStr).isCriticalDelay);
             const hasAlarms = dayEvts.some(e => e.type === 'alarm');
             const hasTasks = dayEvts.some(e => e.type === 'task');
             const hasEvents = dayEvts.some(e => e.type === 'event');
@@ -267,13 +305,15 @@ export function ProjectCalendarCard({
                 {/* Event Dots Container */}
                 {hasAny && (
                   <div className="flex items-center justify-center gap-0.5 mt-0.5 leading-none">
-                    {hasAlarms && (
+                    {hasCritical ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,1)] animate-pulse" />
+                    ) : hasAlarms ? (
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_4px_rgba(244,63,94,0.8)] animate-pulse" />
-                    )}
-                    {hasTasks && !hasAlarms && (
+                    ) : null}
+                    {hasTasks && !hasAlarms && !hasCritical && (
                       <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                     )}
-                    {hasEvents && !hasAlarms && !hasTasks && (
+                    {hasEvents && !hasAlarms && !hasTasks && !hasCritical && (
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                     )}
                     {hasMilestone && (
