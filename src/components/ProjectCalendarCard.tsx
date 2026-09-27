@@ -8,7 +8,12 @@ interface ProjectCalendarCardProps {
   project: Project;
   neonColor?: string;
   onOpenCalendarModal: (projectId: string, initialDate?: string, selectedEventId?: string) => void;
-  onOpenProjectManager?: (projectId: string) => void;
+  onOpenProjectManager?: (
+    projectId: string,
+    initialTab?: 'dashboard' | 'tasks' | 'calendar',
+    initialDate?: string,
+    selectedTaskId?: string
+  ) => void;
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
 }
 
@@ -186,30 +191,24 @@ export function ProjectCalendarCard({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
-            {onOpenProjectManager && (
-              <button
-                type="button"
-                onClick={() => onOpenProjectManager(project.id)}
-                className="px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 transition-all shadow-xs active:scale-95 bg-slate-800 text-slate-200 hover:text-white hover:bg-slate-700 border border-slate-700"
-                title="Abrir módulo Project Manager profesional de esta obra"
-              >
-                <Briefcase className="w-3 h-3 text-cyan-400" />
-                <span>PM</span>
-                {pmStats.criticalDelayCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                )}
-              </button>
-            )}
-
             <button
               type="button"
-              onClick={() => onOpenCalendarModal(project.id, selectedDateStr)}
-              className="ml-0.5 px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 transition-all shadow-xs active:scale-95 text-slate-950"
+              onClick={() => {
+                if (onOpenProjectManager) {
+                  onOpenProjectManager(project.id, 'dashboard', selectedDateStr);
+                } else {
+                  onOpenCalendarModal(project.id, selectedDateStr);
+                }
+              }}
+              className="ml-1 px-2.5 py-1 rounded-xl text-[10.5px] font-black flex items-center gap-1.5 transition-all shadow-md active:scale-95 text-slate-950 shrink-0"
               style={{ backgroundColor: neonColor }}
-              title="Abrir agenda de esta obra para agregar tareas o alarmas"
+              title="Abrir Planificación & Gantt interactivo estilo Dribbble de esta obra"
             >
-              <Plus className="w-3 h-3 stroke-[3]" />
-              <span>Agenda</span>
+              <Briefcase className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Planificación & Gantt</span>
+              {pmStats.criticalDelayCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
+              )}
             </button>
           </div>
         </div>
@@ -219,7 +218,7 @@ export function ProjectCalendarCard({
           <div className="flex items-center gap-2">
             {pmStats.criticalDelayCount > 0 && (
               <span
-                onClick={() => onOpenProjectManager && onOpenProjectManager(project.id)}
+                onClick={() => onOpenProjectManager ? onOpenProjectManager(project.id, 'dashboard') : onOpenCalendarModal(project.id)}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse"
                 title="Ver tareas con retraso crítico en Project Manager"
               >
@@ -283,7 +282,13 @@ export function ProjectCalendarCard({
                 key={dateStr}
                 type="button"
                 onClick={() => setSelectedDateStr(dateStr)}
-                onDoubleClick={() => onOpenCalendarModal(project.id, dateStr)}
+                onDoubleClick={() => {
+                  if (onOpenProjectManager) {
+                    onOpenProjectManager(project.id, 'dashboard', dateStr);
+                  } else {
+                    onOpenCalendarModal(project.id, dateStr);
+                  }
+                }}
                 className={`h-6 rounded-lg text-[10.5px] font-bold flex flex-col items-center justify-center relative transition-all duration-150 ${
                   isSelected
                     ? 'bg-slate-700/90 text-white ring-1 ring-amber-400 shadow-sm'
@@ -296,7 +301,7 @@ export function ProjectCalendarCard({
                     ? { borderColor: neonColor, boxShadow: `0 0 8px ${hexToRgba(neonColor, 0.4)}` }
                     : undefined
                 }
-                title={`${dayNum} de ${MONTH_NAMES[currentMonth]}: ${dayEvts.length} ítems, ${dayMilestones.length} hitos (Doble clic para gestionar)`}
+                title={`${dayNum} de ${MONTH_NAMES[currentMonth]}: ${dayEvts.length} ítems, ${dayMilestones.length} hitos (Doble clic para Planificación)`}
               >
                 <span className={`leading-none ${isToday ? 'font-black' : ''}`}>
                   {dayNum}
@@ -341,7 +346,13 @@ export function ProjectCalendarCard({
 
           <button
             type="button"
-            onClick={() => onOpenCalendarModal(project.id, selectedDateStr)}
+            onClick={() => {
+              if (onOpenProjectManager) {
+                onOpenProjectManager(project.id, 'dashboard', selectedDateStr);
+              } else {
+                onOpenCalendarModal(project.id, selectedDateStr);
+              }
+            }}
             className="text-[9.5px] text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-0.5"
           >
             <span>Ver día</span>
@@ -355,7 +366,13 @@ export function ProjectCalendarCard({
             {selectedDayEvents.map(evt => (
               <div
                 key={evt.id}
-                onClick={() => onOpenCalendarModal(project.id, selectedDateStr, evt.id)}
+                onClick={() => {
+                  if (onOpenProjectManager) {
+                    onOpenProjectManager(project.id, 'dashboard', selectedDateStr, evt.id);
+                  } else {
+                    onOpenCalendarModal(project.id, selectedDateStr, evt.id);
+                  }
+                }}
                 className="p-1 px-1.5 rounded-lg bg-slate-950/70 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 transition-all flex items-center justify-between gap-1.5 cursor-pointer group"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -390,7 +407,13 @@ export function ProjectCalendarCard({
             {selectedDayMilestones.map(ms => (
               <div
                 key={ms.id}
-                onClick={() => onOpenCalendarModal(project.id, selectedDateStr)}
+                onClick={() => {
+                  if (onOpenProjectManager) {
+                    onOpenProjectManager(project.id, 'dashboard', selectedDateStr);
+                  } else {
+                    onOpenCalendarModal(project.id, selectedDateStr);
+                  }
+                }}
                 className="p-1 px-1.5 rounded-lg bg-purple-950/40 hover:bg-purple-950/70 border border-purple-800/60 transition-all flex items-center justify-between gap-1.5 cursor-pointer"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -409,7 +432,11 @@ export function ProjectCalendarCard({
           <div
             onClick={() => {
               setSelectedDateStr(nextUpcomingEvent.date);
-              onOpenCalendarModal(project.id, nextUpcomingEvent.date, nextUpcomingEvent.id);
+              if (onOpenProjectManager) {
+                onOpenProjectManager(project.id, 'dashboard', nextUpcomingEvent.date, nextUpcomingEvent.id);
+              } else {
+                onOpenCalendarModal(project.id, nextUpcomingEvent.date, nextUpcomingEvent.id);
+              }
             }}
             className="p-1.5 rounded-lg bg-slate-950/50 border border-slate-800/80 hover:border-slate-700 transition-all flex items-center justify-between gap-2 cursor-pointer group"
           >
@@ -430,7 +457,13 @@ export function ProjectCalendarCard({
             </span>
             <button
               type="button"
-              onClick={() => onOpenCalendarModal(project.id, selectedDateStr)}
+              onClick={() => {
+                if (onOpenProjectManager) {
+                  onOpenProjectManager(project.id, 'dashboard', selectedDateStr);
+                } else {
+                  onOpenCalendarModal(project.id, selectedDateStr);
+                }
+              }}
               className="text-[9.5px] text-slate-300 hover:text-white font-bold bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded transition-colors"
             >
               + Agregar

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Briefcase,
@@ -202,6 +202,35 @@ export function ProjectManagerModal({
     setNewSubtaskDraft('');
     setIsEditorOpen(true);
   };
+
+  // Synchronize tab and task selection whenever modal opens or props change
+  useEffect(() => {
+    if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
+      if (initialDate) {
+        setCalSelectedDateStr(initialDate);
+        const parts = initialDate.split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          const d = parseInt(parts[2], 10);
+          if (!isNaN(y) && !isNaN(m)) {
+            setGanttViewDate(new Date(y, m - 1, 1));
+            setCalDate(new Date(y, m - 1, 1));
+            setWindowStartIndex(d > 16 ? 16 : 0);
+          }
+        }
+      }
+      if (selectedTaskId && project?.calendarEvents) {
+        const found = project.calendarEvents.find(t => t.id === selectedTaskId);
+        if (found) {
+          handleEditTask(found);
+        }
+      }
+    }
+  }, [isOpen, initialTab, initialDate, selectedTaskId, project?.calendarEvents]);
 
   const handleAddSubtask = () => {
     const trimmed = newSubtaskDraft.trim();

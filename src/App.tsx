@@ -539,15 +539,26 @@ export default function App() {
   const [pmModalState, setPmModalState] = useState<{
     isOpen: boolean;
     projectId: string | null;
+    initialTab?: 'dashboard' | 'tasks' | 'calendar';
+    initialDate?: string;
+    selectedTaskId?: string;
   }>({
     isOpen: false,
     projectId: null
   });
 
-  const handleOpenProjectManager = (projectId: string) => {
+  const handleOpenProjectManager = (
+    projectId: string,
+    initialTab: 'dashboard' | 'tasks' | 'calendar' = 'dashboard',
+    initialDate?: string,
+    selectedTaskId?: string
+  ) => {
     setPmModalState({
       isOpen: true,
-      projectId
+      projectId,
+      initialTab,
+      initialDate,
+      selectedTaskId
     });
   };
 
@@ -2554,6 +2565,9 @@ export default function App() {
         <ProjectManagerModal
           isOpen={pmModalState.isOpen}
           project={activePMProject}
+          initialTab={pmModalState.initialTab || 'dashboard'}
+          initialDate={pmModalState.initialDate}
+          selectedTaskId={pmModalState.selectedTaskId}
           neonColor={localColors.neonColor || '#00f2fe'}
           onClose={handleCloseProjectManager}
           onSaveTask={handleSaveCalendarEvent}

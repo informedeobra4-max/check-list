@@ -23,7 +23,6 @@ import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 import { ExecutiveGaugeChart } from './ExecutiveGaugeChart';
 import { ExecutiveTimeline } from './ExecutiveTimeline';
 import { ProjectCalendarCard } from './ProjectCalendarCard';
-import { ProjectCalendarModal } from './ProjectCalendarModal';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -41,7 +40,12 @@ interface DashboardViewProps {
   onToggleManualMilestone: (projectId: string, milestoneId: string) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
-  onOpenProjectManager?: (projectId: string) => void;
+  onOpenProjectManager?: (
+    projectId: string,
+    initialTab?: 'dashboard' | 'tasks' | 'calendar',
+    initialDate?: string,
+    selectedTaskId?: string
+  ) => void;
   onSaveCalendarEvent?: (projectId: string, event: ProjectCalendarEvent) => void;
   onDeleteCalendarEvent?: (projectId: string, eventId: string) => void;
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
@@ -76,34 +80,12 @@ export function DashboardView({
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [hoverTriggers, setHoverTriggers] = useState<Record<string, number>>({});
 
-  // State for project calendar modal (strictly isolated per project)
-  const [calendarModalState, setCalendarModalState] = useState<{
-    isOpen: boolean;
-    projectId: string | null;
-    initialDate?: string;
-    selectedEventId?: string;
-  }>({
-    isOpen: false,
-    projectId: null
-  });
-
+  // Route any calendar click directly to the new Project Manager & Planning modal
   const handleOpenCalendarModal = (projectId: string, initialDate?: string, selectedEventId?: string) => {
-    setCalendarModalState({
-      isOpen: true,
-      projectId,
-      initialDate,
-      selectedEventId
-    });
+    if (onOpenProjectManager) {
+      onOpenProjectManager(projectId, 'dashboard', initialDate, selectedEventId);
+    }
   };
-
-  const handleCloseCalendarModal = () => {
-    setCalendarModalState({
-      isOpen: false,
-      projectId: null
-    });
-  };
-
-  const activeCalendarProject = projects.find(p => p.id === calendarModalState.projectId) || null;
 
   // Compute status and progress for each project
   const projectsWithProgress = projects.map(project => {
@@ -549,28 +531,6 @@ export function DashboardView({
           })
         )}
       </div>
-
-      {/* Modal de Agenda / Calendario Interactivo por Obra */}
-      {calendarModalState.isOpen && activeCalendarProject && (
-        <ProjectCalendarModal
-          isOpen={calendarModalState.isOpen}
-          project={activeCalendarProject}
-          initialDate={calendarModalState.initialDate}
-          selectedEventId={calendarModalState.selectedEventId}
-          neonColor={neonColor}
-          onClose={handleCloseCalendarModal}
-          onSaveEvent={(projId, evt) => {
-            if (onSaveCalendarEvent) onSaveCalendarEvent(projId, evt);
-          }}
-          onDeleteEvent={(projId, evtId) => {
-            if (onDeleteCalendarEvent) onDeleteCalendarEvent(projId, evtId);
-          }}
-          onToggleEventCompleted={(projId, evtId) => {
-            if (onToggleCalendarEvent) onToggleCalendarEvent(projId, evtId);
-          }}
-          onShowToast={onShowToast || (() => {})}
-        />
-      )}
     </section>
   );
 }
