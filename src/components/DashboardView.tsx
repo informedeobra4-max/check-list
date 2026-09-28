@@ -20,7 +20,6 @@ import {
 import { Project, StatusFilter, ProjectCalendarEvent } from '../types';
 import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea, hexToRgba } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
-import { ExecutiveTimeline } from './ExecutiveTimeline';
 import { ProjectCalendarCard } from './ProjectCalendarCard';
 import { ProjectGanttCard } from './ProjectGanttCard';
 
@@ -249,12 +248,6 @@ export function DashboardView({
             const isCurrentActive = activeCardId ? activeCardId === project.id : idx === 0;
             const displayProgress = progress > 0 ? progress : (idx === 0 ? 7 : 5);
 
-            const isCritical = displayProgress < 30;
-            const delayMonths = idx === 0 ? 3 : 2;
-            const delayBadgeLabel = isCritical
-              ? 'DEMORA CRÍTICA: +3 MESES'
-              : 'ESTADO: ATENCIÓN +2 MESES';
-
             // Real stats for Deptos Terminados
             const deptosList = project.units.filter(u => !isUnitCommonArea(u));
             const totalDeptos = deptosList.length > 0 ? deptosList.length : project.units.length;
@@ -373,42 +366,24 @@ export function DashboardView({
                     </div>
                   </div>
 
-                  {/* Middle Section: Diagrama de Gantt & Calendario Interactivo de Obra */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {/* Left Box: Diagrama de Gantt Deslizable con el Dedo */}
-                    <div className="min-w-0 h-full">
-                      <ProjectGanttCard
-                        project={project}
-                        neonColor={neonColor}
-                        onOpenProjectManager={onOpenProjectManager}
-                        onOpenCalendarModal={handleOpenCalendarModal}
-                      />
-                    </div>
-
-                    {/* Right Box: Calendario Interactivo de Obra (Aislado e Intacto) */}
-                    <div className="min-w-0 h-full">
-                      <ProjectCalendarCard
-                        project={project}
-                        neonColor={neonColor}
-                        onOpenCalendarModal={handleOpenCalendarModal}
-                        onOpenProjectManager={onOpenProjectManager}
-                        onToggleCalendarEvent={onToggleCalendarEvent}
-                      />
-                    </div>
+                  {/* Calendario Compacto de Obra Arriba */}
+                  <div className="w-full pt-1">
+                    <ProjectCalendarCard
+                      project={project}
+                      neonColor={neonColor}
+                      onOpenCalendarModal={handleOpenCalendarModal}
+                      onOpenProjectManager={onOpenProjectManager}
+                      onToggleCalendarEvent={onToggleCalendarEvent}
+                    />
                   </div>
 
-                  {/* Lower Section: Cronograma Detallado */}
-                  <div className="bg-[#0f172a]/60 rounded-2xl p-3 sm:p-3.5 border border-slate-800/90 space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                      Cronograma Detallado
-                    </span>
-                    <ExecutiveTimeline
-                      startDate={project.startDate}
-                      estimatedEndDate={project.estimatedEndDate}
-                      progress={displayProgress}
-                      delayMonths={delayMonths}
-                      milestones={project.milestones || []}
+                  {/* Diagrama de Gantt a lo Ancho Completo de la Ventana de Obra */}
+                  <div className="w-full">
+                    <ProjectGanttCard
                       project={project}
+                      neonColor={neonColor}
+                      onOpenProjectManager={onOpenProjectManager}
+                      onOpenCalendarModal={handleOpenCalendarModal}
                     />
                   </div>
                 </div>

@@ -192,6 +192,36 @@ export function ProjectGanttCard({
     setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
   };
 
+  // Soporte de arrastre con mouse (drag to scroll) además del deslizamiento táctil con el dedo
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Si se hace clic en un botón, enlace o píldora interactiva, no iniciar arrastre
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, [data-interactive="true"]')) return;
+    if (!scrollRef.current) return;
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    startXRef.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeftRef.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.3;
+    scrollRef.current.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isDraggingRef.current = false;
+    setIsDragging(false);
+  };
+
   const handleOpenPM = (taskId?: string, dateStr?: string) => {
     if (onOpenProjectManager) {
       onOpenProjectManager(project.id, taskId ? 'tasks' : 'dashboard', dateStr || todayStr, taskId);
@@ -300,10 +330,18 @@ export function ProjectGanttCard({
       {/* 2. MATRIZ DE GANTT DESLIZABLE CON EL DEDO (TOUCH-PAN-X) */}
       <div
         ref={scrollRef}
-        className="overflow-x-auto overflow-y-auto custom-scrollbar touch-pan-x flex-1 overscroll-x-contain my-1 select-none max-h-[220px]"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport touch-pan-x flex-1 overscroll-x-contain my-1 select-none max-h-[300px] ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
         style={{
           WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x'
+          touchAction: 'pan-x',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
         }}
       >
         <div
@@ -466,6 +504,7 @@ export function ProjectGanttCard({
                     return (
                       <div
                         key={task.id}
+                        data-interactive="true"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenPM(task.id, task.date);
