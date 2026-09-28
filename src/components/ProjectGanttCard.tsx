@@ -42,6 +42,19 @@ const MONTH_NAMES = [
 
 const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
+function normalizeDateStr(d?: string): string {
+  if (!d) return '';
+  const clean = d.split('T')[0].trim();
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return clean;
+}
+
 const DAY_WIDTH = 28; // Ancho en píxeles de cada columna de día
 const STICKY_COL_WIDTH = 145; // Ancho de la columna izquierda de responsables
 
@@ -69,12 +82,12 @@ export function ProjectGanttCard({
     // Recolectar fechas clave de tareas e hitos
     const dates: string[] = [todayStr];
     allEvents.forEach(e => {
-      if (e.date) dates.push(e.date);
-      if (e.startDate) dates.push(e.startDate);
+      if (e.date) dates.push(normalizeDateStr(e.date));
+      if (e.startDate) dates.push(normalizeDateStr(e.startDate));
     });
     (project.milestones || []).forEach(m => {
-      if (m.targetDate) dates.push(m.targetDate);
-      if ((m as any).endDate) dates.push((m as any).endDate);
+      if (m.targetDate) dates.push(normalizeDateStr(m.targetDate));
+      if ((m as any).endDate) dates.push(normalizeDateStr((m as any).endDate));
     });
 
     // El cronograma siempre comienza estrictamente 2 meses antes del mes actual para ver semanas recientes
@@ -188,8 +201,9 @@ export function ProjectGanttCard({
 
     // 1. Contratistas oficiales
     activeContractors.forEach(c => {
+      const cName = c.name.trim().toLowerCase();
       const assigned = allEvents.filter(
-        e => e.assignedTo?.trim().toLowerCase() === c.name.toLowerCase()
+        e => (e.assignedTo || '').trim().toLowerCase() === cName
       );
       rawRows.push({
         profile: c,
@@ -198,20 +212,21 @@ export function ProjectGanttCard({
     });
 
     // 2. Responsables presentes en tareas no incluidos en la lista oficial
-    const assignedNames = new Set(activeContractors.map(c => c.name.toLowerCase()));
+    const assignedNames = new Set(activeContractors.map(c => c.name.trim().toLowerCase()));
     allEvents.forEach(e => {
-      if (e.assignedTo?.trim() && !assignedNames.has(e.assignedTo.trim().toLowerCase())) {
-        assignedNames.add(e.assignedTo.trim().toLowerCase());
-        const prof = getContractorProfile(e.assignedTo.trim(), e.assignedRole, activeContractors);
+      const aName = (e.assignedTo || '').trim().toLowerCase();
+      if (aName && !assignedNames.has(aName)) {
+        assignedNames.add(aName);
+        const prof = getContractorProfile(e.assignedTo!.trim(), e.assignedRole, activeContractors);
         rawRows.push({
           profile: prof,
-          tasks: allEvents.filter(t => t.assignedTo?.trim().toLowerCase() === e.assignedTo?.trim().toLowerCase())
+          tasks: allEvents.filter(t => (t.assignedTo || '').trim().toLowerCase() === aName)
         });
       }
     });
 
     // 3. Tareas generales sin asignar
-    const unassignedTasks = allEvents.filter(e => !e.assignedTo?.trim());
+    const unassignedTasks = allEvents.filter(e => !(e.assignedTo || '').trim());
     if (unassignedTasks.length > 0) {
       rawRows.unshift({
         profile: getContractorProfile('Cuadrilla General', 'Tareas Generales', activeContractors),
@@ -222,8 +237,8 @@ export function ProjectGanttCard({
     // Calcular posición y carril (lane) para cada tarea continua
     return rawRows.map(row => {
       const sorted = [...row.tasks].sort((a, b) => {
-        const aStart = a.startDate || a.date;
-        const bStart = b.startDate || b.date;
+        const aStart = normalizeDateStr(a.startDate || a.date);
+        const bStart = normalizeDateStr(b.startDate || b.date);
         return aStart.localeCompare(bStart);
       });
 
@@ -240,11 +255,17 @@ export function ProjectGanttCard({
         isApproachingNoProgress: boolean;
         pillClasses: string;
         statusText: string;
+        taskProgress: number;
       }[] = [];
 
       sorted.forEach(task => {
-        const taskStart = task.startDate || task.date;
-        const taskEnd = task.date;
+        const rawStart = normalizeDateStr(task.startDate || task.date);
+        const rawEnd = normalizeDateStr(task.date || task.startDate);
+        if (!rawStart && !rawEnd) return;
+
+        // Invertir si startDate es posterior a date (ej. cargaron fecha inicio > fin por error)
+        const taskStart = rawStart && rawEnd && rawStart > rawEnd ? rawEnd : (rawStart || rawEnd);
+        const taskEnd = rawStart && rawEnd && rawStart > rawEnd ? rawStart : (rawEnd || rawStart);
 
         if (taskEnd < timelineStartStr || taskStart > timelineEndStr) return;
 
@@ -673,7 +694,7 @@ export function ProjectGanttCard({
 
                   {/* Píldoras de Hitos con color condicional y titilado */}
                   {projectMilestones.map(m => {
-                    const mDate = m.targetDate || (m as any).endDate;
+                    const mDate = normalizeDateStr(m.targetDate || (m as any).endDate);
                     if (!mDate || mDate < timelineStartStr || mDate > timelineEndStr) return null;
 
                     const mIdx = dateToIndex.get(mDate);
@@ -785,7 +806,7 @@ export function ProjectGanttCard({
                           e.stopPropagation();
                           handleOpenPM(task.id, task.date);
                         }}
-                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border relative overflow-hidden ${pillClasses}`}
+                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border overflow-hidden ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
                           width: `${width}px`,

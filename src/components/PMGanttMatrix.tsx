@@ -44,6 +44,19 @@ const MONTH_NAMES_ES = [
 
 const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
+export function normalizeDateStr(d?: string): string {
+  if (!d) return '';
+  const clean = d.split('T')[0].trim();
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return clean;
+}
+
 const DAY_WIDTH = 30; // Ancho en px de cada columna de día
 const STICKY_COL_WIDTH = 190; // Ancho de la columna de responsables
 
@@ -71,12 +84,12 @@ export function PMGanttMatrix({
     // Fechas relevantes
     const dates: string[] = [todayStr];
     allEvents.forEach(e => {
-      if (e.date) dates.push(e.date);
-      if (e.startDate) dates.push(e.startDate);
+      if (e.date) dates.push(normalizeDateStr(e.date));
+      if (e.startDate) dates.push(normalizeDateStr(e.startDate));
     });
     (project.milestones || []).forEach(m => {
-      if (m.targetDate) dates.push(m.targetDate);
-      if ((m as any).endDate) dates.push((m as any).endDate);
+      if (m.targetDate) dates.push(normalizeDateStr(m.targetDate));
+      if ((m as any).endDate) dates.push(normalizeDateStr((m as any).endDate));
     });
 
     // El cronograma siempre comienza 2 meses antes del mes actual para ver semanas recientes
@@ -192,8 +205,9 @@ export function PMGanttMatrix({
 
     // 1. Contratistas oficiales
     activeContractors.forEach(c => {
+      const cName = c.name.trim().toLowerCase();
       const assigned = allEvents.filter(
-        e => e.assignedTo?.trim().toLowerCase() === c.name.toLowerCase()
+        e => (e.assignedTo || '').trim().toLowerCase() === cName
       );
       rawRows.push({
         profile: c,
@@ -202,20 +216,21 @@ export function PMGanttMatrix({
     });
 
     // 2. Responsables presentes en tareas no incluidos en la lista oficial
-    const assignedNames = new Set(activeContractors.map(c => c.name.toLowerCase()));
+    const assignedNames = new Set(activeContractors.map(c => c.name.trim().toLowerCase()));
     allEvents.forEach(e => {
-      if (e.assignedTo?.trim() && !assignedNames.has(e.assignedTo.trim().toLowerCase())) {
-        assignedNames.add(e.assignedTo.trim().toLowerCase());
-        const prof = getContractorProfile(e.assignedTo.trim(), e.assignedRole, activeContractors);
+      const aName = (e.assignedTo || '').trim().toLowerCase();
+      if (aName && !assignedNames.has(aName)) {
+        assignedNames.add(aName);
+        const prof = getContractorProfile(e.assignedTo!.trim(), e.assignedRole, activeContractors);
         rawRows.push({
           profile: prof,
-          tasks: allEvents.filter(t => t.assignedTo?.trim().toLowerCase() === e.assignedTo?.trim().toLowerCase())
+          tasks: allEvents.filter(t => (t.assignedTo || '').trim().toLowerCase() === aName)
         });
       }
     });
 
     // 3. Tareas generales sin asignar
-    const unassignedTasks = allEvents.filter(e => !e.assignedTo?.trim());
+    const unassignedTasks = allEvents.filter(e => !(e.assignedTo || '').trim());
     if (unassignedTasks.length > 0) {
       rawRows.unshift({
         profile: getContractorProfile('Cuadrilla General', 'Tareas Generales', activeContractors),
@@ -228,7 +243,8 @@ export function PMGanttMatrix({
       const filteredTasks = row.tasks.filter(task => {
         if (statusFilter === 'all') return true;
         const alarms = getTaskAlarms(task, todayStr);
-        const daysDiff = getDaysDiff(task.date, todayStr);
+        const rawTaskDate = normalizeDateStr(task.date || task.startDate);
+        const daysDiff = getDaysDiff(rawTaskDate, todayStr);
         const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
         const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
         const isCrit = !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProgress) || task.type === 'alarm' || alarms.isCriticalDelay);
@@ -241,8 +257,8 @@ export function PMGanttMatrix({
       });
 
       const sorted = [...filteredTasks].sort((a, b) => {
-        const aStart = a.startDate || a.date;
-        const bStart = b.startDate || b.date;
+        const aStart = normalizeDateStr(a.startDate || a.date);
+        const bStart = normalizeDateStr(b.startDate || b.date);
         return aStart.localeCompare(bStart);
       });
 
@@ -259,11 +275,17 @@ export function PMGanttMatrix({
         isApproachingNoProgress: boolean;
         pillClasses: string;
         statusText: string;
+        taskProgress: number;
       }[] = [];
 
       sorted.forEach(task => {
-        const taskStart = task.startDate || task.date;
-        const taskEnd = task.date;
+        const rawStart = normalizeDateStr(task.startDate || task.date);
+        const rawEnd = normalizeDateStr(task.date || task.startDate);
+        if (!rawStart && !rawEnd) return;
+
+        // Invertir si startDate es posterior a date (ej. cargaron fecha inicio > fin por error)
+        const taskStart = rawStart && rawEnd && rawStart > rawEnd ? rawEnd : (rawStart || rawEnd);
+        const taskEnd = rawStart && rawEnd && rawStart > rawEnd ? rawStart : (rawEnd || rawStart);
 
         if (taskEnd < timelineStartStr || taskStart > timelineEndStr) return;
 
@@ -698,7 +720,7 @@ export function PMGanttMatrix({
 
                   {/* Píldoras de Hitos con color condicional y titilado */}
                   {projectMilestones.map(m => {
-                    const mDate = m.targetDate || (m as any).endDate;
+                    const mDate = normalizeDateStr(m.targetDate || (m as any).endDate);
                     if (!mDate || mDate < timelineStartStr || mDate > timelineEndStr) return null;
 
                     const mIdx = dateToIndex.get(mDate);
@@ -825,7 +847,7 @@ export function PMGanttMatrix({
                           e.stopPropagation();
                           onSelectTask(task);
                         }}
-                        className={`absolute h-6 rounded-xl text-[9.5px] font-black px-2 flex items-center justify-between gap-1.5 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border relative overflow-hidden ${pillClasses}`}
+                        className={`absolute h-6 rounded-xl text-[9.5px] font-black px-2 flex items-center justify-between gap-1.5 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border overflow-hidden ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
                           width: `${width}px`,
