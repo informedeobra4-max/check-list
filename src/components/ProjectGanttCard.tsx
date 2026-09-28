@@ -2,11 +2,9 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
-  Briefcase,
   Flame,
   Clock,
   CheckCircle2,
-  Calendar,
   MoveHorizontal,
   Plus,
   Layers
@@ -36,8 +34,8 @@ const MONTH_NAMES = [
 
 const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
-const DAY_WIDTH = 30; // Ancho en píxeles de cada columna de día
-const STICKY_COL_WIDTH = 138; // Ancho de la columna izquierda de responsables
+const DAY_WIDTH = 28; // Ancho en píxeles de cada columna de día
+const STICKY_COL_WIDTH = 140; // Ancho de la columna izquierda de responsables
 
 export function ProjectGanttCard({
   project,
@@ -49,51 +47,116 @@ export function ProjectGanttCard({
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
 
-  // Mes y año visualizado en este Gantt
-  const [viewDate, setViewDate] = useState<Date>(() => {
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
-
-  const currentYear = viewDate.getFullYear();
-  const currentMonth = viewDate.getMonth(); // 0 a 11
-
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Total de días en el mes
-  const daysInMonth = useMemo(() => {
-    return new Date(currentYear, currentMonth + 1, 0).getDate();
-  }, [currentYear, currentMonth]);
+  // Generar rango continuo de meses y días para abarcar todas las tareas del proyecto
+  const { monthsList, daysList, todayIndex, dateToIndex } = useMemo(() => {
+    const allEvents = project.calendarEvents || [];
 
-  // Lista de días del mes
-  const daysList = useMemo(() => {
-    const list: {
+    // Recolectar fechas clave del proyecto y sus tareas
+    const dates: string[] = [todayStr];
+    if (project.startDate) dates.push(project.startDate);
+    if (project.estimatedEndDate) dates.push(project.estimatedEndDate);
+    allEvents.forEach(e => {
+      if (e.date) dates.push(e.date);
+      if (e.startDate) dates.push(e.startDate);
+    });
+
+    // Rango mínimo: desde 2 meses atrás hasta 6 meses adelante respecto a hoy
+    let minYear = now.getFullYear();
+    let minMonth = now.getMonth() - 2;
+    let maxYear = now.getFullYear();
+    let maxMonth = now.getMonth() + 6;
+
+    dates.forEach(d => {
+      const parts = d.split('-').map(Number);
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        const y = parts[0];
+        const m = parts[1] - 1; // 0 a 11
+        if (y < minYear || (y === minYear && m < minMonth)) {
+          minYear = y;
+          minMonth = m;
+        }
+        if (y > maxYear || (y === maxYear && m > maxMonth)) {
+          maxYear = y;
+          maxMonth = m;
+        }
+      }
+    });
+
+    const startD = new Date(minYear, minMonth, 1);
+    const endD = new Date(maxYear, maxMonth + 1, 0);
+
+    const mList: {
+      year: number;
+      monthIndex: number;
+      name: string;
+      daysCount: number;
+      startDayIndex: number;
+    }[] = [];
+
+    const dList: {
       dayNum: number;
       dateStr: string;
       weekdayLetter: string;
       isWeekend: boolean;
       isToday: boolean;
+      monthIndex: number;
+      year: number;
     }[] = [];
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateObj = new Date(currentYear, currentMonth, d);
-      const dayOfWeek = dateObj.getDay(); // 0 Dom, 6 Sáb
-      const dStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dToIdx = new Map<string, number>();
 
-      list.push({
-        dayNum: d,
-        dateStr: dStr,
-        weekdayLetter: WEEKDAY_INITIALS[dayOfWeek],
-        isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-        isToday: dStr === todayStr
+    let cur = new Date(startD.getFullYear(), startD.getMonth(), 1);
+    let globalDayCounter = 0;
+    let iter = 0;
+
+    // Permitir hasta 24 meses continuos con total fluidez
+    while (cur <= endD && iter < 24) {
+      iter++;
+      const y = cur.getFullYear();
+      const m = cur.getMonth();
+      const daysInCurMonth = new Date(y, m + 1, 0).getDate();
+
+      mList.push({
+        year: y,
+        monthIndex: m,
+        name: MONTH_NAMES[m],
+        daysCount: daysInCurMonth,
+        startDayIndex: globalDayCounter
       });
-    }
-    return list;
-  }, [currentYear, currentMonth, daysInMonth, todayStr]);
 
-  // Índice de hoy si está en el mes visualizado
-  const todayIndex = useMemo(() => {
-    return daysList.findIndex(d => d.isToday);
-  }, [daysList]);
+      for (let day = 1; day <= daysInCurMonth; day++) {
+        const dayDate = new Date(y, m, day);
+        const dayOfWeek = dayDate.getDay();
+        const dStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        dList.push({
+          dayNum: day,
+          dateStr: dStr,
+          weekdayLetter: WEEKDAY_INITIALS[dayOfWeek],
+          isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+          isToday: dStr === todayStr,
+          monthIndex: m,
+          year: y
+        });
+
+        dToIdx.set(dStr, globalDayCounter);
+        globalDayCounter++;
+      }
+
+      cur = new Date(y, m + 1, 1);
+    }
+
+    const tIdx = dList.findIndex(d => d.isToday);
+
+    return {
+      monthsList: mList,
+      daysList: dList,
+      todayIndex: tIdx,
+      dateToIndex: dToIdx
+    };
+  }, [project, todayStr, now]);
 
   // Contratistas activos de la obra
   const activeContractors = useMemo(() => {
@@ -101,120 +164,184 @@ export function ProjectGanttCard({
     return getProjectContractors(project);
   }, [contractors, project]);
 
-  // Tareas del proyecto para este mes
-  const monthStartStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-  const monthEndStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-
   const allEvents = project.calendarEvents || [];
+  const totalDays = daysList.length;
+  const timelineStartStr = daysList[0]?.dateStr || '';
+  const timelineEndStr = daysList[totalDays - 1]?.dateStr || '';
 
-  // Tareas que se solapan con este mes
-  const monthEvents = useMemo(() => {
-    return allEvents.filter(e => {
-      const taskStart = e.startDate || e.date;
-      const taskEnd = e.date;
-      return taskEnd >= monthStartStr && taskStart <= monthEndStr;
-    });
-  }, [allEvents, monthStartStr, monthEndStr]);
-
-  // Agrupar filas por contratista
+  // Agrupar filas por contratista con carriles automáticos (lanes) si hay solapamiento
   const contractorRows = useMemo(() => {
-    const rows: {
+    const rawRows: {
       profile: ContractorProfile;
       tasks: ProjectCalendarEvent[];
     }[] = [];
 
-    // 1. Agregar contratistas oficiales del proyecto
+    // 1. Contratistas oficiales
     activeContractors.forEach(c => {
-      const assigned = monthEvents.filter(
+      const assigned = allEvents.filter(
         e => e.assignedTo?.trim().toLowerCase() === c.name.toLowerCase()
       );
-      rows.push({
+      rawRows.push({
         profile: c,
         tasks: assigned
       });
     });
 
-    // 2. Revisar si hay responsables en tareas no incluidos en la lista oficial
+    // 2. Responsables presentes en tareas no incluidos en la lista oficial
     const assignedNames = new Set(activeContractors.map(c => c.name.toLowerCase()));
-    monthEvents.forEach(e => {
+    allEvents.forEach(e => {
       if (e.assignedTo?.trim() && !assignedNames.has(e.assignedTo.trim().toLowerCase())) {
         assignedNames.add(e.assignedTo.trim().toLowerCase());
         const prof = getContractorProfile(e.assignedTo.trim(), e.assignedRole, activeContractors);
-        rows.push({
+        rawRows.push({
           profile: prof,
-          tasks: monthEvents.filter(t => t.assignedTo?.trim().toLowerCase() === e.assignedTo?.trim().toLowerCase())
+          tasks: allEvents.filter(t => t.assignedTo?.trim().toLowerCase() === e.assignedTo?.trim().toLowerCase())
         });
       }
     });
 
     // 3. Tareas generales sin asignar
-    const unassignedTasks = monthEvents.filter(e => !e.assignedTo?.trim());
+    const unassignedTasks = allEvents.filter(e => !e.assignedTo?.trim());
     if (unassignedTasks.length > 0) {
-      rows.unshift({
+      rawRows.unshift({
         profile: getContractorProfile('Cuadrilla General', 'Tareas Generales', activeContractors),
         tasks: unassignedTasks
       });
     }
 
-    return rows;
-  }, [activeContractors, monthEvents]);
+    // Calcular posición y carril (lane) para cada tarea continua
+    return rawRows.map(row => {
+      const sorted = [...row.tasks].sort((a, b) => {
+        const aStart = a.startDate || a.date;
+        const bStart = b.startDate || b.date;
+        return aStart.localeCompare(bStart);
+      });
 
-  // Estadísticas del mes
+      const lanesEnd: number[] = [];
+      const positionedTasks: {
+        event: ProjectCalendarEvent;
+        leftOffset: number;
+        width: number;
+        lane: number;
+        taskStart: string;
+        taskEnd: string;
+      }[] = [];
+
+      sorted.forEach(task => {
+        const taskStart = task.startDate || task.date;
+        const taskEnd = task.date;
+
+        if (taskEnd < timelineStartStr || taskStart > timelineEndStr) return;
+
+        let startIdx = 0;
+        if (taskStart >= timelineStartStr) {
+          startIdx = dateToIndex.get(taskStart) ?? 0;
+        }
+
+        let endIdx = totalDays - 1;
+        if (taskEnd <= timelineEndStr) {
+          endIdx = dateToIndex.get(taskEnd) ?? (totalDays - 1);
+        }
+
+        if (endIdx < startIdx) endIdx = startIdx;
+
+        // Asignar primer carril disponible
+        let assignedLane = -1;
+        for (let l = 0; l < lanesEnd.length; l++) {
+          if (lanesEnd[l] < startIdx) {
+            assignedLane = l;
+            lanesEnd[l] = endIdx;
+            break;
+          }
+        }
+        if (assignedLane === -1) {
+          assignedLane = lanesEnd.length;
+          lanesEnd.push(endIdx);
+        }
+
+        const spanDays = endIdx - startIdx + 1;
+        positionedTasks.push({
+          event: task,
+          leftOffset: startIdx * DAY_WIDTH + 2,
+          width: Math.max(DAY_WIDTH - 4, spanDays * DAY_WIDTH - 4),
+          lane: assignedLane,
+          taskStart,
+          taskEnd
+        });
+      });
+
+      const totalLanes = Math.max(1, lanesEnd.length);
+      const rowHeight = totalLanes === 1 ? 40 : totalLanes * 26 + 12;
+
+      return {
+        profile: row.profile,
+        tasks: row.tasks,
+        positionedTasks,
+        rowHeight,
+        totalLanes
+      };
+    });
+  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays]);
+
+  // Estadísticas globales del Gantt
   const stats = useMemo(() => {
-    const total = monthEvents.length;
-    const completed = monthEvents.filter(t => t.completed || t.status === 'completed').length;
-    const critical = monthEvents.filter(t => getTaskAlarms(t, todayStr).isCriticalDelay).length;
-    const upcoming = monthEvents.filter(t => getTaskAlarms(t, todayStr).isUpcomingDeadline).length;
+    const total = allEvents.length;
+    const completed = allEvents.filter(t => t.completed || t.status === 'completed').length;
+    const critical = allEvents.filter(t => getTaskAlarms(t, todayStr).isCriticalDelay).length;
+    const upcoming = allEvents.filter(t => getTaskAlarms(t, todayStr).isUpcomingDeadline).length;
     return { total, completed, critical, upcoming };
-  }, [monthEvents, todayStr]);
+  }, [allEvents, todayStr]);
 
-  // Auto-scroll al día de hoy al cargar o cambiar de mes
+  // Centrar automáticamente en el día de hoy al cargar
   useEffect(() => {
     if (scrollRef.current && todayIndex >= 0) {
-      // Centrar el día actual en la ventana visible
-      const scrollPos = Math.max(0, todayIndex * DAY_WIDTH - 90);
-      scrollRef.current.scrollTo({ left: scrollPos, behavior: 'smooth' });
+      const containerW = scrollRef.current.clientWidth || 600;
+      const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
+      scrollRef.current.scrollLeft = targetX;
     }
-  }, [todayIndex, currentMonth, currentYear]);
+  }, [todayIndex]);
 
-  const handlePrevMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setViewDate(new Date(currentYear, currentMonth - 1, 1));
+  // Navegación rápida con botones
+  const handleScrollToToday = () => {
+    if (!scrollRef.current || todayIndex < 0) return;
+    const containerW = scrollRef.current.clientWidth || 600;
+    const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
+    scrollRef.current.scrollTo({ left: targetX, behavior: 'smooth' });
   };
 
-  const handleNextMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setViewDate(new Date(currentYear, currentMonth + 1, 1));
+  const handleScrollDelta = (dir: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    const delta = dir === 'right' ? 500 : -500;
+    scrollRef.current.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
-  const handleResetToToday = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  };
-
-  // Soporte de arrastre con mouse (drag to scroll) además del deslizamiento táctil con el dedo
+  // Soporte bidireccional (2D) de arrastre con mouse además del toque táctil nativo
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
   const scrollLeftRef = useRef(0);
+  const scrollTopRef = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Si se hace clic en un botón, enlace o píldora interactiva, no iniciar arrastre
     const target = e.target as HTMLElement;
     if (target.closest('button, a, input, [data-interactive="true"]')) return;
     if (!scrollRef.current) return;
     isDraggingRef.current = true;
     setIsDragging(true);
-    startXRef.current = e.pageX - scrollRef.current.offsetLeft;
+    startXRef.current = e.pageX;
+    startYRef.current = e.pageY;
     scrollLeftRef.current = scrollRef.current.scrollLeft;
+    scrollTopRef.current = scrollRef.current.scrollTop;
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDraggingRef.current || !scrollRef.current) return;
     e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startXRef.current) * 1.3;
-    scrollRef.current.scrollLeft = scrollLeftRef.current - walk;
+    const walkX = (e.pageX - startXRef.current) * 1.3;
+    const walkY = (e.pageY - startYRef.current) * 1.3;
+    scrollRef.current.scrollLeft = scrollLeftRef.current - walkX;
+    scrollRef.current.scrollTop = scrollTopRef.current - walkY;
   };
 
   const handleMouseUpOrLeave = () => {
@@ -230,116 +357,109 @@ export function ProjectGanttCard({
     }
   };
 
+  const firstMonth = monthsList[0];
+  const lastMonth = monthsList[monthsList.length - 1];
+
   return (
     <div
       onClick={(e) => {
         // Evitar que hacer clic en el Gantt active la selección de la obra entera
         e.stopPropagation();
       }}
-      className="bg-[#0f172a]/90 rounded-2xl p-3 border border-slate-800/90 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden h-full"
+      className="bg-[#0f172a]/95 rounded-2xl p-2.5 sm:p-3 border border-slate-800/90 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden w-full"
     >
-      {/* 1. HEADER: Título, Navegación de Meses y Acciones */}
+      {/* 1. HEADER: Título Continuo, Controles de Desplazamiento y Acceso a PM */}
       <div>
-        <div className="flex items-center justify-between gap-1 mb-2">
-          {/* Título & Mes */}
+        <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-slate-800/80 flex-wrap sm:flex-nowrap">
+          {/* Título & Rango de Meses Continuos */}
           <div className="flex items-center gap-1.5 min-w-0">
-            <Briefcase className="w-3.5 h-3.5 flex-shrink-0" style={{ color: neonColor }} />
+            <Layers className="w-3.5 h-3.5 flex-shrink-0" style={{ color: neonColor }} />
             <span className="text-[11px] font-black uppercase tracking-wider text-white truncate">
-              Gantt • {MONTH_NAMES[currentMonth]} {currentYear}
+              Gantt Continuo • {firstMonth?.name} {firstMonth?.year} - {lastMonth?.name} {lastMonth?.year}
             </span>
+
+            {/* Stepper Rápido de Meses y Botón Hoy */}
+            <div className="flex items-center gap-0.5 ml-1">
+              <button
+                type="button"
+                onClick={() => handleScrollDelta('left')}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Deslizar meses anteriores"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleScrollToToday}
+                className="px-2 py-0.5 rounded text-[9.5px] font-black text-cyan-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors border border-cyan-500/30"
+                title="Centrar en el día de hoy"
+              >
+                Hoy
+              </button>
+              <button
+                type="button"
+                onClick={() => handleScrollDelta('right')}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Deslizar meses siguientes"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
-          {/* Controles de Navegación de Meses */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Mes anterior"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
+          {/* Badges de Resumen y Acceso a Project Manager */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 text-[9.5px]">
+              {stats.critical > 0 && (
+                <span
+                  onClick={() => handleOpenPM()}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse"
+                  title="Tareas críticas con retraso en el Gantt"
+                >
+                  <Flame className="w-3 h-3 text-rose-400" />
+                  <span>{stats.critical} críticas</span>
+                </span>
+              )}
 
-            <button
-              type="button"
-              onClick={handleResetToToday}
-              className="px-1.5 py-0.5 rounded text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
-              title="Ir al mes actual"
-            >
-              Hoy
-            </button>
+              {stats.upcoming > 0 && (
+                <span className="hidden sm:flex items-center gap-0.5 text-amber-400 font-bold">
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  <span>{stats.upcoming} próx.</span>
+                </span>
+              )}
 
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Mes siguiente"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+              <span className="text-slate-400 font-medium">
+                <span className="text-white font-bold">{stats.total}</span> tareas
+              </span>
+            </div>
 
             <button
               type="button"
               onClick={() => handleOpenPM()}
-              className="ml-1 px-2.5 py-1 rounded-xl text-[10.5px] font-black flex items-center gap-1.5 transition-all shadow-md active:scale-95 text-slate-950 shrink-0"
+              className="px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1.5 transition-all shadow-md active:scale-95 text-slate-950 shrink-0"
               style={{ backgroundColor: neonColor }}
               title="Abrir vista completa del Project Manager & Gantt"
             >
               <Layers className="w-3.5 h-3.5 stroke-[2.5]" />
               <span className="hidden sm:inline">Abrir PM</span>
-              {stats.critical > 0 && (
-                <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse ml-0.5" />
-              )}
             </button>
           </div>
         </div>
-
-        {/* Badges de Tareas & Retrasos en el Mes */}
-        <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1.5 border-b border-slate-800/80 mb-1 flex-wrap gap-1">
-          <div className="flex items-center gap-2">
-            {stats.critical > 0 && (
-              <span
-                onClick={() => handleOpenPM()}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse"
-                title="Tareas críticas con retraso en el Gantt"
-              >
-                <Flame className="w-3 h-3 text-rose-400" />
-                <span>{stats.critical} retrasos</span>
-              </span>
-            )}
-
-            {stats.upcoming > 0 && (
-              <span className="flex items-center gap-1 text-amber-400 font-bold">
-                <Clock className="w-3 h-3 text-amber-400" />
-                <span>{stats.upcoming} próx.</span>
-              </span>
-            )}
-
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block" />
-              <span className="font-semibold">{stats.total} tareas en Gantt</span>
-            </span>
-          </div>
-
-          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-            {stats.completed}/{stats.total} listas
-          </span>
-        </div>
       </div>
 
-      {/* 2. MATRIZ DE GANTT DESLIZABLE CON EL DEDO (TOUCH-PAN-X) */}
+      {/* 2. MATRIZ 2D DE GANTT: CABECERA FIJA SUPERIOR Y COLUMNA FIJA DE RESPONSABLES */}
       <div
         ref={scrollRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
-        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport touch-pan-x flex-1 overscroll-x-contain my-1 select-none max-h-[300px] ${
+        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport flex-1 max-h-[350px] my-1 select-none border border-slate-800/80 rounded-xl bg-[#090f1d] ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
           WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x',
+          touchAction: 'pan-x pan-y',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
         }}
@@ -347,59 +467,77 @@ export function ProjectGanttCard({
         <div
           className="relative text-left"
           style={{
-            width: `${STICKY_COL_WIDTH + daysInMonth * DAY_WIDTH}px`,
-            minWidth: `${STICKY_COL_WIDTH + daysInMonth * DAY_WIDTH}px`
+            width: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`,
+            minWidth: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`
           }}
         >
-          {/* HEADER: DÍAS DEL MES */}
-          <div className="flex items-center border-b border-slate-800 bg-[#0b1220] sticky top-0 z-30">
-            {/* Columna Izquierda Fija: Responsables */}
-            <div
-              className="sticky left-0 z-40 bg-[#0b1220] px-2 py-1 flex items-center justify-between border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.5)] shrink-0"
-              style={{ width: `${STICKY_COL_WIDTH}px` }}
-            >
-              <span className="text-[9.5px] font-black uppercase text-slate-400 tracking-wider">
-                Responsable
-              </span>
-              <span className="text-[9px] text-slate-500 font-bold">
-                {contractorRows.length}
-              </span>
-            </div>
+          {/* CABECERA FIJA SUPERIOR (STICKY TOP-0 Z-30) */}
+          <div className="sticky top-0 z-30 bg-[#0b1220] border-b border-slate-800 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+            <div className="flex items-stretch">
+              {/* Esquina Superior Izquierda: Fija tanto en X como en Y (STICKY TOP-0 LEFT-0 Z-50) */}
+              <div
+                className="sticky left-0 z-50 bg-[#0b1220] px-2.5 py-1.5 flex flex-col justify-center border-r border-slate-800 shadow-[3px_0_8px_rgba(0,0,0,0.6)] shrink-0"
+                style={{ width: `${STICKY_COL_WIDTH}px` }}
+              >
+                <span className="text-[10px] font-black uppercase text-slate-300 tracking-wider block">
+                  Responsable
+                </span>
+                <span className="text-[8.5px] text-slate-500 font-bold truncate">
+                  {contractorRows.length} cuadrillas
+                </span>
+              </div>
 
-            {/* Columnas de Días (1..31) */}
-            <div className="flex items-center">
-              {daysList.map((d) => (
-                <div
-                  key={d.dateStr}
-                  className={`flex flex-col items-center justify-center border-r border-slate-800/40 text-center shrink-0 py-0.5 ${
-                    d.isToday
-                      ? 'bg-blue-600/20'
-                      : d.isWeekend
-                      ? 'bg-slate-900/50'
-                      : ''
-                  }`}
-                  style={{ width: `${DAY_WIDTH}px` }}
-                >
-                  <span className={`text-[8.5px] leading-tight ${d.isToday ? 'text-cyan-300 font-black' : 'text-slate-500'}`}>
-                    {d.weekdayLetter}
-                  </span>
-                  <span
-                    className={`text-[10px] leading-tight rounded px-1 ${
-                      d.isToday
-                        ? 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_8px_rgba(6,182,212,0.8)]'
-                        : 'text-slate-300 font-bold'
-                    }`}
-                  >
-                    {d.dayNum}
-                  </span>
+              {/* Área de Meses y Días continuos */}
+              <div className="flex flex-col flex-1">
+                {/* Fila 1: Meses */}
+                <div className="flex items-center border-b border-slate-800/80">
+                  {monthsList.map(m => (
+                    <div
+                      key={`${m.year}-${m.monthIndex}`}
+                      className="border-r border-slate-800/80 px-2 flex items-center justify-between shrink-0 bg-[#0d1527] h-6"
+                      style={{ width: `${m.daysCount * DAY_WIDTH}px` }}
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300 truncate">
+                        {m.name} {m.year}
+                      </span>
+                      <span className="text-[8.5px] text-slate-500 font-mono">
+                        {m.daysCount}d
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+
+                {/* Fila 2: Días */}
+                <div className="flex items-center h-6">
+                  {daysList.map(d => (
+                    <div
+                      key={d.dateStr}
+                      className={`flex flex-col items-center justify-center border-r border-slate-800/40 text-center shrink-0 ${
+                        d.isToday
+                          ? 'bg-cyan-500/20 text-cyan-300 font-black'
+                          : d.isWeekend
+                          ? 'bg-slate-900/60 text-slate-500'
+                          : 'text-slate-400'
+                      }`}
+                      style={{ width: `${DAY_WIDTH}px`, height: '24px' }}
+                      title={`${d.dayNum} - ${d.dateStr}`}
+                    >
+                      <span className="text-[7.5px] leading-none text-slate-500">
+                        {d.weekdayLetter}
+                      </span>
+                      <span className={`text-[9.5px] leading-tight rounded px-0.5 ${d.isToday ? 'bg-cyan-400 text-slate-950 font-black' : ''}`}>
+                        {d.dayNum}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* CUERPO: FILAS POR RESPONSABLE */}
+          {/* CUERPO: FILAS DE CUADRILLAS / RESPONSABLES */}
           <div className="relative divide-y divide-slate-800/50">
-            {/* Línea vertical indicadora del día de hoy */}
+            {/* Línea vertical indicadora del día de hoy a lo largo de toda la matriz */}
             {todayIndex >= 0 && (
               <div
                 className="absolute top-0 bottom-0 pointer-events-none z-10"
@@ -408,21 +546,21 @@ export function ProjectGanttCard({
                   width: '2px'
                 }}
               >
-                <div className="w-[2px] h-full border-l-2 border-dashed border-cyan-400/80 shadow-[0_0_6px_rgba(34,211,238,0.7)]" />
+                <div className="w-[2px] h-full border-l-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
               </div>
             )}
 
-            {contractorRows.map((row) => (
+            {contractorRows.map(row => (
               <div
                 key={row.profile.id}
                 className="flex items-center hover:bg-slate-800/30 transition-colors group relative"
-                style={{ height: '36px' }}
+                style={{ height: `${row.rowHeight}px` }}
               >
-                {/* Columna Izquierda Fija: Avatar + Nombre */}
+                {/* Columna Izquierda Fija: Avatar + Nombre + Cargo (STICKY LEFT-0 Z-20) */}
                 <div
                   onClick={() => handleOpenPM(undefined, todayStr)}
-                  className="sticky left-0 z-20 bg-[#0f172a] px-2 flex items-center gap-2 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.5)] shrink-0 cursor-pointer group-hover:bg-slate-850"
-                  style={{ width: `${STICKY_COL_WIDTH}px`, height: '36px' }}
+                  className="sticky left-0 z-20 bg-[#0f172a] px-2 flex items-center gap-2 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer group-hover:bg-slate-850"
+                  style={{ width: `${STICKY_COL_WIDTH}px`, height: `${row.rowHeight}px` }}
                   title={`${row.profile.name} - ${row.profile.role} (Clic para abrir PM)`}
                 >
                   <ContractorAvatar
@@ -435,63 +573,32 @@ export function ProjectGanttCard({
                     statusColor={row.profile.color || neonColor}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10.5px] font-black text-slate-200 group-hover:text-cyan-400 truncate leading-tight transition-colors">
+                    <p className="text-[10px] font-black text-slate-200 group-hover:text-cyan-400 truncate leading-tight transition-colors">
                       {row.profile.name}
                     </p>
-                    <p className="text-[8.5px] text-slate-500 truncate leading-tight font-medium">
+                    <p className="text-[8px] text-slate-500 truncate leading-tight font-medium">
                       {row.profile.role}
                     </p>
                   </div>
                 </div>
 
-                {/* Track de Días con Celdas de Fondo */}
+                {/* Track de Días y Tareas Continuas */}
                 <div className="flex items-center relative h-full">
-                  {daysList.map((d) => (
+                  {daysList.map(d => (
                     <div
                       key={d.dateStr}
                       className={`h-full border-r border-slate-800/30 shrink-0 ${
                         d.isWeekend ? 'bg-slate-900/30' : ''
-                      } ${d.isToday ? 'bg-blue-600/10' : ''}`}
+                      } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
                       style={{ width: `${DAY_WIDTH}px` }}
                     />
                   ))}
 
-                  {/* Píldoras de Tareas Superpuestas */}
-                  {row.tasks.map((task) => {
-                    const taskStart = task.startDate || task.date;
-                    const taskEnd = task.date;
-
-                    // Calcular inicio y fin dentro del mes
-                    const startParts = taskStart.split('-').map(Number);
-                    const endParts = taskEnd.split('-').map(Number);
-
-                    // Si la tarea empieza antes de este mes, fijar día 1
-                    let startDay = 1;
-                    if (startParts[0] === currentYear && startParts[1] === currentMonth + 1) {
-                      startDay = startParts[2];
-                    } else if (taskStart > monthEndStr) {
-                      return null;
-                    }
-
-                    // Si la tarea termina después de este mes, fijar día final
-                    let endDay = daysInMonth;
-                    if (endParts[0] === currentYear && endParts[1] === currentMonth + 1) {
-                      endDay = endParts[2];
-                    } else if (taskEnd < monthStartStr) {
-                      return null;
-                    }
-
-                    startDay = Math.max(1, Math.min(daysInMonth, startDay));
-                    endDay = Math.max(startDay, Math.min(daysInMonth, endDay));
-
-                    const spanDays = endDay - startDay + 1;
-                    const leftOffset = (startDay - 1) * DAY_WIDTH + 2;
-                    const pillWidth = spanDays * DAY_WIDTH - 4;
-
+                  {/* Píldoras de Tareas Continuas (Multimes sin cortes) */}
+                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd }) => {
                     const alarms = getTaskAlarms(task, todayStr);
                     const isDone = task.completed || task.status === 'completed';
 
-                    // Colores temáticos vibrantes según estado
                     let pillClasses = 'bg-cyan-500 text-slate-950';
                     if (isDone) {
                       pillClasses = 'bg-emerald-500 text-white';
@@ -509,10 +616,11 @@ export function ProjectGanttCard({
                           e.stopPropagation();
                           handleOpenPM(task.id, task.date);
                         }}
-                        className={`absolute top-1.5 h-6 rounded-lg text-[9.5px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.03] active:scale-95 z-10 truncate ${pillClasses}`}
+                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
-                          width: `${Math.max(DAY_WIDTH - 4, pillWidth)}px`
+                          width: `${width}px`,
+                          top: `${6 + lane * 26}px`
                         }}
                         title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • Clic para editar`}
                       >
@@ -527,7 +635,7 @@ export function ProjectGanttCard({
             ))}
 
             {contractorRows.length === 0 && (
-              <div className="py-6 text-center text-xs text-slate-500">
+              <div className="py-8 text-center text-xs text-slate-500">
                 No hay cuadrillas configuradas en esta obra.
               </div>
             )}
@@ -535,11 +643,11 @@ export function ProjectGanttCard({
         </div>
       </div>
 
-      {/* 3. FOOTER: Indicador táctil de deslizamiento y botón de acción */}
+      {/* 3. FOOTER: Indicador de Navegación 2D y Acción Rápida */}
       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
         <div className="flex items-center gap-1.5 text-cyan-400/90 font-medium">
           <MoveHorizontal className="w-3.5 h-3.5 animate-pulse" />
-          <span>Desliza con el dedo para recorrer los {daysInMonth} días</span>
+          <span>Desliza lateralmente para ver todos los meses y hacia abajo para más cuadrillas</span>
         </div>
 
         <button
