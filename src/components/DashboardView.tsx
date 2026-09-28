@@ -20,9 +20,9 @@ import {
 import { Project, StatusFilter, ProjectCalendarEvent } from '../types';
 import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea, hexToRgba } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
-import { ExecutiveGaugeChart } from './ExecutiveGaugeChart';
 import { ExecutiveTimeline } from './ExecutiveTimeline';
 import { ProjectCalendarCard } from './ProjectCalendarCard';
+import { ProjectGanttCard } from './ProjectGanttCard';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -261,22 +261,6 @@ export function DashboardView({
             const completedDeptos = (deptosList.length > 0 ? deptosList : project.units).filter(u => calculateUnitProgress(u) >= 100).length;
             const deptosPercent = totalDeptos > 0 ? Math.round((completedDeptos / totalDeptos) * 100) : 0;
 
-            // Real stats for Cronograma Speedometers
-            const stats = getProjectConsolidatedStats(project);
-            const pendingItems = stats.pendingItems;
-            const totalItems = stats.totalItems;
-            const pendingPct = totalItems > 0 ? Math.round((pendingItems / totalItems) * 100) : 0;
-
-            const projectMilestones = project.milestones || [];
-            const totalMilestones = projectMilestones.length;
-            const completedMilestones = projectMilestones.filter(m => m.manualCompleted).length;
-            const milestonesPct = totalMilestones > 0
-              ? Math.round((completedMilestones / totalMilestones) * 100)
-              : Math.min(100, Math.round(displayProgress * 0.8));
-            const milestonesDisplay = totalMilestones > 0
-              ? `${completedMilestones}/${totalMilestones}`
-              : `${milestonesPct}%`;
-
             const triggerVal = hoverTriggers[project.id] || 0;
 
             return (
@@ -389,57 +373,28 @@ export function DashboardView({
                     </div>
                   </div>
 
-                  {/* Middle Section: Estado del Cronograma (Gauges) & Deptos Terminados */}
+                  {/* Middle Section: Diagrama de Gantt & Calendario Interactivo de Obra */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {/* Left Box: Estado del Cronograma */}
-                    <div className="bg-[#0f172a]/80 rounded-2xl p-3 border border-slate-800/90 flex flex-col justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">
-                        Estado del Cronograma
-                      </span>
-
-                      {/* Two Semicircle Speedometer Gauges */}
-                      <div className="flex items-center justify-around py-1">
-                        <ExecutiveGaugeChart
-                          value={milestonesPct}
-                          valueDisplay={milestonesDisplay}
-                          label="Hitos"
-                          sublabel="cumplidos"
-                          size={76}
-                          colorVariant="emerald"
-                          animationTrigger={triggerVal}
-                        />
-                        <ExecutiveGaugeChart
-                          value={pendingPct}
-                          valueDisplay={pendingItems}
-                          label="No Empezados"
-                          sublabel={`${pendingPct}% pendientes`}
-                          size={76}
-                          colorVariant="amber"
-                          animationTrigger={triggerVal}
-                        />
-                      </div>
-
-                      {/* Alert Status Pill */}
-                      <div
-                        className={`mt-2 py-1 px-3 rounded-full text-[10.5px] font-black flex items-center justify-center gap-1.5 border text-center ${
-                          isCurrentActive
-                            ? 'bg-[#f87171]/20 text-[#f87171] border-[#f87171]/40 shadow-[0_0_12px_rgba(248,113,113,0.25)]'
-                            : 'bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/40'
-                        }`}
-                      >
-                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{delayBadgeLabel}</span>
-                      </div>
+                    {/* Left Box: Diagrama de Gantt Deslizable con el Dedo */}
+                    <div className="min-w-0 h-full">
+                      <ProjectGanttCard
+                        project={project}
+                        neonColor={neonColor}
+                        onOpenProjectManager={onOpenProjectManager}
+                        onOpenCalendarModal={handleOpenCalendarModal}
+                      />
                     </div>
 
-                    {/* Right Box: Calendario Interactivo de Obra */}
-                    <ProjectCalendarCard
-                      project={project}
-                      neonColor={neonColor}
-                      onOpenCalendarModal={handleOpenCalendarModal}
-                      onOpenProjectManager={onOpenProjectManager}
-                      onToggleCalendarEvent={onToggleCalendarEvent}
-                    />
+                    {/* Right Box: Calendario Interactivo de Obra (Aislado e Intacto) */}
+                    <div className="min-w-0 h-full">
+                      <ProjectCalendarCard
+                        project={project}
+                        neonColor={neonColor}
+                        onOpenCalendarModal={handleOpenCalendarModal}
+                        onOpenProjectManager={onOpenProjectManager}
+                        onToggleCalendarEvent={onToggleCalendarEvent}
+                      />
+                    </div>
                   </div>
 
                   {/* Lower Section: Cronograma Detallado */}
