@@ -7,10 +7,12 @@ import {
   CheckCircle2,
   MoveHorizontal,
   Plus,
-  Layers
+  Layers,
+  Flag,
+  Pencil
 } from 'lucide-react';
-import { Project, ProjectCalendarEvent, ContractorProfile } from '../types';
-import { getTodayString, getTaskAlarms, formatPMDate } from '../utils/pmCalculations';
+import { Project, ProjectCalendarEvent, ContractorProfile, Milestone } from '../types';
+import { getTodayString, getTaskAlarms, formatPMDate, getDaysDiff } from '../utils/pmCalculations';
 import { getContractorProfile, getProjectContractors } from '../utils/pmContractors';
 import { ContractorAvatar } from './ContractorAvatar';
 
@@ -24,7 +26,9 @@ interface ProjectGanttCardProps {
     selectedTaskId?: string
   ) => void;
   onOpenCalendarModal?: (projectId: string, initialDate?: string, selectedEventId?: string) => void;
+  onOpenMilestonesConfig?: (projectId: string) => void;
   contractors?: ContractorProfile[];
+  large?: boolean; // Para vista ampliada al entrar a la obra (UnitsView)
 }
 
 const MONTH_NAMES = [
@@ -35,14 +39,16 @@ const MONTH_NAMES = [
 const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
 const DAY_WIDTH = 28; // Ancho en píxeles de cada columna de día
-const STICKY_COL_WIDTH = 140; // Ancho de la columna izquierda de responsables
+const STICKY_COL_WIDTH = 145; // Ancho de la columna izquierda de responsables
 
 export function ProjectGanttCard({
   project,
   neonColor = '#00f2fe',
   onOpenProjectManager,
   onOpenCalendarModal,
-  contractors
+  onOpenMilestonesConfig,
+  contractors,
+  large = false
 }: ProjectGanttCardProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
@@ -53,16 +59,18 @@ export function ProjectGanttCard({
   const { monthsList, daysList, todayIndex, dateToIndex } = useMemo(() => {
     const allEvents = project.calendarEvents || [];
 
-    // Recolectar fechas clave del proyecto y sus tareas
+    // Recolectar fechas clave de tareas e hitos
     const dates: string[] = [todayStr];
-    if (project.startDate) dates.push(project.startDate);
-    if (project.estimatedEndDate) dates.push(project.estimatedEndDate);
     allEvents.forEach(e => {
       if (e.date) dates.push(e.date);
       if (e.startDate) dates.push(e.startDate);
     });
+    (project.milestones || []).forEach(m => {
+      if (m.targetDate) dates.push(m.targetDate);
+      if ((m as any).endDate) dates.push((m as any).endDate);
+    });
 
-    // El cronograma siempre comienza 2 meses antes del mes actual para ver semanas recientes
+    // El cronograma siempre comienza estrictamente 2 meses antes del mes actual para ver semanas recientes
     // Nunca dejamos que una fecha antigua histórica (ej. 2023) desplace la vista 3 años atrás
     const startD = new Date(now.getFullYear(), now.getMonth() - 2, 1);
 
@@ -159,6 +167,7 @@ export function ProjectGanttCard({
   }, [contractors, project]);
 
   const allEvents = project.calendarEvents || [];
+  const projectMilestones = project.milestones || [];
   const totalDays = daysList.length;
   const timelineStartStr = daysList[0]?.dateStr || '';
   const timelineEndStr = daysList[totalDays - 1]?.dateStr || '';
@@ -219,6 +228,11 @@ export function ProjectGanttCard({
         lane: number;
         taskStart: string;
         taskEnd: string;
+        isDone: boolean;
+        isCritical: boolean;
+        isApproachingNoProgress: boolean;
+        pillClasses: string;
+        statusText: string;
       }[] = [];
 
       sorted.forEach(task => {
@@ -254,13 +268,48 @@ export function ProjectGanttCard({
         }
 
         const spanDays = endIdx - startIdx + 1;
+        const alarms = getTaskAlarms(task, todayStr);
+        const daysDiff = getDaysDiff(taskEnd, todayStr);
+        const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
+        const isOverdue = daysDiff < 0 && !isDone;
+        const isApproaching = daysDiff >= 0 && daysDiff <= 3;
+        const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
+        const isCriticalAlarm = task.type === 'alarm' || alarms.isCriticalDelay;
+        const isApproachingNoProgress = isApproaching && hasNoProgress && !isDone;
+
+        // Criterio de color y titilado en rojo:
+        // "en rojo titilando si esta llegando al dia de terminar y no hay avances o viene mal, y en verde si venimos bien"
+        let pillClasses = 'bg-cyan-500 text-slate-950 border-cyan-400';
+        let statusText = 'Pendiente';
+
+        if (isDone) {
+          pillClasses = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/25';
+          statusText = 'Listo';
+        } else if (isOverdue || isApproachingNoProgress || isCriticalAlarm) {
+          pillClasses = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
+          statusText = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Quedan ${daysDiff}d sin avances!`;
+        } else if (task.status === 'in_progress' || (task.progress !== undefined && task.progress > 0)) {
+          if (isApproaching) {
+            pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25';
+            statusText = `${daysDiff}d restantes`;
+          } else {
+            pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
+            statusText = 'En curso al día';
+          }
+        }
+
         positionedTasks.push({
           event: task,
           leftOffset: startIdx * DAY_WIDTH + 2,
           width: Math.max(DAY_WIDTH - 4, spanDays * DAY_WIDTH - 4),
           lane: assignedLane,
           taskStart,
-          taskEnd
+          taskEnd,
+          isDone,
+          isCritical: isOverdue || isCriticalAlarm,
+          isApproachingNoProgress,
+          pillClasses,
+          statusText
         });
       });
 
@@ -275,13 +324,18 @@ export function ProjectGanttCard({
         totalLanes
       };
     });
-  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays]);
+  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays, todayStr]);
 
   // Estadísticas globales del Gantt
   const stats = useMemo(() => {
     const total = allEvents.length;
     const completed = allEvents.filter(t => t.completed || t.status === 'completed').length;
-    const critical = allEvents.filter(t => getTaskAlarms(t, todayStr).isCriticalDelay).length;
+    const critical = allEvents.filter(t => {
+      const daysDiff = getDaysDiff(t.date, todayStr);
+      const isDone = Boolean(t.completed || t.status === 'completed');
+      const hasNoProgress = (t.progress === undefined || t.progress === 0) && (t.status === 'pending' || !t.status);
+      return !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProgress) || t.type === 'alarm');
+    }).length;
     const upcoming = allEvents.filter(t => getTaskAlarms(t, todayStr).isUpcomingDeadline).length;
     return { total, completed, critical, upcoming };
   }, [allEvents, todayStr]);
@@ -367,13 +421,15 @@ export function ProjectGanttCard({
   const firstMonth = monthsList[0];
   const lastMonth = monthsList[monthsList.length - 1];
 
+  const viewportMaxHeight = large ? 'max-h-[460px]' : 'max-h-[350px]';
+
   return (
     <div
       onClick={(e) => {
         // Evitar que hacer clic en el Gantt active la selección de la obra entera
         e.stopPropagation();
       }}
-      className="bg-[#0f172a]/95 rounded-2xl p-2.5 sm:p-3 border border-slate-800/90 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden w-full"
+      className={`bg-[#0f172a]/95 rounded-2xl ${large ? 'p-3.5 sm:p-4' : 'p-2.5 sm:p-3'} border border-slate-800/90 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden w-full`}
     >
       {/* 1. HEADER: Título Continuo, Controles de Desplazamiento y Acceso a PM */}
       <div>
@@ -382,7 +438,7 @@ export function ProjectGanttCard({
           <div className="flex items-center gap-1.5 min-w-0">
             <Layers className="w-3.5 h-3.5 flex-shrink-0" style={{ color: neonColor }} />
             <span className="text-[11px] font-black uppercase tracking-wider text-white truncate">
-              Gantt Continuo • {firstMonth?.name} {firstMonth?.year} - {lastMonth?.name} {lastMonth?.year}
+              Gantt {large ? 'General de Obra' : 'Continuo'} • {firstMonth?.name} {firstMonth?.year} - {lastMonth?.name} {lastMonth?.year}
             </span>
 
             {/* Stepper Rápido de Meses y Botón Hoy */}
@@ -420,18 +476,18 @@ export function ProjectGanttCard({
               {stats.critical > 0 && (
                 <span
                   onClick={() => handleOpenPM()}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse"
-                  title="Tareas críticas con retraso en el Gantt"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-pointer font-black animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.6)]"
+                  title="Tareas o hitos con alerta crítica"
                 >
                   <Flame className="w-3 h-3 text-rose-400" />
-                  <span>{stats.critical} críticas</span>
+                  <span>{stats.critical} críticas / sin avances</span>
                 </span>
               )}
 
-              {stats.upcoming > 0 && (
-                <span className="hidden sm:flex items-center gap-0.5 text-amber-400 font-bold">
-                  <Clock className="w-3 h-3 text-amber-400" />
-                  <span>{stats.upcoming} próx.</span>
+              {stats.completed > 0 && (
+                <span className="hidden sm:flex items-center gap-0.5 text-emerald-400 font-bold">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>{stats.completed} listas</span>
                 </span>
               )}
 
@@ -461,7 +517,7 @@ export function ProjectGanttCard({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
-        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport flex-1 max-h-[350px] my-1 select-none border border-slate-800/80 rounded-xl bg-[#090f1d] ${
+        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport flex-1 ${viewportMaxHeight} my-1 select-none border border-slate-800/80 rounded-xl bg-[#090f1d] ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
@@ -490,7 +546,7 @@ export function ProjectGanttCard({
                   Responsable
                 </span>
                 <span className="text-[8.5px] text-slate-500 font-bold truncate">
-                  {contractorRows.length} cuadrillas
+                  {contractorRows.length} cuadrillas {projectMilestones.length > 0 ? '• Hitos' : ''}
                 </span>
               </div>
 
@@ -542,7 +598,7 @@ export function ProjectGanttCard({
             </div>
           </div>
 
-          {/* CUERPO: FILAS DE CUADRILLAS / RESPONSABLES */}
+          {/* CUERPO: FILA DE HITOS Y FILAS DE CUADRILLAS */}
           <div className="relative divide-y divide-slate-800/50">
             {/* Línea vertical indicadora del día de hoy a lo largo de toda la matriz */}
             {todayIndex >= 0 && (
@@ -557,6 +613,109 @@ export function ProjectGanttCard({
               </div>
             )}
 
+            {/* FILA ESPECIAL DE HITOS DEL PROYECTO */}
+            {projectMilestones.length > 0 && (
+              <div
+                className="flex items-center hover:bg-slate-800/40 transition-colors group relative border-b-2 border-slate-700/80 bg-slate-900/40"
+                style={{ height: '42px' }}
+              >
+                {/* Columna Izquierda Fija: Rótulo de Hitos */}
+                <div
+                  onClick={() => onOpenMilestonesConfig && onOpenMilestonesConfig(project.id)}
+                  className="sticky left-0 z-20 bg-[#0f172a] px-2 flex items-center justify-between gap-1.5 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer hover:bg-slate-800"
+                  style={{ width: `${STICKY_COL_WIDTH}px`, height: '42px' }}
+                  title="Hitos clave de la obra (Clic para configurar)"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-5 h-5 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                      <Flag className="w-3 h-3 text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black text-amber-300 truncate leading-tight">
+                        Hitos de Obra
+                      </p>
+                      <p className="text-[8px] text-slate-400 font-bold truncate">
+                        {projectMilestones.length} hitos
+                      </p>
+                    </div>
+                  </div>
+                  {onOpenMilestonesConfig && (
+                    <Pencil className="w-3 h-3 text-slate-500 hover:text-amber-400 shrink-0" />
+                  )}
+                </div>
+
+                {/* Track de Días con Hitos */}
+                <div className="flex items-center relative h-full">
+                  {daysList.map(d => (
+                    <div
+                      key={d.dateStr}
+                      className={`h-full border-r border-slate-800/30 shrink-0 ${
+                        d.isWeekend ? 'bg-slate-900/30' : ''
+                      } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
+                      style={{ width: `${DAY_WIDTH}px` }}
+                    />
+                  ))}
+
+                  {/* Píldoras de Hitos con color condicional y titilado */}
+                  {projectMilestones.map(m => {
+                    const mDate = m.targetDate || (m as any).endDate;
+                    if (!mDate || mDate < timelineStartStr || mDate > timelineEndStr) return null;
+
+                    const mIdx = dateToIndex.get(mDate);
+                    if (mIdx === undefined) return null;
+
+                    const daysDiff = getDaysDiff(mDate, todayStr);
+                    const isDone = Boolean(m.completed || (m.progress !== undefined && m.progress >= 100));
+                    const isOverdue = daysDiff < 0 && !isDone;
+                    const isApproaching = daysDiff >= 0 && daysDiff <= 3;
+                    const hasNoProgress = !m.progress || m.progress === 0;
+
+                    let pillClass = 'bg-purple-600 text-white border-purple-400';
+                    let statusLabel = 'Hito';
+
+                    if (isDone) {
+                      pillClass = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/30';
+                      statusLabel = '100% Listo';
+                    } else if (isOverdue || (isApproaching && hasNoProgress)) {
+                      pillClass = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
+                      statusLabel = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Faltan ${daysDiff}d sin avances!`;
+                    } else if (m.progress && m.progress > 0) {
+                      pillClass = 'bg-emerald-600 text-white border-emerald-400';
+                      statusLabel = `${m.progress}%`;
+                    }
+
+                    const mLeft = Math.max(0, mIdx * DAY_WIDTH - 20);
+
+                    return (
+                      <div
+                        key={m.id}
+                        data-interactive="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenMilestonesConfig) onOpenMilestonesConfig(project.id);
+                        }}
+                        className={`absolute top-1.5 h-6 rounded-xl text-[9px] font-black px-2 flex items-center gap-1 cursor-pointer transition-all shadow-lg hover:scale-105 active:scale-95 z-10 border ${pillClass}`}
+                        style={{
+                          left: `${mLeft}px`,
+                          minWidth: '85px',
+                          maxWidth: '180px'
+                        }}
+                        title={`Hito: ${m.name} (${formatPMDate(mDate)}) • ${statusLabel}`}
+                      >
+                        <Flag className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate flex-1 font-bold">{m.name}</span>
+                        {isDone && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
+                        {(isOverdue || (isApproaching && hasNoProgress)) && (
+                          <Flame className="w-2.5 h-2.5 shrink-0 text-white animate-bounce" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FILAS DE CUADRILLAS / RESPONSABLES */}
             {contractorRows.map(row => (
               <div
                 key={row.profile.id}
@@ -602,19 +761,7 @@ export function ProjectGanttCard({
                   ))}
 
                   {/* Píldoras de Tareas Continuas (Multimes sin cortes) */}
-                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd }) => {
-                    const alarms = getTaskAlarms(task, todayStr);
-                    const isDone = task.completed || task.status === 'completed';
-
-                    let pillClasses = 'bg-cyan-500 text-slate-950';
-                    if (isDone) {
-                      pillClasses = 'bg-emerald-500 text-white';
-                    } else if (alarms.isCriticalDelay) {
-                      pillClasses = 'bg-rose-500 text-white animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]';
-                    } else if (alarms.isUpcomingDeadline || task.status === 'in_progress') {
-                      pillClasses = 'bg-amber-400 text-slate-950';
-                    }
-
+                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, isApproachingNoProgress, pillClasses, statusText }) => {
                     return (
                       <div
                         key={task.id}
@@ -623,17 +770,19 @@ export function ProjectGanttCard({
                           e.stopPropagation();
                           handleOpenPM(task.id, task.date);
                         }}
-                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate ${pillClasses}`}
+                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
                           width: `${width}px`,
                           top: `${6 + lane * 26}px`
                         }}
-                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • Clic para editar`}
+                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
                       >
                         <span className="truncate flex-1">{task.title}</span>
                         {isDone && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
-                        {alarms.isCriticalDelay && <Flame className="w-2.5 h-2.5 shrink-0" />}
+                        {(isCritical || isApproachingNoProgress) && (
+                          <Flame className="w-2.5 h-2.5 shrink-0 text-white" />
+                        )}
                       </div>
                     );
                   })}
@@ -654,7 +803,7 @@ export function ProjectGanttCard({
       <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
         <div className="flex items-center gap-1.5 text-cyan-400/90 font-medium">
           <MoveHorizontal className="w-3.5 h-3.5 animate-pulse" />
-          <span>Desliza lateralmente para ver todos los meses y hacia abajo para más cuadrillas</span>
+          <span>Desliza lateralmente para ver meses/semanas y hacia abajo para más cuadrillas</span>
         </div>
 
         <button

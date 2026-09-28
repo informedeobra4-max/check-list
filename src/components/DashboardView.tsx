@@ -384,6 +384,7 @@ export function DashboardView({
                       neonColor={neonColor}
                       onOpenProjectManager={onOpenProjectManager}
                       onOpenCalendarModal={handleOpenCalendarModal}
+                      onOpenMilestonesConfig={onOpenMilestonesConfig}
                     />
                   </div>
                 </div>

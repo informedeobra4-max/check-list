@@ -30,7 +30,7 @@ import {
 import { Project, Unit, StatusFilter } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor, hexToRgba } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
-import { ProjectTimeline } from './ProjectTimeline';
+import { ProjectGanttCard } from './ProjectGanttCard';
 import { ErrorBoundary } from './ErrorBoundary';
 import { AnimatedCircularProgress } from './AnimatedCircularProgress';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
@@ -402,16 +402,15 @@ export function UnitsView({
           )}
         </div>
 
-        {/* Línea de Tiempo e Hitos Críticos de la Obra */}
+        {/* Diagrama de Gantt Continuo e Hitos de la Obra (Vista Ampliada) */}
         <div className="mt-3.5 pt-2 border-t border-slate-800/80">
-          <ErrorBoundary fallbackTitle="Error al visualizar el cronograma de hitos">
-            <ProjectTimeline
+          <ErrorBoundary fallbackTitle="Error al visualizar el diagrama de Gantt">
+            <ProjectGanttCard
               project={project}
-              compact={false}
+              neonColor={neonColor}
+              onOpenProjectManager={onOpenProjectManager}
               onOpenMilestonesConfig={onOpenMilestonesConfig}
-              onToggleManualMilestone={onToggleManualMilestone}
-              onUpdateMilestoneProgress={onUpdateMilestoneProgress}
-              onUpdateProjectDates={onUpdateProjectDates}
+              large={true}
             />
           </ErrorBoundary>
         </div>

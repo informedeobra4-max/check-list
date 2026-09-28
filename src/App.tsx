@@ -2590,6 +2590,7 @@ export default function App() {
             onToggleTaskStatus={handleToggleCalendarEvent}
             onToggleSubtask={handleTogglePMSubtask}
             onSaveContractors={handleSaveContractors}
+            onOpenMilestonesConfig={handleOpenMilestonesConfig}
             onShowToast={showToast}
           />
         </ErrorBoundary>

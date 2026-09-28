@@ -51,6 +51,7 @@ interface ProjectManagerModalProps {
   onToggleTaskStatus?: (projectId: string, taskId: string, newStatus: PMTaskStatus) => void;
   onToggleSubtask?: (projectId: string, taskId: string, subtaskId: string) => void;
   onSaveContractors?: (projectId: string, contractors: ContractorProfile[]) => void;
+  onOpenMilestonesConfig?: (projectId: string) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
 
@@ -74,6 +75,7 @@ export function ProjectManagerModal({
   onToggleTaskStatus,
   onToggleSubtask,
   onSaveContractors,
+  onOpenMilestonesConfig,
   onShowToast
 }: ProjectManagerModalProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'calendar'>(initialTab);
@@ -556,6 +558,7 @@ export function ProjectManagerModal({
                 onStatusFilterChange={(val) => setStatusFilter(val as any)}
                 onOpenContractorManager={() => setIsContractorManagerOpen(true)}
                 onEditContractor={() => setIsContractorManagerOpen(true)}
+                onOpenMilestonesConfig={onOpenMilestonesConfig}
               />
 
               {/* BOTTOM 3-COLUMN MODULAR SECTION */}

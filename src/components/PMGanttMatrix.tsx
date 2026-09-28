@@ -11,10 +11,11 @@ import {
   Users,
   Pencil,
   Calendar,
-  Filter
+  Filter,
+  Flag
 } from 'lucide-react';
 import { Project, ProjectCalendarEvent, PMTaskStatus, ContractorProfile } from '../types';
-import { getTodayString, getTaskAlarms, formatPMDate } from '../utils/pmCalculations';
+import { getTodayString, getTaskAlarms, formatPMDate, getDaysDiff } from '../utils/pmCalculations';
 import { getContractorProfile, getProjectContractors } from '../utils/pmContractors';
 import { ContractorAvatar } from './ContractorAvatar';
 
@@ -33,6 +34,7 @@ interface PMGanttMatrixProps {
   onStatusFilterChange: (status: string) => void;
   onOpenContractorManager?: () => void;
   onEditContractor?: (contractor: ContractorProfile) => void;
+  onOpenMilestonesConfig?: (projectId: string) => void;
 }
 
 const MONTH_NAMES_ES = [
@@ -54,7 +56,8 @@ export function PMGanttMatrix({
   statusFilter,
   onStatusFilterChange,
   onOpenContractorManager,
-  onEditContractor
+  onEditContractor,
+  onOpenMilestonesConfig
 }: PMGanttMatrixProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
@@ -70,6 +73,10 @@ export function PMGanttMatrix({
     allEvents.forEach(e => {
       if (e.date) dates.push(e.date);
       if (e.startDate) dates.push(e.startDate);
+    });
+    (project.milestones || []).forEach(m => {
+      if (m.targetDate) dates.push(m.targetDate);
+      if ((m as any).endDate) dates.push((m as any).endDate);
     });
 
     // El cronograma siempre comienza 2 meses antes del mes actual para ver semanas recientes
@@ -169,6 +176,9 @@ export function PMGanttMatrix({
   }, [contractors, project]);
 
   const allEvents = project.calendarEvents || [];
+  const projectMilestones = useMemo(() => {
+    return (project.milestones || []).filter(m => m.name && (m.targetDate || (m as any).endDate));
+  }, [project.milestones]);
   const totalDays = daysList.length;
   const timelineStartStr = daysList[0]?.dateStr || '';
   const timelineEndStr = daysList[totalDays - 1]?.dateStr || '';
@@ -218,10 +228,15 @@ export function PMGanttMatrix({
       const filteredTasks = row.tasks.filter(task => {
         if (statusFilter === 'all') return true;
         const alarms = getTaskAlarms(task, todayStr);
-        if (statusFilter === 'critical') return alarms.isCriticalDelay;
-        if (statusFilter === 'in_progress') return task.status === 'in_progress' && !task.completed;
-        if (statusFilter === 'pending') return (!task.status || task.status === 'pending') && !task.completed;
-        if (statusFilter === 'completed') return task.completed || task.status === 'completed';
+        const daysDiff = getDaysDiff(task.date, todayStr);
+        const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
+        const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
+        const isCrit = !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProgress) || task.type === 'alarm' || alarms.isCriticalDelay);
+
+        if (statusFilter === 'critical') return isCrit;
+        if (statusFilter === 'in_progress') return (task.status === 'in_progress' || (task.progress !== undefined && task.progress > 0)) && !isDone;
+        if (statusFilter === 'pending') return (!task.status || task.status === 'pending') && !isDone && !isCrit;
+        if (statusFilter === 'completed') return isDone;
         return true;
       });
 
@@ -239,6 +254,11 @@ export function PMGanttMatrix({
         lane: number;
         taskStart: string;
         taskEnd: string;
+        isDone: boolean;
+        isCritical: boolean;
+        isApproachingNoProgress: boolean;
+        pillClasses: string;
+        statusText: string;
       }[] = [];
 
       sorted.forEach(task => {
@@ -274,13 +294,48 @@ export function PMGanttMatrix({
         }
 
         const spanDays = endIdx - startIdx + 1;
+        const alarms = getTaskAlarms(task, todayStr);
+        const daysDiff = getDaysDiff(taskEnd, todayStr);
+        const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
+        const isOverdue = daysDiff < 0 && !isDone;
+        const isApproaching = daysDiff >= 0 && daysDiff <= 3;
+        const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
+        const isCriticalAlarm = task.type === 'alarm' || alarms.isCriticalDelay;
+        const isApproachingNoProgress = isApproaching && hasNoProgress && !isDone;
+
+        // Criterio de color y titilado en rojo:
+        // "en rojo titilando si esta llegando al dia de terminar y no hay avances o viene mal, y en verde si venimos bien"
+        let pillClasses = 'bg-cyan-500 text-slate-950 border-cyan-400';
+        let statusText = 'Pendiente';
+
+        if (isDone) {
+          pillClasses = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/25';
+          statusText = 'Listo';
+        } else if (isOverdue || isApproachingNoProgress || isCriticalAlarm) {
+          pillClasses = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
+          statusText = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Quedan ${daysDiff}d sin avances!`;
+        } else if (task.status === 'in_progress' || (task.progress !== undefined && task.progress > 0)) {
+          if (isApproaching) {
+            pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25';
+            statusText = `${daysDiff}d restantes`;
+          } else {
+            pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
+            statusText = 'En curso al día';
+          }
+        }
+
         positionedTasks.push({
           event: task,
           leftOffset: startIdx * DAY_WIDTH + 2,
           width: Math.max(DAY_WIDTH - 4, spanDays * DAY_WIDTH - 4),
           lane: assignedLane,
           taskStart,
-          taskEnd
+          taskEnd,
+          isDone,
+          isCritical: isOverdue || isCriticalAlarm || isApproachingNoProgress,
+          isApproachingNoProgress,
+          pillClasses,
+          statusText
         });
       });
 
@@ -301,9 +356,14 @@ export function PMGanttMatrix({
   // Estadísticas globales del Gantt
   const stats = useMemo(() => {
     const total = allEvents.length;
-    const completed = allEvents.filter(t => t.completed || t.status === 'completed').length;
-    const critical = allEvents.filter(t => getTaskAlarms(t, todayStr).isCriticalDelay).length;
-    const inProgress = allEvents.filter(t => t.status === 'in_progress' && !t.completed).length;
+    const completed = allEvents.filter(t => t.completed || t.status === 'completed' || (t.progress !== undefined && t.progress >= 100)).length;
+    const critical = allEvents.filter(t => {
+      const daysDiff = getDaysDiff(t.date, todayStr);
+      const isDone = Boolean(t.completed || t.status === 'completed' || (t.progress !== undefined && t.progress >= 100));
+      const hasNoProgress = (t.progress === undefined || t.progress === 0) && (t.status === 'pending' || !t.status);
+      return !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProgress) || t.type === 'alarm');
+    }).length;
+    const inProgress = allEvents.filter(t => (t.status === 'in_progress' || (t.progress !== undefined && t.progress > 0)) && !t.completed).length;
     return { total, completed, critical, inProgress };
   }, [allEvents, todayStr]);
 
@@ -505,7 +565,7 @@ export function PMGanttMatrix({
                     Responsable
                   </span>
                   <span className="text-[9px] text-slate-400 font-bold truncate">
-                    {contractorRows.length} cuadrillas
+                    {contractorRows.length} cuadrillas {projectMilestones.length > 0 ? '• Hitos' : ''}
                   </span>
                 </div>
 
@@ -569,7 +629,7 @@ export function PMGanttMatrix({
             </div>
           </div>
 
-          {/* CUERPO: FILAS DE CUADRILLAS / RESPONSABLES */}
+          {/* CUERPO: FILA DE HITOS Y FILAS DE CUADRILLAS */}
           <div className="relative divide-y divide-slate-200 dark:divide-slate-800/50">
             {/* Línea vertical indicadora del día de hoy a lo largo de toda la matriz */}
             {todayIndex >= 0 && (
@@ -581,6 +641,109 @@ export function PMGanttMatrix({
                 }}
               >
                 <div className="w-[2px] h-full border-l-2 border-dashed border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+              </div>
+            )}
+
+            {/* FILA ESPECIAL DE HITOS DEL PROYECTO */}
+            {projectMilestones.length > 0 && (
+              <div
+                className="flex items-center hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors group relative border-b-2 border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40"
+                style={{ height: '42px' }}
+              >
+                {/* Columna Izquierda Fija: Rótulo de Hitos */}
+                <div
+                  onClick={() => onOpenMilestonesConfig && onOpenMilestonesConfig(project.id)}
+                  className={`sticky left-0 z-20 bg-slate-100/90 dark:bg-[#0f172a] px-3 flex items-center justify-between gap-1.5 border-r border-slate-200 dark:border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.06)] dark:shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 ${
+                    onOpenMilestonesConfig ? 'cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800' : ''
+                  }`}
+                  style={{ width: `${STICKY_COL_WIDTH}px`, height: '42px' }}
+                  title="Hitos clave de la obra (Clic para configurar)"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                      <Flag className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-black text-amber-600 dark:text-amber-400 truncate leading-tight">
+                        Hitos de Obra
+                      </p>
+                      <p className="text-[8.5px] text-slate-500 dark:text-slate-400 font-bold truncate">
+                        {projectMilestones.length} hitos clave
+                      </p>
+                    </div>
+                  </div>
+                  {onOpenMilestonesConfig && (
+                    <Pencil className="w-3 h-3 text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 shrink-0" />
+                  )}
+                </div>
+
+                {/* Track de Días con Hitos */}
+                <div className="flex items-center relative h-full">
+                  {daysList.map(d => (
+                    <div
+                      key={d.dateStr}
+                      className={`h-full border-r border-slate-200/50 dark:border-slate-800/30 shrink-0 ${
+                        d.isWeekend ? 'bg-slate-100/40 dark:bg-slate-900/30' : ''
+                      } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
+                      style={{ width: `${DAY_WIDTH}px` }}
+                    />
+                  ))}
+
+                  {/* Píldoras de Hitos con color condicional y titilado */}
+                  {projectMilestones.map(m => {
+                    const mDate = m.targetDate || (m as any).endDate;
+                    if (!mDate || mDate < timelineStartStr || mDate > timelineEndStr) return null;
+
+                    const mIdx = dateToIndex.get(mDate);
+                    if (mIdx === undefined) return null;
+
+                    const daysDiff = getDaysDiff(mDate, todayStr);
+                    const isDone = Boolean(m.completed || (m.progress !== undefined && m.progress >= 100));
+                    const isOverdue = daysDiff < 0 && !isDone;
+                    const isApproaching = daysDiff >= 0 && daysDiff <= 3;
+                    const hasNoProgress = !m.progress || m.progress === 0;
+
+                    let pillClass = 'bg-purple-600 text-white border-purple-400';
+                    let statusLabel = 'Hito';
+
+                    if (isDone) {
+                      pillClass = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/30';
+                      statusLabel = '100% Listo';
+                    } else if (isOverdue || (isApproaching && hasNoProgress)) {
+                      pillClass = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
+                      statusLabel = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Faltan ${daysDiff}d sin avances!`;
+                    } else if (m.progress && m.progress > 0) {
+                      pillClass = 'bg-emerald-600 text-white border-emerald-400';
+                      statusLabel = `${m.progress}%`;
+                    }
+
+                    const mLeft = Math.max(0, mIdx * DAY_WIDTH - 20);
+
+                    return (
+                      <div
+                        key={m.id}
+                        data-interactive="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenMilestonesConfig) onOpenMilestonesConfig(project.id);
+                        }}
+                        className={`absolute top-2 h-6 rounded-xl text-[9px] font-black px-2 flex items-center gap-1 cursor-pointer transition-all shadow-md hover:scale-105 active:scale-95 z-10 border ${pillClass}`}
+                        style={{
+                          left: `${mLeft}px`,
+                          minWidth: '85px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={`Hito: ${m.name} (${formatPMDate(mDate)}) • ${statusLabel}`}
+                      >
+                        <Flag className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate max-w-[110px]">{m.name}</span>
+                        <span className="opacity-80 font-mono text-[8px] ml-0.5 shrink-0">
+                          {statusLabel}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -645,22 +808,8 @@ export function PMGanttMatrix({
                     />
                   ))}
 
-                  {/* Píldoras de Tareas Continuas */}
-                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd }) => {
-                    const alarms = getTaskAlarms(task, todayStr);
-                    const isDone = task.completed || task.status === 'completed';
-
-                    let pillClasses = 'bg-cyan-500 text-slate-950 shadow-cyan-500/25 border-cyan-400/50';
-                    if (isDone) {
-                      pillClasses = 'bg-emerald-500 text-white shadow-emerald-500/25 border-emerald-400/40';
-                    } else if (alarms.isCriticalDelay) {
-                      pillClasses = 'bg-rose-500 text-white shadow-rose-500/40 border-rose-300/60 animate-pulse';
-                    } else if (alarms.isUpcomingDeadline || task.status === 'in_progress') {
-                      pillClasses = 'bg-amber-400 text-slate-950 shadow-amber-500/25 border-amber-300/50';
-                    } else if (task.type === 'alarm') {
-                      pillClasses = 'bg-purple-600 text-white shadow-purple-500/30 border-purple-400/50';
-                    }
-
+                  {/* Píldoras de Tareas Continuas con color condicional y titilado */}
+                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, pillClasses, statusText }) => {
                     return (
                       <div
                         key={task.id}
@@ -675,11 +824,11 @@ export function PMGanttMatrix({
                           width: `${width}px`,
                           top: `${8 + lane * 28}px`
                         }}
-                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • Clic para editar`}
+                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
                       >
                         <span className="truncate flex-1 font-bold">{task.title}</span>
                         {isDone && <CheckCircle2 className="w-3 h-3 shrink-0" />}
-                        {alarms.isCriticalDelay && <Flame className="w-3 h-3 shrink-0 text-white" />}
+                        {isCritical && <Flame className="w-3 h-3 shrink-0 text-white animate-pulse" />}
                         {task.type === 'alarm' && <AlertTriangle className="w-3 h-3 shrink-0" />}
                       </div>
                     );
