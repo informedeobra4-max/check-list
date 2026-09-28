@@ -70,6 +70,26 @@
   scrollbar-width: none !important;
 }
 
+/* Dark sleek scrollbar for custom-scrollbar containers to prevent default white browser scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.7);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.9);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(51, 65, 85, 0.7) transparent;
+}
+
 /* Print specific styles for A4 Technical Inspection Act PDF */
 @media print {
   body {

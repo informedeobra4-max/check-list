@@ -62,30 +62,24 @@ export function ProjectGanttCard({
       if (e.startDate) dates.push(e.startDate);
     });
 
-    // Rango mínimo: desde 2 meses atrás hasta 6 meses adelante respecto a hoy
-    let minYear = now.getFullYear();
-    let minMonth = now.getMonth() - 2;
-    let maxYear = now.getFullYear();
-    let maxMonth = now.getMonth() + 6;
+    // El cronograma siempre comienza 2 meses antes del mes actual para ver semanas recientes
+    // Nunca dejamos que una fecha antigua histórica (ej. 2023) desplace la vista 3 años atrás
+    const startD = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+
+    // Fin: al menos 10 meses hacia adelante desde hoy (o la fecha final si hay tareas futuras)
+    let endD = new Date(now.getFullYear(), now.getMonth() + 10 + 1, 0);
 
     dates.forEach(d => {
       const parts = d.split('-').map(Number);
       if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         const y = parts[0];
         const m = parts[1] - 1; // 0 a 11
-        if (y < minYear || (y === minYear && m < minMonth)) {
-          minYear = y;
-          minMonth = m;
-        }
-        if (y > maxYear || (y === maxYear && m > maxMonth)) {
-          maxYear = y;
-          maxMonth = m;
+        const taskEndDate = new Date(y, m + 1, 0);
+        if (taskEndDate > endD) {
+          endD = taskEndDate;
         }
       }
     });
-
-    const startD = new Date(minYear, minMonth, 1);
-    const endD = new Date(maxYear, maxMonth + 1, 0);
 
     const mList: {
       year: number;
@@ -292,21 +286,34 @@ export function ProjectGanttCard({
     return { total, completed, critical, upcoming };
   }, [allEvents, todayStr]);
 
-  // Centrar automáticamente en el día de hoy al cargar
+  // Función para centrar exactamente en el día de hoy
+  const scrollToToday = (behavior: ScrollBehavior = 'smooth') => {
+    if (!scrollRef.current || todayIndex < 0) return;
+    const containerW = scrollRef.current.clientWidth || 600;
+    const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
+    scrollRef.current.scrollTo({ left: targetX, behavior });
+  };
+
+  // Centrar automáticamente en el día de hoy al cargar en múltiples frames para asegurar layout completo
   useEffect(() => {
-    if (scrollRef.current && todayIndex >= 0) {
-      const containerW = scrollRef.current.clientWidth || 600;
-      const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
-      scrollRef.current.scrollLeft = targetX;
+    if (todayIndex >= 0) {
+      scrollToToday('auto');
+      const rAF = requestAnimationFrame(() => {
+        scrollToToday('auto');
+      });
+      const timer = setTimeout(() => {
+        scrollToToday('smooth');
+      }, 150);
+      return () => {
+        cancelAnimationFrame(rAF);
+        clearTimeout(timer);
+      };
     }
   }, [todayIndex]);
 
   // Navegación rápida con botones
   const handleScrollToToday = () => {
-    if (!scrollRef.current || todayIndex < 0) return;
-    const containerW = scrollRef.current.clientWidth || 600;
-    const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
-    scrollRef.current.scrollTo({ left: targetX, behavior: 'smooth' });
+    scrollToToday('smooth');
   };
 
   const handleScrollDelta = (dir: 'left' | 'right') => {
