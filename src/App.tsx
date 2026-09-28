@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress, hexToRgba } from './utils/calculations';
 import { Header } from './components/Header';
@@ -2173,6 +2173,17 @@ export default function App() {
     }
   };
 
+  // Save custom contractors / team members per project with dual cloud sync
+  const handleSaveContractors = (projectId: string, contractors: ContractorProfile[]) => {
+    updateProjectsAndSync(prev =>
+      prev.map(proj => proj.id === projectId ? { ...proj, contractors } : proj)
+    );
+    try {
+      localStorage.setItem(`pm_contractors_${projectId}`, JSON.stringify(contractors));
+    } catch {}
+    showToast('Cuadrillas y fotos del equipo actualizadas en la Nube', 'Users');
+  };
+
   // Reset to Mock Data
   const handleResetData = () => {
     if (confirm('¿Restablecer datos de prueba de ejemplo? Se reiniciarán las obras y fotos de muestra.')) {
@@ -2562,20 +2573,26 @@ export default function App() {
 
       {/* Modal de Project Manager y Agenda Integral por Obra */}
       {pmModalState.isOpen && activePMProject && (
-        <ProjectManagerModal
-          isOpen={pmModalState.isOpen}
-          project={activePMProject}
-          initialTab={pmModalState.initialTab || 'dashboard'}
-          initialDate={pmModalState.initialDate}
-          selectedTaskId={pmModalState.selectedTaskId}
-          neonColor={localColors.neonColor || '#00f2fe'}
-          onClose={handleCloseProjectManager}
-          onSaveTask={handleSaveCalendarEvent}
-          onDeleteTask={handleDeleteCalendarEvent}
-          onToggleTaskStatus={handleToggleCalendarEvent}
-          onToggleSubtask={handleTogglePMSubtask}
-          onShowToast={showToast}
-        />
+        <ErrorBoundary
+          fallbackTitle="Error al cargar el módulo de Project Manager"
+          onReset={handleCloseProjectManager}
+        >
+          <ProjectManagerModal
+            isOpen={pmModalState.isOpen}
+            project={activePMProject}
+            initialTab={pmModalState.initialTab || 'dashboard'}
+            initialDate={pmModalState.initialDate}
+            selectedTaskId={pmModalState.selectedTaskId}
+            neonColor={localColors.neonColor || '#00f2fe'}
+            onClose={handleCloseProjectManager}
+            onSaveTask={handleSaveCalendarEvent}
+            onDeleteTask={handleDeleteCalendarEvent}
+            onToggleTaskStatus={handleToggleCalendarEvent}
+            onToggleSubtask={handleTogglePMSubtask}
+            onSaveContractors={handleSaveContractors}
+            onShowToast={showToast}
+          />
+        </ErrorBoundary>
       )}
 
       {isCroquisModalOpen && projects.length > 0 && (

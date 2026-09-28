@@ -12,14 +12,16 @@ import {
   Briefcase,
   Calendar,
   Sparkles,
-  Tool
+  Users,
+  Pencil
 } from 'lucide-react';
-import { Project, ProjectCalendarEvent, PMTaskStatus } from '../types';
+import { Project, ProjectCalendarEvent, PMTaskStatus, ContractorProfile } from '../types';
 import { getTodayString, getTaskAlarms } from '../utils/pmCalculations';
-import { getContractorProfile, DEFAULT_CONTRACTORS } from '../utils/pmContractors';
+import { getContractorProfile, getProjectContractors, DEFAULT_CONTRACTORS } from '../utils/pmContractors';
 
 interface PMGanttMatrixProps {
   project: Project;
+  contractors?: ContractorProfile[];
   neonColor?: string;
   viewDate: Date; // Year and month being viewed
   windowStartIndex: number; // 0 for days 1-16, 16 for days 17-31
@@ -30,6 +32,8 @@ interface PMGanttMatrixProps {
   onQuickAddTask: (contractorName: string, dateStr: string) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  onOpenContractorManager?: () => void;
+  onEditContractor?: (contractor: ContractorProfile) => void;
 }
 
 const MONTH_NAMES_ES = [
@@ -50,7 +54,10 @@ export function PMGanttMatrix({
   onSelectTask,
   onQuickAddTask,
   statusFilter,
-  onStatusFilterChange
+  onStatusFilterChange,
+  contractors,
+  onOpenContractorManager,
+  onEditContractor
 }: PMGanttMatrixProps) {
   const todayStr = useMemo(() => getTodayString(), []);
   const currentYear = viewDate.getFullYear();
@@ -93,38 +100,37 @@ export function PMGanttMatrix({
     return visibleDays.findIndex(d => d.isToday);
   }, [visibleDays]);
 
-  // Collect list of contractors: start with those already referenced in project tasks, then fill with default
+  // Collect list of contractors: active contractors for this project + any task assignees
   const contractorRows = useMemo(() => {
     const events = project.calendarEvents || [];
-    const assignedNames = new Set<string>();
+    const activeContractors = (contractors && contractors.length > 0)
+      ? contractors
+      : getProjectContractors(project);
 
-    events.forEach(e => {
-      if (e.assignedTo?.trim()) assignedNames.add(e.assignedTo.trim());
-    });
+    const list: { name: string; role: string; profile: ContractorProfile; tasks: ProjectCalendarEvent[] }[] = [];
 
-    const list: { name: string; role: string; profile: ReturnType<typeof getContractorProfile>; tasks: ProjectCalendarEvent[] }[] = [];
-
-    // Add existing assigned contractors first
-    assignedNames.forEach(name => {
-      const sample = events.find(e => e.assignedTo?.trim() === name);
-      const profile = getContractorProfile(name, sample?.assignedRole);
-      const contractorTasks = events.filter(e => e.assignedTo?.trim() === name);
+    // Use active project contractors as main rows
+    activeContractors.forEach(c => {
+      const cTasks = events.filter(e => e.assignedTo?.trim().toLowerCase() === c.name.toLowerCase());
       list.push({
-        name,
-        role: profile.role,
-        profile,
-        tasks: contractorTasks
+        name: c.name,
+        role: c.role,
+        profile: c,
+        tasks: cTasks
       });
     });
 
-    // If less than 5 rows, add defaults so the Gantt has that rich Dribbble dashboard density
-    DEFAULT_CONTRACTORS.forEach(def => {
-      if (!assignedNames.has(def.name)) {
+    // Check if there are other assignees in tasks not in the contractors list
+    const assignedNames = new Set(activeContractors.map(c => c.name.toLowerCase()));
+    events.forEach(e => {
+      if (e.assignedTo?.trim() && !assignedNames.has(e.assignedTo.trim().toLowerCase())) {
+        assignedNames.add(e.assignedTo.trim().toLowerCase());
+        const prof = getContractorProfile(e.assignedTo.trim(), e.assignedRole, activeContractors);
         list.push({
-          name: def.name,
-          role: def.role,
-          profile: def,
-          tasks: events.filter(e => e.assignedTo?.trim() === def.name)
+          name: e.assignedTo.trim(),
+          role: prof.role,
+          profile: prof,
+          tasks: events.filter(t => t.assignedTo?.trim().toLowerCase() === e.assignedTo?.trim().toLowerCase())
         });
       }
     });
@@ -135,13 +141,13 @@ export function PMGanttMatrix({
       list.unshift({
         name: 'Cuadrilla General',
         role: 'Tareas de Obra',
-        profile: getContractorProfile('Cuadrilla General', 'Tareas Generales'),
+        profile: getContractorProfile('Cuadrilla General', 'Tareas Generales', activeContractors),
         tasks: unassignedTasks
       });
     }
 
-    return list.slice(0, 6); // Keep 5-6 rows for optimal vertical rhythm matching image
-  }, [project.calendarEvents]);
+    return list;
+  }, [project.calendarEvents, contractors, project]);
 
   // Helper to calculate pill placement within visible 16 days
   const getTaskPillMetrics = (task: ProjectCalendarEvent) => {
@@ -165,8 +171,14 @@ export function PMGanttMatrix({
       if (taskEnd > lastVis) {
         endIdx = visibleDays.length - 1;
       } else {
-        endIdx = visibleDays.findLastIndex(d => d.dateStr <= taskEnd);
-        if (endIdx === -1) endIdx = startIdx;
+        let lastMatch = -1;
+        for (let i = visibleDays.length - 1; i >= 0; i--) {
+          if (visibleDays[i].dateStr <= taskEnd) {
+            lastMatch = i;
+            break;
+          }
+        }
+        endIdx = lastMatch === -1 ? startIdx : lastMatch;
       }
     }
 
@@ -262,8 +274,19 @@ export function PMGanttMatrix({
           {/* HEADER ROW (Employees label + 16 Days) */}
           <div className="grid grid-cols-[210px_repeat(16,minmax(0,1fr))] gap-1.5 items-center mb-2 px-1">
             {/* Left Header */}
-            <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 pl-2">
-              Responsables
+            <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 pl-2 pr-2">
+              <span>Responsables</span>
+              {onOpenContractorManager && (
+                <button
+                  type="button"
+                  onClick={onOpenContractorManager}
+                  className="p-1 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                  title="Gestionar responsables y fotos de cuadrillas"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span className="text-[9px] font-bold lowercase">editar</span>
+                </button>
+              )}
             </div>
 
             {/* Days Header */}
@@ -315,33 +338,54 @@ export function PMGanttMatrix({
                 className="grid grid-cols-[210px_repeat(16,minmax(0,1fr))] gap-1.5 items-center p-1.5 rounded-2xl hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
               >
                 {/* LEFT CELL: CONTRACTOR PROFILE */}
-                <div className="flex items-center gap-3 pr-2 min-w-0">
-                  <div className="relative shrink-0">
-                    <img
-                      src={contractor.profile.avatarUrl}
-                      alt={contractor.name}
-                      className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 shadow-sm"
-                      onError={(e) => {
-                        // Fallback initials if image fails to load
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white absolute inset-0 -z-10 shadow-inner"
-                      style={{ backgroundColor: contractor.profile.color }}
-                    >
-                      {contractor.profile.initials}
+                <div
+                  onClick={() => onEditContractor && onEditContractor(contractor.profile)}
+                  className="flex items-center justify-between gap-2 pr-2 min-w-0 cursor-pointer group/row"
+                  title={`Clic para editar datos o foto de ${contractor.name}`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="relative shrink-0">
+                      <img
+                        src={contractor.profile.avatarUrl}
+                        alt={contractor.name}
+                        className="w-10 h-10 rounded-full object-cover ring-2 shadow-sm"
+                        style={{ borderColor: contractor.profile.color || neonColor }}
+                        onError={(e) => {
+                          // Fallback initials if image fails to load
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white absolute inset-0 -z-10 shadow-inner"
+                        style={{ backgroundColor: contractor.profile.color }}
+                      >
+                        {contractor.profile.initials}
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-black text-slate-800 dark:text-white truncate group-hover/row:text-cyan-400 transition-colors">
+                        {contractor.name}
+                      </h4>
+                      <p className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate font-medium">
+                        {contractor.role}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-xs font-black text-slate-800 dark:text-white truncate">
-                      {contractor.name}
-                    </h4>
-                    <p className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate font-medium">
-                      {contractor.role}
-                    </p>
-                  </div>
+                  {onEditContractor && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditContractor(contractor.profile);
+                      }}
+                      className="opacity-0 group-hover/row:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shrink-0"
+                      title="Editar foto y rol"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
 
                 {/* RIGHT CELL: GANTT DAY CELLS & FLOATING TASK PILLS */}

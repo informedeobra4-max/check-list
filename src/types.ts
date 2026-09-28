@@ -132,6 +132,15 @@ export interface ProjectCalendarEvent {
   updatedAt?: string; // Timestamp ISO para sincronización multi-dispositivo determinista
 }
 
+export interface ContractorProfile {
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl: string;
+  color: string;
+  initials: string;
+}
+
 export type ProjectManagerTask = ProjectCalendarEvent;
 
 export interface Project {
@@ -151,6 +160,7 @@ export interface Project {
   customServices?: ProjectCustomService[];
   milestones?: Milestone[];
   calendarEvents?: ProjectCalendarEvent[]; // Tareas, eventos y alarmas independientes por obra
+  contractors?: ContractorProfile[]; // Cuadrillas y responsables técnicos personalizados con fotos
   units: Unit[];
 }
 
