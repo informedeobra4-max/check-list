@@ -136,7 +136,7 @@ export interface ContractorProfile {
   id: string;
   name: string;
   role: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   color: string;
   initials: string;
 }

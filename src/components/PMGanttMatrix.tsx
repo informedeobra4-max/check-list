@@ -18,6 +18,7 @@ import {
 import { Project, ProjectCalendarEvent, PMTaskStatus, ContractorProfile } from '../types';
 import { getTodayString, getTaskAlarms } from '../utils/pmCalculations';
 import { getContractorProfile, getProjectContractors, DEFAULT_CONTRACTORS } from '../utils/pmContractors';
+import { ContractorAvatar } from './ContractorAvatar';
 
 interface PMGanttMatrixProps {
   project: Project;
@@ -344,24 +345,15 @@ export function PMGanttMatrix({
                   title={`Clic para editar datos o foto de ${contractor.name}`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="relative shrink-0">
-                      <img
-                        src={contractor.profile.avatarUrl}
-                        alt={contractor.name}
-                        className="w-10 h-10 rounded-full object-cover ring-2 shadow-sm"
-                        style={{ borderColor: contractor.profile.color || neonColor }}
-                        onError={(e) => {
-                          // Fallback initials if image fails to load
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white absolute inset-0 -z-10 shadow-inner"
-                        style={{ backgroundColor: contractor.profile.color }}
-                      >
-                        {contractor.profile.initials}
-                      </div>
-                    </div>
+                    <ContractorAvatar
+                      avatarUrl={contractor.profile.avatarUrl}
+                      name={contractor.name}
+                      color={contractor.profile.color || neonColor}
+                      sizeClassName="w-10 h-10"
+                      ringClassName="ring-2 shadow-xs"
+                      showStatusDot
+                      statusColor={contractor.profile.color || neonColor}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <h4 className="text-xs font-black text-slate-800 dark:text-white truncate group-hover/row:text-cyan-400 transition-colors">

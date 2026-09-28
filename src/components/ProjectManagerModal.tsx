@@ -36,6 +36,7 @@ import { getTodayString, getTaskAlarms, calculateProjectPMStats, formatPMDate, g
 import { DEFAULT_CONTRACTORS, getContractorProfile, getProjectContractors } from '../utils/pmContractors';
 import { PMGanttMatrix } from './PMGanttMatrix';
 import { ContractorManagerModal } from './ContractorManagerModal';
+import { ContractorAvatar } from './ContractorAvatar';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -481,12 +482,13 @@ export function ProjectManagerModal({
               title="Haz clic para gestionar cuadrillas y cambiar fotos del equipo"
             >
               {contractorList.slice(0, 4).map(c => (
-                <img
+                <ContractorAvatar
                   key={c.id}
-                  src={c.avatarUrl}
-                  alt={c.name}
-                  className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover shadow-xs"
-                  style={{ borderColor: c.color }}
+                  avatarUrl={c.avatarUrl}
+                  name={c.name}
+                  color={c.color || neonColor}
+                  sizeClassName="w-8 h-8"
+                  ringClassName="ring-2 ring-white dark:ring-slate-900"
                   title={`${c.name} - ${c.role} (Clic para editar fotos)`}
                 />
               ))}
@@ -603,10 +605,12 @@ export function ProjectManagerModal({
                             {upcomingEvents[0].time && <span>• {upcomingEvents[0].time} hs</span>}
                           </div>
                           {upcomingEvents[0].assignedTo && (
-                            <img
-                              src={getContractorProfile(upcomingEvents[0].assignedTo).avatarUrl}
-                              alt={upcomingEvents[0].assignedTo}
-                              className="w-6 h-6 rounded-full object-cover ring-2 ring-white dark:ring-slate-900"
+                            <ContractorAvatar
+                              avatarUrl={getContractorProfile(upcomingEvents[0].assignedTo, undefined, contractorList).avatarUrl}
+                              name={upcomingEvents[0].assignedTo}
+                              color={getContractorProfile(upcomingEvents[0].assignedTo, undefined, contractorList).color}
+                              sizeClassName="w-6 h-6"
+                              ringClassName="ring-2 ring-white dark:ring-slate-900"
                               title={upcomingEvents[0].assignedTo}
                             />
                           )}
@@ -633,10 +637,13 @@ export function ProjectManagerModal({
                           </div>
 
                           {evt.assignedTo && (
-                            <img
-                              src={getContractorProfile(evt.assignedTo).avatarUrl}
-                              alt={evt.assignedTo}
-                              className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700 shrink-0"
+                            <ContractorAvatar
+                              avatarUrl={getContractorProfile(evt.assignedTo, undefined, contractorList).avatarUrl}
+                              name={evt.assignedTo}
+                              color={getContractorProfile(evt.assignedTo, undefined, contractorList).color}
+                              sizeClassName="w-7 h-7"
+                              ringClassName="ring-1 ring-slate-200 dark:ring-slate-700"
+                              className="shrink-0"
                               title={evt.assignedTo}
                             />
                           )}
@@ -694,11 +701,13 @@ export function ProjectManagerModal({
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <img
-                                src={item.contractor.avatarUrl}
-                                alt={item.contractor.name}
-                                className="w-9 h-9 rounded-full object-cover ring-2 shadow-xs shrink-0"
-                                style={{ borderColor: item.contractor.color }}
+                              <ContractorAvatar
+                                avatarUrl={item.contractor.avatarUrl}
+                                name={item.contractor.name}
+                                color={item.contractor.color}
+                                sizeClassName="w-9 h-9"
+                                ringClassName="ring-2 shadow-xs"
+                                className="shrink-0"
                               />
                               <div className="min-w-0">
                                 <h6 className="text-xs font-black text-slate-800 dark:text-white truncate">
@@ -979,11 +988,13 @@ export function ProjectManagerModal({
                               </span>
 
                               {task.assignedTo && (
-                                <span className="flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300">
-                                  <img
-                                    src={getContractorProfile(task.assignedTo).avatarUrl}
-                                    alt={task.assignedTo}
-                                    className="w-4 h-4 rounded-full object-cover"
+                                <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                                  <ContractorAvatar
+                                    avatarUrl={getContractorProfile(task.assignedTo, task.assignedRole, contractorList).avatarUrl}
+                                    name={task.assignedTo}
+                                    color={getContractorProfile(task.assignedTo, task.assignedRole, contractorList).color}
+                                    sizeClassName="w-4 h-4"
+                                    className="shrink-0"
                                   />
                                   <span>{task.assignedTo}</span>
                                   {task.assignedRole && <span className="text-slate-400">({task.assignedRole})</span>}

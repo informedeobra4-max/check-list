@@ -22,10 +22,14 @@ export const PRESET_COLORS = [
   '#818cf8',
   '#38bdf8',
   '#34d399',
+  '#10b981',
   '#fb7185',
+  '#f43f5e',
   '#f59e0b',
+  '#f97316',
   '#a855f7',
-  '#ec4899'
+  '#ec4899',
+  '#64748b'
 ];
 
 export const DEFAULT_CONTRACTORS: ContractorProfile[] = [
@@ -132,7 +136,7 @@ export function getContractorProfile(
       id: 'c_default',
       name: 'Sin Asignar',
       role: fallbackRole || 'Responsable General',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      avatarUrl: '',
       color: '#94a3b8',
       initials: 'SA'
     };
