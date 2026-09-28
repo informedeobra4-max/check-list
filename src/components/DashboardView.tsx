@@ -385,6 +385,7 @@ export function DashboardView({
                       onOpenProjectManager={onOpenProjectManager}
                       onOpenCalendarModal={handleOpenCalendarModal}
                       onOpenMilestonesConfig={onOpenMilestonesConfig}
+                      onSaveTask={onSaveCalendarEvent}
                     />
                   </div>
                 </div>

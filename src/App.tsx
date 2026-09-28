@@ -2334,6 +2334,7 @@ export default function App() {
               onUpdateProjectDates={handleUpdateProjectDates}
               onEditProject={(proj) => setEditingProject(proj)}
               onOpenProjectManager={handleOpenProjectManager}
+              onSaveCalendarEvent={handleSaveCalendarEvent}
               onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
               onAddTrade={handleAddTrade}
               onDeleteTrade={handleDeleteTrade}

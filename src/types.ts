@@ -123,6 +123,7 @@ export interface ProjectCalendarEvent {
   priority?: 'low' | 'medium' | 'high' | 'urgent'; // Baja, Media, Alta, Urgente
   status?: PMTaskStatus; // 'pending' | 'in_progress' | 'blocked' | 'completed'
   completed?: boolean;
+  progress?: number; // Porcentaje de avance de la tarea (0 a 100)
   assignedTo?: string; // Responsable o encargado de la tarea
   assignedRole?: string; // Rol o especialidad del responsable (ej. "Director de Obra", "Capataz", "Instalador")
   subtasks?: PMSubtask[]; // Subtareas interactivas con checklist

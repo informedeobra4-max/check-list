@@ -9,7 +9,10 @@ import {
   Plus,
   Layers,
   Flag,
-  Pencil
+  Pencil,
+  Percent,
+  Check,
+  X
 } from 'lucide-react';
 import { Project, ProjectCalendarEvent, ContractorProfile, Milestone } from '../types';
 import { getTodayString, getTaskAlarms, formatPMDate, getDaysDiff } from '../utils/pmCalculations';
@@ -27,6 +30,7 @@ interface ProjectGanttCardProps {
   ) => void;
   onOpenCalendarModal?: (projectId: string, initialDate?: string, selectedEventId?: string) => void;
   onOpenMilestonesConfig?: (projectId: string) => void;
+  onSaveTask?: (projectId: string, task: ProjectCalendarEvent) => void;
   contractors?: ContractorProfile[];
   large?: boolean; // Para vista ampliada al entrar a la obra (UnitsView)
 }
@@ -47,11 +51,14 @@ export function ProjectGanttCard({
   onOpenProjectManager,
   onOpenCalendarModal,
   onOpenMilestonesConfig,
+  onSaveTask,
   contractors,
   large = false
 }: ProjectGanttCardProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
+
+  const [quickProgressTask, setQuickProgressTask] = useState<{ task: ProjectCalendarEvent; progress: number } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -270,32 +277,38 @@ export function ProjectGanttCard({
         const spanDays = endIdx - startIdx + 1;
         const alarms = getTaskAlarms(task, todayStr);
         const daysDiff = getDaysDiff(taskEnd, todayStr);
-        const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
+        const taskProgress = task.progress !== undefined ? task.progress : (task.completed || task.status === 'completed' ? 100 : 0);
+        const isDone = Boolean(task.completed || task.status === 'completed' || taskProgress >= 100);
         const isOverdue = daysDiff < 0 && !isDone;
         const isApproaching = daysDiff >= 0 && daysDiff <= 3;
-        const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
+        const hasNoProgress = taskProgress === 0;
+        const hasSignificantProgress = taskProgress > 0;
         const isCriticalAlarm = task.type === 'alarm' || alarms.isCriticalDelay;
         const isApproachingNoProgress = isApproaching && hasNoProgress && !isDone;
 
         // Criterio de color y titilado en rojo:
-        // "en rojo titilando si esta llegando al dia de terminar y no hay avances o viene mal, y en verde si venimos bien"
+        // "no es lo mismo que quede 3 dias para terminar sin avances a que tengamos un avance del 90% quedando 3 dias no estari aen rojo sino naranja, eso porcentaje se lo podria colocar si entro en la tarea ahi le puedo ir colocando porcentaje de avance."
         let pillClasses = 'bg-cyan-500 text-slate-950 border-cyan-400';
-        let statusText = 'Pendiente';
+        let statusText = `${taskProgress}% • Pendiente`;
 
         if (isDone) {
           pillClasses = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/25';
-          statusText = 'Listo';
-        } else if (isOverdue || isApproachingNoProgress || isCriticalAlarm) {
+          statusText = '100% Listo';
+        } else if (isOverdue || isCriticalAlarm || isApproachingNoProgress) {
           pillClasses = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
-          statusText = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Quedan ${daysDiff}d sin avances!`;
-        } else if (task.status === 'in_progress' || (task.progress !== undefined && task.progress > 0)) {
-          if (isApproaching) {
-            pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25';
-            statusText = `${daysDiff}d restantes`;
-          } else {
-            pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
-            statusText = 'En curso al día';
-          }
+          statusText = isOverdue
+            ? `${taskProgress}% • Atraso +${Math.abs(daysDiff)}d`
+            : daysDiff === 0
+            ? `${taskProgress}% • ¡Vence Hoy sin avances!`
+            : `${taskProgress}% • ¡Quedan ${daysDiff}d sin avances!`;
+        } else if (isApproaching && hasSignificantProgress) {
+          // Quedan <= 3 días pero con avance registrado (ej. 90%) -> NARANJA / ÁMBAR (No titila en rojo)
+          pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.5)] font-bold';
+          statusText = `${taskProgress}% • Quedan ${daysDiff}d`;
+        } else if (taskProgress > 0 || task.status === 'in_progress') {
+          // En curso al día con tiempo suficiente -> VERDE ESMERALDA ("si venimos bien")
+          pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
+          statusText = `${taskProgress}% • En curso al día`;
         }
 
         positionedTasks.push({
@@ -306,10 +319,11 @@ export function ProjectGanttCard({
           taskStart,
           taskEnd,
           isDone,
-          isCritical: isOverdue || isCriticalAlarm,
+          isCritical: isOverdue || isCriticalAlarm || isApproachingNoProgress,
           isApproachingNoProgress,
           pillClasses,
-          statusText
+          statusText,
+          taskProgress
         });
       });
 
@@ -329,12 +343,13 @@ export function ProjectGanttCard({
   // Estadísticas globales del Gantt
   const stats = useMemo(() => {
     const total = allEvents.length;
-    const completed = allEvents.filter(t => t.completed || t.status === 'completed').length;
+    const completed = allEvents.filter(t => t.completed || t.status === 'completed' || (t.progress !== undefined && t.progress >= 100)).length;
     const critical = allEvents.filter(t => {
       const daysDiff = getDaysDiff(t.date, todayStr);
-      const isDone = Boolean(t.completed || t.status === 'completed');
-      const hasNoProgress = (t.progress === undefined || t.progress === 0) && (t.status === 'pending' || !t.status);
-      return !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProgress) || t.type === 'alarm');
+      const tProg = t.progress !== undefined ? t.progress : (t.completed || t.status === 'completed' ? 100 : 0);
+      const isDone = Boolean(t.completed || t.status === 'completed' || tProg >= 100);
+      const hasNoProg = tProg === 0;
+      return !isDone && (daysDiff < 0 || (daysDiff <= 3 && hasNoProg) || t.type === 'alarm');
     }).length;
     const upcoming = allEvents.filter(t => getTaskAlarms(t, todayStr).isUpcomingDeadline).length;
     return { total, completed, critical, upcoming };
@@ -761,7 +776,7 @@ export function ProjectGanttCard({
                   ))}
 
                   {/* Píldoras de Tareas Continuas (Multimes sin cortes) */}
-                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, isApproachingNoProgress, pillClasses, statusText }) => {
+                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, isApproachingNoProgress, pillClasses, statusText, taskProgress }) => {
                     return (
                       <div
                         key={task.id}
@@ -770,19 +785,47 @@ export function ProjectGanttCard({
                           e.stopPropagation();
                           handleOpenPM(task.id, task.date);
                         }}
-                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border ${pillClasses}`}
+                        className={`absolute h-5 sm:h-5.5 rounded-lg text-[9px] font-black px-1.5 flex items-center justify-between gap-1 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border relative overflow-hidden ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
                           width: `${width}px`,
                           top: `${6 + lane * 26}px`
                         }}
-                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
+                        title={`${task.title} • Avance: ${taskProgress}% (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
                       >
-                        <span className="truncate flex-1">{task.title}</span>
-                        {isDone && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
-                        {(isCritical || isApproachingNoProgress) && (
-                          <Flame className="w-2.5 h-2.5 shrink-0 text-white" />
+                        {/* Relleno interno translúcido de progreso */}
+                        {taskProgress > 0 && taskProgress < 100 && (
+                          <div
+                            className="absolute left-0 top-0 bottom-0 bg-white/20 rounded-l-md pointer-events-none"
+                            style={{ width: `${taskProgress}%` }}
+                          />
                         )}
+
+                        <span className="truncate flex-1 z-1 relative flex items-center gap-1 min-w-0">
+                          {/* Badge de porcentaje con clic directo para ajuste rápido */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickProgressTask({
+                                task,
+                                progress: taskProgress
+                              });
+                            }}
+                            className="px-1 py-0.2 rounded text-[7.5px] font-black bg-black/35 hover:bg-black/60 text-white shrink-0 transition-colors"
+                            title={`Avance: ${taskProgress}%. Clic para cambiar rápido.`}
+                          >
+                            {taskProgress}%
+                          </button>
+                          <span className="truncate font-bold">{task.title}</span>
+                        </span>
+
+                        <div className="z-1 relative flex items-center gap-0.5 shrink-0">
+                          {isDone && <CheckCircle2 className="w-2.5 h-2.5" />}
+                          {(isCritical || isApproachingNoProgress) && (
+                            <Flame className="w-2.5 h-2.5 text-white animate-pulse" />
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -815,6 +858,143 @@ export function ProjectGanttCard({
           <span>Nueva Tarea</span>
         </button>
       </div>
+
+      {/* MODAL / POPOVER FLOTANTE DE AJUSTE RÁPIDO DE AVANCE (%) */}
+      {quickProgressTask && (
+        <div
+          className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setQuickProgressTask(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-slate-900 border border-slate-700/90 rounded-3xl p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0">
+                  <Percent className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                    Avance de Tarea
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-bold truncate">
+                    {quickProgressTask.task.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickProgressTask(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-bold">Porcentaje de Avance</span>
+                <span className={`text-sm font-black px-2.5 py-0.5 rounded-xl border ${
+                  quickProgressTask.progress >= 100
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : quickProgressTask.progress >= 75
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    : quickProgressTask.progress > 0
+                    ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
+                    : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                }`}>
+                  {quickProgressTask.progress}%
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={quickProgressTask.progress}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setQuickProgressTask(prev => prev ? { ...prev, progress: val } : null);
+                }}
+                className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
+              />
+
+              {/* Botones rápidos */}
+              <div className="flex items-center justify-between gap-1">
+                {[0, 25, 50, 75, 90, 100].map(pct => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setQuickProgressTask(prev => prev ? { ...prev, progress: pct } : null)}
+                    className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all ${
+                      quickProgressTask.progress === pct
+                        ? 'bg-cyan-500 text-slate-950 shadow-md scale-105'
+                        : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+
+              {/* Explicación de impacto en Gantt */}
+              <div className="text-[10px] font-medium p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                {quickProgressTask.progress >= 100 ? (
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    ✓ 100% Finalizada (Se verá verde en Gantt)
+                  </span>
+                ) : quickProgressTask.progress > 0 ? (
+                  <span className="text-amber-400 font-bold flex items-center gap-1">
+                    ⚡ {quickProgressTask.progress}% con avance: Si quedan ≤3 días, se verá en naranja/ámbar como tarea al día.
+                  </span>
+                ) : (
+                  <span className="text-rose-400 font-bold flex items-center gap-1">
+                    ⚠️ 0% Sin avances: Si quedan ≤3 días, titilará en rojo como alarma crítica.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setQuickProgressTask(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updatedTask: ProjectCalendarEvent = {
+                    ...quickProgressTask.task,
+                    progress: quickProgressTask.progress,
+                    completed: quickProgressTask.progress >= 100,
+                    status: quickProgressTask.progress >= 100
+                      ? 'completed'
+                      : quickProgressTask.progress > 0
+                      ? 'in_progress'
+                      : 'pending',
+                    updatedAt: new Date().toISOString()
+                  };
+                  if (onSaveTask) {
+                    onSaveTask(project.id, updatedTask);
+                  } else if (onOpenProjectManager) {
+                    onOpenProjectManager(project.id, 'tasks', updatedTask.date, updatedTask.id);
+                  }
+                  setQuickProgressTask(null);
+                }}
+                className="px-4 py-1.5 rounded-xl text-xs font-black bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-md active:scale-95 flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Guardar Avance</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

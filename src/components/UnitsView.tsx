@@ -27,7 +27,7 @@ import {
   AlertTriangle,
   Briefcase
 } from 'lucide-react';
-import { Project, Unit, StatusFilter } from '../types';
+import { Project, Unit, StatusFilter, ProjectCalendarEvent } from '../types';
 import { calculateUnitProgress, getUnitItemCounts, calculateProjectProgress, isUnitCommonArea, parseUnitFloor, hexToRgba } from '../utils/calculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 import { ProjectGanttCard } from './ProjectGanttCard';
@@ -51,7 +51,13 @@ interface UnitsViewProps {
   onUpdateMilestoneProgress?: (projectId: string, milestoneId: string, percentage: number) => void;
   onUpdateProjectDates?: (projectId: string, startDate: string, estimatedEndDate: string) => void;
   onEditProject?: (project: Project) => void;
-  onOpenProjectManager?: (projectId: string) => void;
+  onOpenProjectManager?: (
+    projectId: string,
+    initialTab?: 'dashboard' | 'tasks' | 'calendar',
+    initialDate?: string,
+    selectedTaskId?: string
+  ) => void;
+  onSaveCalendarEvent?: (projectId: string, event: ProjectCalendarEvent) => void;
   onOpenUnitBlueprints?: (unit: Unit) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
@@ -75,6 +81,7 @@ export function UnitsView({
   onUpdateProjectDates,
   onEditProject,
   onOpenProjectManager,
+  onSaveCalendarEvent,
   onOpenUnitBlueprints,
   onAddTrade,
   onDeleteTrade,
@@ -410,6 +417,7 @@ export function UnitsView({
               neonColor={neonColor}
               onOpenProjectManager={onOpenProjectManager}
               onOpenMilestonesConfig={onOpenMilestonesConfig}
+              onSaveTask={onSaveCalendarEvent}
               large={true}
             />
           </ErrorBoundary>

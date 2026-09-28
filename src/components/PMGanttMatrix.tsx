@@ -296,32 +296,38 @@ export function PMGanttMatrix({
         const spanDays = endIdx - startIdx + 1;
         const alarms = getTaskAlarms(task, todayStr);
         const daysDiff = getDaysDiff(taskEnd, todayStr);
-        const isDone = Boolean(task.completed || task.status === 'completed' || (task.progress !== undefined && task.progress >= 100));
+        const taskProgress = task.progress !== undefined ? task.progress : (task.completed || task.status === 'completed' ? 100 : 0);
+        const isDone = Boolean(task.completed || task.status === 'completed' || taskProgress >= 100);
         const isOverdue = daysDiff < 0 && !isDone;
         const isApproaching = daysDiff >= 0 && daysDiff <= 3;
-        const hasNoProgress = (task.progress === undefined || task.progress === 0) && (task.status === 'pending' || !task.status);
+        const hasNoProgress = taskProgress === 0;
+        const hasSignificantProgress = taskProgress > 0;
         const isCriticalAlarm = task.type === 'alarm' || alarms.isCriticalDelay;
         const isApproachingNoProgress = isApproaching && hasNoProgress && !isDone;
 
         // Criterio de color y titilado en rojo:
-        // "en rojo titilando si esta llegando al dia de terminar y no hay avances o viene mal, y en verde si venimos bien"
+        // "no es lo mismo que quede 3 dias para terminar sin avances a que tengamos un avance del 90% quedando 3 dias no estari aen rojo sino naranja, eso porcentaje se lo podria colocar si entro en la tarea ahi le puedo ir colocando porcentaje de avance."
         let pillClasses = 'bg-cyan-500 text-slate-950 border-cyan-400';
-        let statusText = 'Pendiente';
+        let statusText = `${taskProgress}% • Pendiente`;
 
         if (isDone) {
           pillClasses = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/25';
-          statusText = 'Listo';
-        } else if (isOverdue || isApproachingNoProgress || isCriticalAlarm) {
+          statusText = '100% Listo';
+        } else if (isOverdue || isCriticalAlarm || isApproachingNoProgress) {
           pillClasses = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
-          statusText = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Quedan ${daysDiff}d sin avances!`;
-        } else if (task.status === 'in_progress' || (task.progress !== undefined && task.progress > 0)) {
-          if (isApproaching) {
-            pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/25';
-            statusText = `${daysDiff}d restantes`;
-          } else {
-            pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
-            statusText = 'En curso al día';
-          }
+          statusText = isOverdue
+            ? `${taskProgress}% • Atraso +${Math.abs(daysDiff)}d`
+            : daysDiff === 0
+            ? `${taskProgress}% • ¡Vence Hoy sin avances!`
+            : `${taskProgress}% • ¡Quedan ${daysDiff}d sin avances!`;
+        } else if (isApproaching && hasSignificantProgress) {
+          // Quedan <= 3 días pero con avance registrado (ej. 90%) -> NARANJA / ÁMBAR (No titila en rojo)
+          pillClasses = 'bg-amber-500 text-slate-950 border-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.5)] font-bold';
+          statusText = `${taskProgress}% • Quedan ${daysDiff}d`;
+        } else if (taskProgress > 0 || task.status === 'in_progress') {
+          // En curso al día con tiempo suficiente -> VERDE ESMERALDA ("si venimos bien")
+          pillClasses = 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-600/25';
+          statusText = `${taskProgress}% • En curso al día`;
         }
 
         positionedTasks.push({
@@ -335,7 +341,8 @@ export function PMGanttMatrix({
           isCritical: isOverdue || isCriticalAlarm || isApproachingNoProgress,
           isApproachingNoProgress,
           pillClasses,
-          statusText
+          statusText,
+          taskProgress
         });
       });
 
@@ -809,7 +816,7 @@ export function PMGanttMatrix({
                   ))}
 
                   {/* Píldoras de Tareas Continuas con color condicional y titilado */}
-                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, pillClasses, statusText }) => {
+                  {row.positionedTasks.map(({ event: task, leftOffset, width, lane, taskStart, taskEnd, isDone, isCritical, isApproachingNoProgress, pillClasses, statusText, taskProgress }) => {
                     return (
                       <div
                         key={task.id}
@@ -818,18 +825,36 @@ export function PMGanttMatrix({
                           e.stopPropagation();
                           onSelectTask(task);
                         }}
-                        className={`absolute h-6 rounded-xl text-[9.5px] font-black px-2 flex items-center justify-between gap-1.5 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border ${pillClasses}`}
+                        className={`absolute h-6 rounded-xl text-[9.5px] font-black px-2 flex items-center justify-between gap-1.5 cursor-pointer transition-all shadow-md hover:scale-[1.02] active:scale-95 z-10 truncate border relative overflow-hidden ${pillClasses}`}
                         style={{
                           left: `${leftOffset}px`,
                           width: `${width}px`,
                           top: `${8 + lane * 28}px`
                         }}
-                        title={`${task.title} (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
+                        title={`${task.title} • Avance: ${taskProgress}% (${formatPMDate(taskStart)} al ${formatPMDate(taskEnd)}) • ${statusText} • Clic para editar`}
                       >
-                        <span className="truncate flex-1 font-bold">{task.title}</span>
-                        {isDone && <CheckCircle2 className="w-3 h-3 shrink-0" />}
-                        {isCritical && <Flame className="w-3 h-3 shrink-0 text-white animate-pulse" />}
-                        {task.type === 'alarm' && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                        {/* Relleno interno translúcido de progreso */}
+                        {taskProgress > 0 && taskProgress < 100 && (
+                          <div
+                            className="absolute left-0 top-0 bottom-0 bg-white/20 rounded-l-xl pointer-events-none"
+                            style={{ width: `${taskProgress}%` }}
+                          />
+                        )}
+
+                        <span className="truncate flex-1 z-1 relative flex items-center gap-1.5 min-w-0">
+                          <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-black/35 text-white shrink-0">
+                            {taskProgress}%
+                          </span>
+                          <span className="truncate font-bold">{task.title}</span>
+                        </span>
+
+                        <div className="z-1 relative flex items-center gap-0.5 shrink-0">
+                          {isDone && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                          {(isCritical || isApproachingNoProgress) && (
+                            <Flame className="w-3 h-3 shrink-0 text-white animate-pulse" />
+                          )}
+                          {task.type === 'alarm' && <AlertTriangle className="w-3 h-3 shrink-0" />}
+                        </div>
                       </div>
                     );
                   })}
