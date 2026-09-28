@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant glass (&:where(.theme-glass, .theme-glass *));
+@custom-variant original (&:where(.theme-original, .theme-original *));
 
 :root {
   --neon-color: #00f2fe;
@@ -136,3 +138,289 @@ body > iframe {
   height: 0 !important;
   z-index: -99999 !important;
 }
+
+/* ==========================================================================
+   SISTEMA DE TEMAS: TEMA 1 (ORIGINAL OSCURO) vs TEMA 2 (GLASSMORPHISM)
+   ========================================================================== */
+
+/* Transición suave global al alternar entre temas */
+body,
+header,
+nav,
+main,
+.theme-glass,
+.theme-original {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   TEMA 2: NUEVA APARIENCIA MINIMALISTA / GLASSMORPHISM (Estilo Dribbble Ref)
+   ========================================================================== */
+
+/* Fondo general luminoso con gradiente sutil y elegante */
+html.theme-glass,
+body.theme-glass,
+.theme-glass {
+  background-color: #f0f3f8 !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.7) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.6) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.6) 0px, transparent 50%) !important;
+  background-attachment: fixed !important;
+  color: #0f172a !important;
+}
+
+/* Tarjetas y Contenedores con Efecto Vidrio Esmerilado (Glassmorphism) */
+.theme-glass .bg-\[\#131b2c\],
+.theme-glass .bg-\[\#131b2c\]\/80,
+.theme-glass .bg-\[\#151f33\],
+.theme-glass .bg-\[\#151f33\]\/90,
+.theme-glass .bg-\[\#151f33\]\/80,
+.theme-glass .bg-\[\#162035\],
+.theme-glass .bg-\[\#162035\]\/95,
+.theme-glass .bg-\[\#0f172a\],
+.theme-glass .bg-\[\#0e1422\],
+.theme-glass .bg-\[\#111827\],
+.theme-glass .bg-\[\#1e293b\],
+.theme-glass .bg-slate-900,
+.theme-glass .bg-slate-900\/90,
+.theme-glass .bg-slate-900\/80,
+.theme-glass .bg-slate-900\/60,
+.theme-glass .bg-slate-900\/50,
+.theme-glass .bg-slate-950,
+.theme-glass .bg-slate-950\/90,
+.theme-glass .bg-slate-950\/80,
+.theme-glass .bg-slate-950\/60,
+.theme-glass .bg-slate-850,
+.theme-glass .bg-slate-800,
+.theme-glass .bg-slate-800\/90,
+.theme-glass .bg-slate-800\/80,
+.theme-glass .bg-slate-800\/60,
+.theme-glass .bg-slate-800\/50,
+.theme-glass .bg-slate-800\/40 {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Sub-paneles y áreas internas con contraste suave */
+.theme-glass .bg-slate-950\/60,
+.theme-glass .bg-slate-900\/40,
+.theme-glass .bg-slate-800\/30,
+.theme-glass .bg-slate-800\/20 {
+  background-color: rgba(241, 245, 249, 0.7) !important;
+  border-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+/* Hover en tarjetas de cristal */
+.theme-glass .hover\:bg-slate-800:hover,
+.theme-glass .hover\:bg-slate-850:hover,
+.theme-glass .hover\:bg-slate-900:hover {
+  background: rgba(241, 245, 249, 0.9) !important;
+}
+
+/* Bordes y Divisores en Glassmorphism */
+.theme-glass .border-slate-800,
+.theme-glass .border-slate-800\/80,
+.theme-glass .border-slate-800\/60,
+.theme-glass .border-slate-800\/50,
+.theme-glass .border-slate-800\/40,
+.theme-glass .border-slate-800\/30,
+.theme-glass .border-slate-800\/20,
+.theme-glass .border-slate-700,
+.theme-glass .border-slate-700\/80,
+.theme-glass .border-slate-700\/60,
+.theme-glass .border-slate-700\/50,
+.theme-glass .border-slate-700\/40 {
+  border-color: rgba(226, 232, 240, 0.75) !important;
+}
+
+.theme-glass .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+.theme-glass .divide-slate-700 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(226, 232, 240, 0.75) !important;
+}
+
+.theme-glass hr,
+.theme-glass .h-px.bg-slate-800,
+.theme-glass .h-px.bg-slate-800\/80,
+.theme-glass .h-px.bg-slate-700 {
+  background-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+/* Barra de Navegación Superior (Header) Glassmorphism */
+.theme-glass header {
+  background: rgba(255, 255, 255, 0.84) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85) !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03) !important;
+}
+
+.theme-glass header h1,
+.theme-glass header .text-white {
+  color: #0f172a !important;
+}
+
+.theme-glass header .bg-slate-800\/80,
+.theme-glass header .bg-slate-800 {
+  background-color: rgba(241, 245, 249, 0.85) !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  color: #334155 !important;
+}
+
+.theme-glass header .text-slate-300,
+.theme-glass header .text-slate-400 {
+  color: #475569 !important;
+}
+
+/* Breadcrumb Subheader */
+.theme-glass .bg-slate-950.border-b.border-slate-800 {
+  background: rgba(248, 250, 252, 0.9) !important;
+  border-bottom-color: rgba(226, 232, 240, 0.85) !important;
+}
+
+/* Barra Flotante Inferior (Bottom Floating Dock) */
+.theme-glass nav.fixed.bottom-3,
+.theme-glass nav.fixed.bottom-4 {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.1), 0 4px 14px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-glass nav.fixed.bottom-3 button,
+.theme-glass nav.fixed.bottom-4 button {
+  color: #64748b !important;
+}
+
+.theme-glass nav.fixed.bottom-3 button:hover,
+.theme-glass nav.fixed.bottom-4 button:hover {
+  color: #0f172a !important;
+}
+
+/* Tipografía y Textos Nítidos para el Modo Glass */
+.theme-glass h1:not([class*="bg-"]),
+.theme-glass h2:not([class*="bg-"]),
+.theme-glass h3:not([class*="bg-"]),
+.theme-glass h4:not([class*="bg-"]),
+.theme-glass h5:not([class*="bg-"]),
+.theme-glass h6:not([class*="bg-"]) {
+  color: #0f172a !important;
+}
+
+.theme-glass .text-white:not(
+  [class*="bg-emerald"],
+  [class*="bg-rose"],
+  [class*="bg-amber"],
+  [class*="bg-purple"],
+  [class*="bg-indigo"],
+  [class*="bg-blue"],
+  [class*="bg-cyan-600"],
+  [class*="bg-black"],
+  .badge,
+  .badge *
+) {
+  color: #0f172a !important;
+}
+
+.theme-glass .text-slate-100:not(
+  [class*="bg-emerald"],
+  [class*="bg-rose"],
+  [class*="bg-amber"],
+  [class*="bg-purple"],
+  [class*="bg-indigo"]
+),
+.theme-glass .text-slate-200:not(
+  [class*="bg-emerald"],
+  [class*="bg-rose"],
+  [class*="bg-amber"],
+  [class*="bg-purple"]
+) {
+  color: #1e293b !important;
+}
+
+.theme-glass .text-slate-300 {
+  color: #334155 !important;
+}
+
+.theme-glass .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Diagrama de Gantt & Calendarios en Glassmorphism */
+.theme-glass .sticky.left-0 {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  color: #0f172a !important;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-glass .sticky.top-0 {
+  background: rgba(248, 250, 252, 0.96) !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  color: #1e293b !important;
+}
+
+.theme-glass .gantt-scroll-viewport {
+  background: rgba(255, 255, 255, 0.65) !important;
+}
+
+.theme-glass [class*="border-slate-800\/30"],
+.theme-glass [class*="border-slate-800\/50"] {
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+.theme-glass [class*="bg-slate-900\/30"] {
+  background-color: rgba(241, 245, 249, 0.7) !important;
+}
+
+/* Modales y Cuadros de Diálogo en Glassmorphism */
+.theme-glass .fixed.inset-0.bg-black\/80,
+.theme-glass .fixed.inset-0.bg-black\/70,
+.theme-glass .fixed.inset-0.bg-black\/60,
+.theme-glass .fixed.inset-0.bg-slate-950\/80 {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.theme-glass .fixed.inset-0 .bg-slate-900,
+.theme-glass .fixed.inset-0 .bg-slate-950,
+.theme-glass .fixed.inset-0 .bg-\[\#0e1422\],
+.theme-glass .fixed.inset-0 .bg-\[\#131b2c\],
+.theme-glass .fixed.inset-0 .bg-\[\#162035\] {
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.14) !important;
+  color: #0f172a !important;
+}
+
+.theme-glass input[type="text"]:not([class*="bg-transparent"]),
+.theme-glass input[type="number"]:not([class*="bg-transparent"]),
+.theme-glass input[type="date"]:not([class*="bg-transparent"]),
+.theme-glass textarea,
+.theme-glass select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Scrollbar en tema Glassmorphism */
+.theme-glass .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.6) !important;
+}
+.theme-glass .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5) !important;
+}
+.theme-glass .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7) !important;
+}
+

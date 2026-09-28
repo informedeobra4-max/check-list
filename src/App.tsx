@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile, AppTheme } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress, hexToRgba } from './utils/calculations';
 import { Header } from './components/Header';
@@ -386,56 +386,76 @@ export default function App() {
     document.documentElement.style.setProperty('--neon-glow-soft', hexToRgba(activeNeon, 0.15));
   }, [localColors]);
 
-  // Tema Día / Noche (Light / Dark)
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+  // Tema: Tema 1 (Apariencia Original Oscura) vs Tema 2 (Nueva Apariencia Minimalista / Glassmorphism)
+  const [theme, setTheme] = useState<AppTheme>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_THEME);
-      if (saved === 'light' || saved === 'dark') return saved;
+      if (saved === 'theme-glass' || saved === 'light') return 'theme-glass';
+      if (saved === 'theme-original' || saved === 'dark') return 'theme-original';
     } catch {}
-    return 'dark';
+    return 'theme-original';
   });
 
-  const handleSetTheme = (newTheme: 'light' | 'dark') => {
-    setTheme(newTheme);
+  const handleSetTheme = (newTheme: AppTheme | 'light' | 'dark') => {
+    const resolvedTheme: AppTheme =
+      newTheme === 'theme-glass' || newTheme === 'light' ? 'theme-glass' : 'theme-original';
+
+    setTheme(resolvedTheme);
     try {
-      localStorage.setItem(STORAGE_KEY_THEME, newTheme);
+      localStorage.setItem(STORAGE_KEY_THEME, resolvedTheme);
     } catch (e) {
       console.error('Error saving theme preference:', e);
     }
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
+
+    if (resolvedTheme === 'theme-original') {
+      document.documentElement.classList.add('dark', 'theme-original');
+      document.documentElement.classList.remove('light', 'theme-glass');
+      document.body.classList.add('theme-original');
+      document.body.classList.remove('theme-glass');
     } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark', 'theme-original');
+      document.documentElement.classList.add('light', 'theme-glass');
+      document.body.classList.add('theme-glass');
+      document.body.classList.remove('theme-original');
     }
+
     // Si cambia de tema explícitamente, limpiamos appBackground si tenía un color del tema contrario
-    if (newTheme === 'light' && localColors.appBackground && isDarkColor(localColors.appBackground)) {
+    if (resolvedTheme === 'theme-glass' && localColors.appBackground && isDarkColor(localColors.appBackground)) {
       setLocalColors(prev => ({ ...prev, appBackground: '' }));
-    } else if (newTheme === 'dark' && localColors.appBackground && !isDarkColor(localColors.appBackground)) {
+    } else if (resolvedTheme === 'theme-original' && localColors.appBackground && !isDarkColor(localColors.appBackground)) {
       setLocalColors(prev => ({ ...prev, appBackground: '' }));
     }
-    showToast(newTheme === 'dark' ? 'Modo Noche (Oscuro) activado' : 'Modo Día (Claro) activado', newTheme === 'dark' ? 'Moon' : 'Sun');
+
+    showToast(
+      resolvedTheme === 'theme-glass'
+        ? 'Tema 2: Minimalista / Glassmorphism activado'
+        : 'Tema 1: Apariencia Original activado',
+      resolvedTheme === 'theme-glass' ? 'Sun' : 'Moon'
+    );
   };
 
   const handleToggleTheme = () => {
-    handleSetTheme(theme === 'dark' ? 'light' : 'dark');
+    handleSetTheme(theme === 'theme-original' ? 'theme-glass' : 'theme-original');
   };
 
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
+    if (theme === 'theme-original') {
+      document.documentElement.classList.add('dark', 'theme-original');
+      document.documentElement.classList.remove('light', 'theme-glass');
+      document.body.classList.add('theme-original');
+      document.body.classList.remove('theme-glass');
       if (!localColors.appBackground) {
         document.documentElement.style.backgroundColor = '#0e1422';
         document.body.style.backgroundColor = '#0e1422';
       }
     } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark', 'theme-original');
+      document.documentElement.classList.add('light', 'theme-glass');
+      document.body.classList.add('theme-glass');
+      document.body.classList.remove('theme-original');
       if (!localColors.appBackground) {
-        document.documentElement.style.backgroundColor = '#f1f5f9';
-        document.body.style.backgroundColor = '#f1f5f9';
+        document.documentElement.style.backgroundColor = '#f1f4f9';
+        document.body.style.backgroundColor = '#f1f4f9';
       }
     }
   }, [theme, localColors.appBackground]);
@@ -2235,15 +2255,17 @@ export default function App() {
 
   return (
     <div
-      className={`w-full min-h-screen flex flex-col relative pb-20 transition-colors duration-200 ${
+      className={`w-full min-h-screen flex flex-col relative pb-20 transition-all duration-300 ${
+        theme === 'theme-glass' ? 'theme-glass' : 'theme-original'
+      } ${
         localColors.appBackground
           ? isDarkColor(localColors.appBackground) ? 'text-slate-100' : 'text-slate-900'
-          : theme === 'light' ? 'bg-[#f1f5f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
+          : theme === 'theme-glass' ? 'bg-[#f1f4f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
       }`}
       style={{
         backgroundColor: localColors.appBackground
           ? localColors.appBackground
-          : theme === 'light' ? '#f1f5f9' : '#0e1422'
+          : theme === 'theme-glass' ? '#f1f4f9' : '#0e1422'
       }}
     >
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}

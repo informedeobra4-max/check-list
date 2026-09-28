@@ -190,3 +190,4 @@ export interface LocalColors {
 export type ViewMode = 'dashboard' | 'units' | 'checklist';
 export type StatusFilter = 'all' | 'completed' | 'in_progress' | 'pending';
 export type TaskFilter = 'all' | 'pending' | 'completed';
+export type AppTheme = 'theme-original' | 'theme-glass';

@@ -11,8 +11,8 @@ interface LogoEditorModalProps {
   localPresentationBackground?: string;
   localNeonColor?: string;
   initialTarget?: 'header' | 'banner';
-  theme?: 'light' | 'dark';
-  onToggleTheme?: (theme: 'light' | 'dark') => void;
+  theme?: 'theme-original' | 'theme-glass' | 'light' | 'dark';
+  onToggleTheme?: (theme: 'theme-original' | 'theme-glass' | 'light' | 'dark') => void;
   onForceLandscape?: () => void;
   onClose: () => void;
   onSaveLogos: (
@@ -219,20 +219,20 @@ export function LogoEditorModal({
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
               <Sun className="w-3.5 h-3.5 text-amber-500" />
-              <span>Modo de Pantalla (Día / Noche)</span>
+              <span>Selector de Tema / Apariencia</span>
             </label>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 uppercase">
-              {theme === 'dark' ? 'Noche (Oscuro)' : 'Día (Claro)'}
+              {theme === 'theme-glass' || theme === 'light' ? 'Tema 2: Glassmorphism' : 'Tema 1: Original'}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {/* Botón Modo Noche */}
+            {/* Botón Tema 1: Original Oscuro */}
             <button
               type="button"
-              onClick={() => onToggleTheme && onToggleTheme('dark')}
+              onClick={() => onToggleTheme && onToggleTheme('theme-original')}
               className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                theme === 'dark'
+                theme === 'theme-original' || theme === 'dark'
                   ? 'bg-slate-900 text-white border-amber-500 ring-2 ring-amber-500/30 shadow-md'
                   : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
               }`}
@@ -241,26 +241,26 @@ export function LogoEditorModal({
                 <div className="w-6 h-6 rounded-lg bg-indigo-950 flex items-center justify-center text-cyan-400">
                   <Moon className="w-3.5 h-3.5" />
                 </div>
-                {theme === 'dark' && (
+                {(theme === 'theme-original' || theme === 'dark') && (
                   <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center">
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold leading-tight">Modo Noche</p>
-                <p className={`text-[10px] mt-0.5 leading-snug ${theme === 'dark' ? 'text-slate-300' : 'text-slate-500'}`}>
-                  Oscuro para obra
+                <p className="text-xs font-bold leading-tight">Tema 1: Original</p>
+                <p className={`text-[10px] mt-0.5 leading-snug ${theme === 'theme-original' || theme === 'dark' ? 'text-slate-300' : 'text-slate-500'}`}>
+                  Industrial Oscuro
                 </p>
               </div>
             </button>
 
-            {/* Botón Modo Día */}
+            {/* Botón Tema 2: Minimalista Glassmorphism */}
             <button
               type="button"
-              onClick={() => onToggleTheme && onToggleTheme('light')}
+              onClick={() => onToggleTheme && onToggleTheme('theme-glass')}
               className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                theme === 'light'
+                theme === 'theme-glass' || theme === 'light'
                   ? 'bg-amber-50/60 text-slate-900 border-amber-500 ring-2 ring-amber-500/30 shadow-md'
                   : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
               }`}
@@ -269,16 +269,16 @@ export function LogoEditorModal({
                 <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
                   <Sun className="w-3.5 h-3.5" />
                 </div>
-                {theme === 'light' && (
+                {(theme === 'theme-glass' || theme === 'light') && (
                   <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center">
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-xs font-bold leading-tight">Modo Día</p>
+                <p className="text-xs font-bold leading-tight">Tema 2: Glass</p>
                 <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                  Luz alta y claridad
+                  Minimalista Translúcido
                 </p>
               </div>
             </button>

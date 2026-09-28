@@ -15,7 +15,7 @@ interface HeaderProps {
   onBack: () => void;
   onOpenLogoEditor?: () => void;
   onOpenReportModal: (type?: 'auto' | 'project' | 'unit') => void;
-  theme?: 'light' | 'dark';
+  theme?: 'theme-original' | 'theme-glass' | 'light' | 'dark';
   onToggleTheme?: () => void;
   onLogoChange?: (newUrl: string) => void;
   cloudStatus?: CloudSyncStatus;
@@ -32,7 +32,7 @@ export function Header({
   onBack,
   onOpenLogoEditor,
   onOpenReportModal,
-  theme = 'dark',
+  theme = 'theme-original',
   onToggleTheme,
   onLogoChange,
   cloudStatus,
@@ -168,18 +168,26 @@ export function Header({
               </button>
             )}
 
-            {/* Quick Day / Night Theme Toggle */}
+            {/* Selector de Tema (Theme Toggle): Tema 1 (Original) vs Tema 2 (Glassmorphism) */}
             {onToggleTheme && (
               <button
                 type="button"
                 onClick={onToggleTheme}
-                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-amber-400 hover:text-amber-300 transition-colors shadow-sm touch-target"
-                title={theme === 'dark' ? 'Cambiar a Modo Día (Luminoso)' : 'Cambiar a Modo Noche (Oscuro)'}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm touch-target ${
+                  theme === 'theme-glass' || theme === 'light'
+                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 hover:text-amber-300'
+                }`}
+                title={
+                  theme === 'theme-glass' || theme === 'light'
+                    ? 'Cambiar a Tema 1 (Apariencia Original Oscura)'
+                    : 'Cambiar a Tema 2 (Nueva Apariencia Minimalista / Glassmorphism)'
+                }
               >
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
+                {theme === 'theme-glass' || theme === 'light' ? (
+                  <Moon className="w-4 h-4 text-slate-700" />
                 ) : (
-                  <Moon className="w-4 h-4 text-cyan-300" />
+                  <Sun className="w-4 h-4 text-amber-400" />
                 )}
               </button>
             )}
