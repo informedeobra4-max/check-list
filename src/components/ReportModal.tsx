@@ -71,11 +71,12 @@ export function ReportModal({
     targetProject = projects[0];
   }
 
+  const projectUnits = targetProject?.units || [];
   const isUnitScope = !!targetUnit;
-  const overallPct = isUnitScope
-    ? calculateUnitProgress(targetUnit!)
-    : calculateProjectProgress(targetProject);
-  const unitsToReport = isUnitScope ? [targetUnit!] : targetProject.units;
+  const overallPct = isUnitScope && targetUnit
+    ? calculateUnitProgress(targetUnit)
+    : (targetProject ? calculateProjectProgress(targetProject) : 0);
+  const unitsToReport = isUnitScope && targetUnit ? [targetUnit] : projectUnits;
 
   // Aggregate trade metrics for the report
   const tradeSummaries = MASTER_TRADES_TEMPLATE.map(tm => {
@@ -114,47 +115,53 @@ export function ReportModal({
     });
   });
 
-  // Executive Gantt Timeline for Target Project
-  const ganttData = useMemo(() => {
-    const tasks = targetProject?.calendarEvents || [];
-    const milestones = targetProject?.milestones || [];
+  // Executive Gantt Timeline for Target Project (Safely evaluated without conditional hook violation)
+  const ganttData = (() => {
+    if (!targetProject) return null;
+    const tasks = targetProject.calendarEvents || [];
+    const milestones = targetProject.milestones || [];
 
     if (tasks.length === 0 && milestones.length === 0) {
       return null;
     }
 
-    // Collect all dates
-    const dateStrings: string[] = [];
-    if (targetProject?.startDate) dateStrings.push(targetProject.startDate);
-    if (targetProject?.estimatedEndDate) dateStrings.push(targetProject.estimatedEndDate);
-
-    tasks.forEach(t => {
-      if (t.startDate) dateStrings.push(t.startDate);
-      if (t.date) dateStrings.push(t.date);
-    });
-
-    milestones.forEach(m => {
-      if (m.startDate) dateStrings.push(m.startDate);
-      if (m.targetDate) dateStrings.push(m.targetDate);
-    });
-
-    // Determine min and max dates
-    let minD = new Date();
-    let maxD = new Date();
-
-    if (dateStrings.length > 0) {
-      const validDates = dateStrings
-        .map(ds => {
-          const parts = ds.split('T')[0].split('-').map(Number);
-          return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(ds);
-        })
-        .filter(d => !isNaN(d.getTime()));
-
-      if (validDates.length > 0) {
-        minD = new Date(Math.min(...validDates.map(d => d.getTime())));
-        maxD = new Date(Math.max(...validDates.map(d => d.getTime())));
+    const parseDate = (dStr?: string): Date | null => {
+      if (!dStr || typeof dStr !== 'string') return null;
+      try {
+        const clean = dStr.split('T')[0].trim();
+        const parts = clean.split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+        const d = new Date(dStr);
+        return isNaN(d.getTime()) ? null : d;
+      } catch {
+        return null;
       }
-    }
+    };
+
+    // Collect all valid dates
+    const validDates: Date[] = [];
+    [targetProject.startDate, targetProject.estimatedEndDate].forEach(ds => {
+      const d = parseDate(ds);
+      if (d) validDates.push(d);
+    });
+    tasks.forEach(t => {
+      const d1 = parseDate(t.startDate);
+      const d2 = parseDate(t.date);
+      if (d1) validDates.push(d1);
+      if (d2) validDates.push(d2);
+    });
+    milestones.forEach(m => {
+      const d1 = parseDate(m.startDate);
+      const d2 = parseDate(m.targetDate);
+      if (d1) validDates.push(d1);
+      if (d2) validDates.push(d2);
+    });
+
+    const now = new Date();
+    let minD = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : now;
+    let maxD = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : now;
 
     // Expand to cover full months and ensure at least 3 months window
     const startYear = minD.getFullYear();
@@ -178,7 +185,9 @@ export function ReportModal({
     // Generate month segments for header
     const months: { name: string; year: number; widthPct: number }[] = [];
     let curMonthDate = new Date(startDate);
-    while (curMonthDate <= endDate) {
+    let iter = 0;
+    while (curMonthDate <= endDate && iter < 36) {
+      iter++;
       const y = curMonthDate.getFullYear();
       const m = curMonthDate.getMonth();
       const daysInM = new Date(y, m + 1, 0).getDate();
@@ -191,15 +200,9 @@ export function ReportModal({
       curMonthDate = new Date(y, m + 1, 1);
     }
 
-    const parseDate = (dStr?: string): Date | null => {
-      if (!dStr) return null;
-      const parts = dStr.split('T')[0].split('-').map(Number);
-      return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(dStr);
-    };
-
     const getDayOffset = (dateStr?: string) => {
       const d = parseDate(dateStr);
-      if (!d || isNaN(d.getTime())) return 0;
+      if (!d) return 0;
       const diff = Math.round((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       return Math.max(0, Math.min(totalDays, diff));
     };
@@ -223,7 +226,7 @@ export function ReportModal({
       tasks,
       milestones
     };
-  }, [targetProject]);
+  })();
 
   const now = new Date();
   const dateString = now.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -336,7 +339,7 @@ export function ReportModal({
               />
               <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
                 <Building2 className="w-3 h-3 text-amber-600" />
-                Avance por Depto ({targetProject.units.length})
+                Avance por Depto ({projectUnits.length})
               </span>
             </label>
 
@@ -620,12 +623,12 @@ export function ReportModal({
             )}
 
             {/* 3. Department / Units Individual Progress Section */}
-            {includeUnitsProgress && targetProject.units.length > 0 && (
+            {includeUnitsProgress && projectUnits.length > 0 && (
               <div className="mb-6 page-break-inside-avoid">
                 <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                    3. Porcentaje de Avance Individual por Departamento ({targetProject.units.length} Unidades)
+                    3. Porcentaje de Avance Individual por Departamento ({projectUnits.length} Unidades)
                   </h4>
                   <span className="text-[10px] font-bold text-slate-600 font-mono">
                     Auditoría Sectorizada
@@ -634,7 +637,7 @@ export function ReportModal({
 
                 {/* Units Summary Metrics */}
                 {(() => {
-                  const unitsStats = targetProject.units.map(u => {
+                  const unitsStats = projectUnits.map(u => {
                     const pct = calculateUnitProgress(u);
                     const counts = getUnitItemCounts(u);
                     return { unit: u, pct, counts };

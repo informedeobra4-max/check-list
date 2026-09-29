@@ -208,12 +208,15 @@ body.theme-original,
 .theme-original .bg-slate-850,
 .theme-original .bg-slate-800,
 .theme-original .bg-slate-800\/90,
-.theme-original .bg-slate-800\/80 {
-  background: rgba(19, 27, 44, 0.72) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+.theme-original .bg-slate-800\/80,
+.theme-original [class*="bg-\[\#131b2c\]"],
+.theme-original [class*="bg-\[\#151f33\]"],
+.theme-original [class*="bg-\[\#162035\]"] {
+  background: rgba(15, 23, 42, 0.48) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) inset !important;
 }
 
 /* Header y Barra de Navegación Glassmorphism en Tema Original */
@@ -277,11 +280,11 @@ body.theme-glass,
 .theme-glass .bg-slate-800\/60,
 .theme-glass .bg-slate-800\/50,
 .theme-glass .bg-slate-800\/40 {
-  background: rgba(255, 255, 255, 0.78) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.02) !important;
+  background: rgba(255, 255, 255, 0.62) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 16px 45px -8px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.8) inset !important;
 }
 
 /* Sub-paneles y áreas internas con contraste suave */

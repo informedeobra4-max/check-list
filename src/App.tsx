@@ -2273,11 +2273,21 @@ export default function App() {
           : theme === 'theme-glass' ? 'bg-[#f1f4f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
       }`}
       style={{
-        backgroundColor: localColors.appBackground
+        background: localColors.appBackground
           ? localColors.appBackground
-          : theme === 'theme-glass' ? '#f1f4f9' : '#0e1422'
+          : theme === 'theme-glass'
+          ? 'radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.85) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.85) 0px, transparent 50%), radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.85) 0px, transparent 50%), #f0f3f8'
+          : 'radial-gradient(at 10% 15%, rgba(6, 182, 212, 0.20) 0px, transparent 45%), radial-gradient(at 90% 20%, rgba(99, 102, 241, 0.22) 0px, transparent 50%), radial-gradient(at 50% 85%, rgba(168, 85, 247, 0.18) 0px, transparent 55%), #090e1a'
       }}
     >
+      {/* Dynamic ambient luminous orbs for visible glassmorphism floating depth */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 no-print" aria-hidden="true">
+        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-cyan-500/18 blur-[100px]" />
+        <div className="absolute top-1/4 -right-28 w-[520px] h-[520px] rounded-full bg-indigo-600/18 blur-[120px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[460px] h-[460px] rounded-full bg-purple-600/16 blur-[110px]" />
+        <div className="absolute -bottom-24 right-1/4 w-[400px] h-[400px] rounded-full bg-emerald-500/14 blur-[100px]" />
+      </div>
+
       {/* Pantalla de inicio interactiva con tilde verde expansivo y sonido de confirmación */}
       {showSplash && <SplashScreen onFinish={handleFinishSplash} />}
 
@@ -2552,14 +2562,21 @@ export default function App() {
         }}
       />
 
-      <ReportModal
-        isOpen={isReportModalOpen}
-        projects={projects}
-        defaultScope={reportDefaultScope}
-        headerLogoUrl={logos.header}
-        onClose={() => setIsReportModalOpen(false)}
-        onExportJSON={handleExportJSON}
-      />
+      {isReportModalOpen && (
+        <ErrorBoundary
+          fallbackTitle="Error al abrir el reporte"
+          onReset={() => setIsReportModalOpen(false)}
+        >
+          <ReportModal
+            isOpen={isReportModalOpen}
+            projects={projects}
+            defaultScope={reportDefaultScope}
+            headerLogoUrl={logos.header}
+            onClose={() => setIsReportModalOpen(false)}
+            onExportJSON={handleExportJSON}
+          />
+        </ErrorBoundary>
+      )}
 
       <LogoEditorModal
         isOpen={isLogoEditorOpen}
