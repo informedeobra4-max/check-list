@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check, Sparkles, Sun, Moon, Tablet, Maximize2, User } from 'lucide-react';
+import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check, Sparkles, Sun, Moon, Tablet, Maximize2, User, Trash2 } from 'lucide-react';
 import { CustomLogos } from '../types';
 import { DEFAULT_LOGO_URL } from '../data/initialData';
 import { compressImageFile, hexToRgba } from '../utils/calculations';
@@ -8,6 +8,7 @@ interface LogoEditorModalProps {
   isOpen: boolean;
   currentLogos: CustomLogos;
   localAppBackground?: string;
+  localAppBackgroundImage?: string;
   localPresentationBackground?: string;
   localNeonColor?: string;
   initialTarget?: 'header' | 'banner';
@@ -21,10 +22,44 @@ interface LogoEditorModalProps {
       appBackground: string;
       presentationBackground: string;
       neonColor?: string;
+      appBackgroundImage?: string;
     }
   ) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
+
+export const WALLPAPER_PRESETS = [
+  {
+    label: 'Hormigón & Arquitectura',
+    url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    label: 'Plano Blueprint Oscuro',
+    url: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    label: 'Estructura & Acero',
+    url: 'https://images.unsplash.com/photo-1541888946425-d0fbb18615f8?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1541888946425-d0fbb18615f8?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    label: 'Rascacielos & Noche',
+    url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    label: 'Obra & Grúa al Atardecer',
+    url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=200&auto=format&fit=crop'
+  },
+  {
+    label: 'Malla Aurora Cyber',
+    url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1600&auto=format&fit=crop',
+    thumb: 'https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=200&auto=format&fit=crop'
+  }
+];
 
 export const NEON_COLOR_PRESETS = [
   { label: 'Cian Neón (Original)', value: '#00f2fe', colorClass: 'bg-[#00f2fe]' },
@@ -95,6 +130,7 @@ export function LogoEditorModal({
   isOpen,
   currentLogos,
   localAppBackground = '',
+  localAppBackgroundImage = '',
   localPresentationBackground = '',
   localNeonColor = '#00f2fe',
   initialTarget = 'header',
@@ -111,17 +147,20 @@ export function LogoEditorModal({
   );
   const [urlInput, setUrlInput] = useState<string>('');
   const [appBg, setAppBg] = useState<string>(localAppBackground);
+  const [appBgImage, setAppBgImage] = useState<string>(localAppBackgroundImage || '');
+  const [bgImageUrlInput, setBgImageUrlInput] = useState<string>('');
   const [presentationBg, setPresentationBg] = useState<string>(localPresentationBackground);
   const [neonColor, setNeonColor] = useState<string>(localNeonColor || '#00f2fe');
 
   useEffect(() => {
     if (isOpen) {
       setAppBg(localAppBackground);
+      setAppBgImage(localAppBackgroundImage || '');
       setPresentationBg(localPresentationBackground);
       setNeonColor(localNeonColor || '#00f2fe');
       setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
     }
-  }, [isOpen, localAppBackground, localPresentationBackground, localNeonColor, currentLogos, initialTarget]);
+  }, [isOpen, localAppBackground, localAppBackgroundImage, localPresentationBackground, localNeonColor, currentLogos, initialTarget]);
 
   if (!isOpen) return null;
 
@@ -154,6 +193,36 @@ export function LogoEditorModal({
     onShowToast('URL cargada en vista previa', 'Image');
   };
 
+  const handleBgImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Compresión optimizada para fondo de pantalla full HD liviano
+      const compressed = await compressImageFile(file, 1600, 0.82);
+      setAppBgImage(compressed);
+      onShowToast('Fondo de pantalla cargado en vista previa', 'Image');
+    } catch (err) {
+      onShowToast('Error al cargar imagen de fondo', 'AlertCircle');
+    }
+  };
+
+  const handleApplyBgImageUrl = () => {
+    const val = bgImageUrlInput.trim();
+    if (!val) {
+      onShowToast('Ingresa una URL válida de imagen', 'AlertCircle');
+      return;
+    }
+    setAppBgImage(val);
+    setBgImageUrlInput('');
+    onShowToast('Fondo aplicado en vista previa', 'Image');
+  };
+
+  const handleRemoveBgImage = () => {
+    setAppBgImage('');
+    onShowToast('Fondo de imagen eliminado (vuelve al fondo original)', 'RotateCcw');
+  };
+
   const handleSave = () => {
     const updatedLogos: CustomLogos = {
       ...currentLogos,
@@ -162,7 +231,8 @@ export function LogoEditorModal({
     const localColors = {
       appBackground: appBg,
       presentationBackground: presentationBg,
-      neonColor: neonColor || '#00f2fe'
+      neonColor: neonColor || '#00f2fe',
+      appBackgroundImage: appBgImage
     };
     onSaveLogos(updatedLogos, localColors);
     onClose();
@@ -171,9 +241,10 @@ export function LogoEditorModal({
 
   const handleResetColors = () => {
     setAppBg('');
+    setAppBgImage('');
     setPresentationBg('');
     setNeonColor('#00f2fe');
-    onShowToast('Colores y neón restablecidos a los originales en este dispositivo', 'RotateCcw');
+    onShowToast('Colores, fondo y neón restablecidos a los originales en este dispositivo', 'RotateCcw');
   };
 
   const handleReset = () => {
@@ -184,11 +255,12 @@ export function LogoEditorModal({
       };
       setTempPreview(DEFAULT_LOGO_URL);
       setAppBg('');
+      setAppBgImage('');
       setPresentationBg('');
       setNeonColor('#00f2fe');
-      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '', neonColor: '#00f2fe' });
+      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '', neonColor: '#00f2fe', appBackgroundImage: '' });
       onClose();
-      onShowToast('Logotipos y colores restablecidos al original', 'RotateCcw');
+      onShowToast('Logotipos, fondos y colores restablecidos al original', 'RotateCcw');
     }
   };
 
@@ -451,6 +523,144 @@ export function LogoEditorModal({
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 inline-block"></span>
             <span>Ajuste exclusivo para este equipo. No modifica los colores de otros celulares ni computadoras.</span>
           </p>
+
+          {/* SECCIÓN DESTACADA: Imagen de Fondo de Pantalla (Wallpaper Personalizado) */}
+          <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-amber-50/60 p-3.5 rounded-2xl border-2 border-indigo-200/80 mb-3.5 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-indigo-600" />
+                <span>Imagen de Fondo de Pantalla (Wallpaper)</span>
+              </label>
+              {appBgImage ? (
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5 stroke-[3]" /> Activo
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                  Sin imagen
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-600 mb-3 leading-relaxed">
+              Elige una imagen para el fondo general de la app. Gracias al efecto de vidrio esmerilado, la imagen se traslucirá con elegancia a través de todas las tarjetas de obra, el menú inferior y la barra superior.
+            </p>
+
+            {/* Vista previa de fondo activo */}
+            {appBgImage ? (
+              <div className="relative rounded-xl overflow-hidden mb-3 border border-indigo-300 shadow-sm group">
+                <div
+                  className="h-28 w-full bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${appBgImage})` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end justify-between p-2.5">
+                  <span className="text-[11px] font-bold text-white drop-shadow">
+                    Vista previa del fondo seleccionado
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveBgImage}
+                    className="px-2 py-1 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-md active:scale-95 transition-all"
+                    title="Eliminar imagen y volver al fondo original"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Quitar fondo</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Opciones de carga: Archivo propio y URL */}
+            <div className="space-y-2.5 mb-3">
+              {/* Opción A: Subir imagen desde el dispositivo */}
+              <div>
+                <label className="flex items-center justify-between border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-white/80 hover:bg-indigo-50/50 rounded-xl p-2.5 cursor-pointer transition-all">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 leading-tight">Subir foto desde este dispositivo</p>
+                      <p className="text-[10px] text-slate-500">Toca para buscar en tu galería o fotos de obra</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200">
+                    Examinar
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBgImageUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Opción B: Pegar URL */}
+              <div>
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <LinkIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="url"
+                      placeholder="O pegar enlace web (https://...)"
+                      value={bgImageUrlInput}
+                      onChange={(e) => setBgImageUrlInput(e.target.value)}
+                      className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyBgImageUrl}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold touch-target active:scale-95 shadow-xs"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Opción C: Galería de Wallpapers de Obra y Arquitectura */}
+            <div>
+              <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>O elige un fondo temático de obra:</span>
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {WALLPAPER_PRESETS.map((wp) => {
+                  const isSelected = appBgImage === wp.url;
+                  return (
+                    <button
+                      key={wp.label}
+                      type="button"
+                      onClick={() => {
+                        setAppBgImage(wp.url);
+                        onShowToast(`Fondo "${wp.label}" seleccionado`, 'Image');
+                      }}
+                      className={`group relative rounded-xl overflow-hidden border-2 text-left transition-all aspect-video flex flex-col justify-end p-1.5 ${
+                        isSelected
+                          ? 'border-indigo-600 ring-2 ring-indigo-500/40 shadow-md scale-102'
+                          : 'border-slate-200 hover:border-indigo-300 opacity-90 hover:opacity-100'
+                      }`}
+                    >
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-300 group-hover:scale-110"
+                        style={{ backgroundImage: `url(${wp.thumb || wp.url})` }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent" />
+                      {isSelected && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                      <span className="relative z-10 text-[9px] font-bold text-white line-clamp-1 leading-tight drop-shadow">
+                        {wp.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
           {/* 1. Fondo de la App */}
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3">

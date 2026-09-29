@@ -185,6 +185,7 @@ export interface LocalColors {
   appBackground: string;
   presentationBackground: string;
   neonColor?: string;
+  appBackgroundImage?: string;
 }
 
 export type ViewMode = 'dashboard' | 'units' | 'checklist';

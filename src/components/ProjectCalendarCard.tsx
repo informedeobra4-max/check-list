@@ -173,7 +173,7 @@ export function ProjectCalendarCard({
         // Evitar que hacer clic dentro del calendario dispare la navegación a la obra
         e.stopPropagation();
       }}
-      className="bg-[#0f172a]/95 rounded-2xl p-2.5 sm:p-3 border border-slate-800/90 select-none shadow-inner w-full"
+      className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-white/10 select-none shadow-inner w-full"
     >
       {/* 1. Cabecera Compacta: Navegación + Badges + Botón PM */}
       <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-slate-800/80 flex-wrap sm:flex-nowrap">

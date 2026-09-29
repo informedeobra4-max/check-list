@@ -187,6 +187,8 @@ body.theme-original,
 }
 
 /* Tarjetas y Contenedores Flotantes con Efecto Vidrio Esmerilado (Dark Glassmorphism) */
+.project-card-glass,
+.theme-original .project-card-glass,
 .theme-original .bg-\[\#131b2c\],
 .theme-original .bg-\[\#131b2c\]\/80,
 .theme-original .bg-\[\#151f33\],
@@ -194,7 +196,11 @@ body.theme-original,
 .theme-original .bg-\[\#151f33\]\/80,
 .theme-original .bg-\[\#162035\],
 .theme-original .bg-\[\#162035\]\/95,
+.theme-original .bg-\[\#162238\],
+.theme-original .bg-\[\#19263e\],
+.theme-original .bg-\[\#1a2942\],
 .theme-original .bg-\[\#0f172a\],
+.theme-original .bg-\[\#0f172a\]\/95,
 .theme-original .bg-\[\#0e1422\],
 .theme-original .bg-\[\#111827\],
 .theme-original .bg-slate-900,
@@ -212,19 +218,34 @@ body.theme-original,
 .theme-original [class*="bg-\[\#131b2c\]"],
 .theme-original [class*="bg-\[\#151f33\]"],
 .theme-original [class*="bg-\[\#162035\]"] {
-  background: rgba(15, 23, 42, 0.48) !important;
+  background: rgba(15, 23, 42, 0.44) !important;
   backdrop-filter: blur(24px) saturate(190%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow: 0 20px 48px -10px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08) inset !important;
 }
 
-/* Header y Barra de Navegación Glassmorphism en Tema Original */
+/* Header Superior Glassmorphism Translúcido */
+header,
 .theme-original header {
-  background: rgba(15, 23, 42, 0.78) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(15, 23, 42, 0.58) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Dock de Navegación Inferior Flotante Translúcido (Glass Dock) */
+.glass-dock {
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+}
+
+.theme-original .glass-dock,
+html:not(.theme-glass) .glass-dock,
+nav.glass-dock {
+  background: rgba(15, 23, 42, 0.50) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.10) inset !important;
 }
 
 /* Modales Flotantes en Tema Original */
@@ -253,6 +274,7 @@ body.theme-glass,
 }
 
 /* Tarjetas y Contenedores con Efecto Vidrio Esmerilado (Glassmorphism) */
+.theme-glass .project-card-glass,
 .theme-glass .bg-\[\#131b2c\],
 .theme-glass .bg-\[\#131b2c\]\/80,
 .theme-glass .bg-\[\#151f33\],
@@ -260,7 +282,11 @@ body.theme-glass,
 .theme-glass .bg-\[\#151f33\]\/80,
 .theme-glass .bg-\[\#162035\],
 .theme-glass .bg-\[\#162035\]\/95,
+.theme-glass .bg-\[\#162238\],
+.theme-glass .bg-\[\#19263e\],
+.theme-glass .bg-\[\#1a2942\],
 .theme-glass .bg-\[\#0f172a\],
+.theme-glass .bg-\[\#0f172a\]\/95,
 .theme-glass .bg-\[\#0e1422\],
 .theme-glass .bg-\[\#111827\],
 .theme-glass .bg-\[\#1e293b\],
@@ -365,8 +391,9 @@ body.theme-glass,
 
 /* Barra Flotante Inferior (Bottom Floating Dock) */
 .theme-glass nav.fixed.bottom-3,
-.theme-glass nav.fixed.bottom-4 {
-  background: rgba(255, 255, 255, 0.88) !important;
+.theme-glass nav.fixed.bottom-4,
+.theme-glass nav.glass-dock {
+  background: rgba(255, 255, 255, 0.65) !important;
   backdrop-filter: blur(24px) saturate(200%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;

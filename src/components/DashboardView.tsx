@@ -280,7 +280,7 @@ export function DashboardView({
                   borderColor: neonColor,
                   boxShadow: `0 0 35px ${hexToRgba(neonColor, 0.38)}`
                 } : undefined}
-                className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden group flex flex-col justify-between ${
+                className={`rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer relative overflow-hidden group flex flex-col justify-between project-card-glass ${
                   isCurrentActive
                     ? 'border-2 scale-[1.01] bg-[#131b2c]'
                     : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'

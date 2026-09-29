@@ -327,8 +327,7 @@ export default function App() {
     };
   });
 
-  // Colores de fondo y presentación exclusivos y locales de este dispositivo
-  // Colores de fondo, presentación y neón exclusivos y locales de este dispositivo
+  // Colores de fondo, presentación, neón e imagen de wallpaper exclusivos y locales de este dispositivo
   const [localColors, setLocalColors] = useState<LocalColors>(() => {
     try {
       const storedColors = localStorage.getItem(STORAGE_KEY_LOCAL_COLORS);
@@ -337,18 +336,20 @@ export default function App() {
         return {
           appBackground: parsed.appBackground || '',
           presentationBackground: parsed.presentationBackground || '',
-          neonColor: parsed.neonColor || '#00f2fe'
+          neonColor: parsed.neonColor || '#00f2fe',
+          appBackgroundImage: parsed.appBackgroundImage || ''
         };
       }
       // Retrocompatibilidad: si ya se habían guardado colores en STORAGE_KEY_LOGOS en este dispositivo
       const storedLogos = localStorage.getItem(STORAGE_KEY_LOGOS);
       if (storedLogos) {
         const parsed = JSON.parse(storedLogos);
-        if (parsed.appBackground || parsed.presentationBackground || parsed.neonColor) {
+        if (parsed.appBackground || parsed.presentationBackground || parsed.neonColor || parsed.appBackgroundImage) {
           const migrated: LocalColors = {
             appBackground: parsed.appBackground || '',
             presentationBackground: parsed.presentationBackground || '',
-            neonColor: parsed.neonColor || '#00f2fe'
+            neonColor: parsed.neonColor || '#00f2fe',
+            appBackgroundImage: parsed.appBackgroundImage || ''
           };
           localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(migrated));
           return migrated;
@@ -360,7 +361,8 @@ export default function App() {
     return {
       appBackground: '',
       presentationBackground: '',
-      neonColor: '#00f2fe'
+      neonColor: '#00f2fe',
+      appBackgroundImage: ''
     };
   });
 
@@ -372,7 +374,7 @@ export default function App() {
       console.error('Error saving local colors to localStorage:', e);
     }
 
-    if (localColors.appBackground) {
+    if (localColors.appBackground && !localColors.appBackgroundImage) {
       document.documentElement.style.backgroundColor = localColors.appBackground;
       document.body.style.backgroundColor = localColors.appBackground;
     } else {
@@ -2268,18 +2270,47 @@ export default function App() {
       className={`w-full min-h-screen flex flex-col relative pb-20 transition-all duration-300 ${
         theme === 'theme-glass' ? 'theme-glass' : 'theme-original'
       } ${
-        localColors.appBackground
+        localColors.appBackgroundImage
+          ? (theme === 'theme-glass' ? 'text-slate-900' : 'text-slate-100')
+          : localColors.appBackground
           ? isDarkColor(localColors.appBackground) ? 'text-slate-100' : 'text-slate-900'
           : theme === 'theme-glass' ? 'bg-[#f1f4f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
       }`}
       style={{
-        background: localColors.appBackground
+        background: localColors.appBackgroundImage
+          ? 'transparent'
+          : localColors.appBackground
           ? localColors.appBackground
           : theme === 'theme-glass'
           ? 'radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.85) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.85) 0px, transparent 50%), radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.85) 0px, transparent 50%), #f0f3f8'
           : 'radial-gradient(at 10% 15%, rgba(6, 182, 212, 0.20) 0px, transparent 45%), radial-gradient(at 90% 20%, rgba(99, 102, 241, 0.22) 0px, transparent 50%), radial-gradient(at 50% 85%, rgba(168, 85, 247, 0.18) 0px, transparent 55%), #090e1a'
       }}
     >
+      {/* Dynamic Background Image Wallpaper Layer */}
+      {localColors.appBackgroundImage && (
+        <div
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 no-print"
+          style={{
+            backgroundImage: `url(${localColors.appBackgroundImage})`,
+            backgroundAttachment: 'fixed',
+            filter: theme === 'theme-glass' ? 'brightness(0.96) contrast(1.04)' : 'brightness(0.82) contrast(1.08)'
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* High-legibility subtle tint overlay for background wallpaper */}
+      {localColors.appBackgroundImage && (
+        <div
+          className={`fixed inset-0 pointer-events-none z-0 no-print transition-all duration-500 ${
+            theme === 'theme-glass'
+              ? 'bg-slate-100/35 backdrop-blur-[2px]'
+              : 'bg-[#090e1a]/45 backdrop-blur-[2px]'
+          }`}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Dynamic ambient luminous orbs for visible glassmorphism floating depth */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 no-print" aria-hidden="true">
         <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-cyan-500/18 blur-[100px]" />
@@ -2429,7 +2460,7 @@ export default function App() {
       </main>
 
       {/* Executive Floating Bottom Navigation Dock - Matches Reference Screenshot */}
-      <nav className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-[#162035]/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl px-5 py-2 flex justify-around items-center z-40 shadow-[0_12px_40px_rgba(0,0,0,0.8)] no-print transition-all">
+      <nav className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-md glass-dock rounded-2xl px-5 py-2 flex justify-around items-center z-40 no-print transition-all">
         <button
           onClick={() => handleNavigate('dashboard')}
           style={currentView === 'dashboard' ? {
@@ -2582,6 +2613,7 @@ export default function App() {
         isOpen={isLogoEditorOpen}
         currentLogos={logos}
         localAppBackground={localColors.appBackground}
+        localAppBackgroundImage={localColors.appBackgroundImage}
         localPresentationBackground={localColors.presentationBackground}
         localNeonColor={localColors.neonColor || '#00f2fe'}
         initialTarget={logoEditorTarget}

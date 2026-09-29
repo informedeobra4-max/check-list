@@ -465,7 +465,7 @@ export function ProjectGanttCard({
         // Evitar que hacer clic en el Gantt active la selección de la obra entera
         e.stopPropagation();
       }}
-      className={`bg-[#0f172a]/95 rounded-2xl ${large ? 'p-3.5 sm:p-4' : 'p-2.5 sm:p-3'} border border-slate-800/90 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden w-full`}
+      className={`bg-slate-900/40 backdrop-blur-md rounded-2xl ${large ? 'p-3.5 sm:p-4' : 'p-2.5 sm:p-3'} border border-white/10 flex flex-col justify-between select-none shadow-inner min-w-0 overflow-hidden w-full`}
     >
       {/* 1. HEADER: Título Continuo, Controles de Desplazamiento y Acceso a PM */}
       <div>
@@ -553,7 +553,7 @@ export function ProjectGanttCard({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
-        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport flex-1 ${viewportMaxHeight} my-1 select-none border border-slate-800/80 rounded-xl bg-[#090f1d] ${
+        className={`overflow-x-auto overflow-y-auto no-scrollbar scrollbar-none gantt-scroll-viewport flex-1 ${viewportMaxHeight} my-1 select-none border border-slate-800/80 rounded-xl bg-slate-950/40 backdrop-blur-md ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
@@ -571,11 +571,11 @@ export function ProjectGanttCard({
           }}
         >
           {/* CABECERA FIJA SUPERIOR (STICKY TOP-0 Z-30) */}
-          <div className="sticky top-0 z-30 bg-[#0b1220] border-b border-slate-800 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+          <div className="sticky top-0 z-30 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
             <div className="flex items-stretch">
               {/* Esquina Superior Izquierda: Fija tanto en X como en Y (STICKY TOP-0 LEFT-0 Z-50) */}
               <div
-                className="sticky left-0 z-50 bg-[#0b1220] px-2.5 py-1.5 flex flex-col justify-center border-r border-slate-800 shadow-[3px_0_8px_rgba(0,0,0,0.6)] shrink-0"
+                className="sticky left-0 z-50 bg-slate-900/90 backdrop-blur-md px-2.5 py-1.5 flex flex-col justify-center border-r border-slate-800 shadow-[3px_0_8px_rgba(0,0,0,0.6)] shrink-0"
                 style={{ width: `${STICKY_COL_WIDTH}px` }}
               >
                 <span className="text-[10px] font-black uppercase text-slate-300 tracking-wider block">
@@ -593,7 +593,7 @@ export function ProjectGanttCard({
                   {monthsList.map(m => (
                     <div
                       key={`${m.year}-${m.monthIndex}`}
-                      className="border-r border-slate-800/80 px-2 flex items-center justify-between shrink-0 bg-[#0d1527] h-6"
+                      className="border-r border-slate-800/80 px-2 flex items-center justify-between shrink-0 bg-slate-900/60 h-6"
                       style={{ width: `${m.daysCount * DAY_WIDTH}px` }}
                     >
                       <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300 truncate">
@@ -658,7 +658,7 @@ export function ProjectGanttCard({
                 {/* Columna Izquierda Fija: Rótulo de Hitos */}
                 <div
                   onClick={() => onOpenMilestonesConfig && onOpenMilestonesConfig(project.id)}
-                  className="sticky left-0 z-20 bg-[#0f172a] px-2 flex items-center justify-between gap-1.5 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer hover:bg-slate-800"
+                  className="sticky left-0 z-20 bg-slate-900/85 backdrop-blur-md px-2 flex items-center justify-between gap-1.5 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer hover:bg-slate-800"
                   style={{ width: `${STICKY_COL_WIDTH}px`, height: '42px' }}
                   title="Hitos clave de la obra (Clic para configurar)"
                 >
@@ -761,7 +761,7 @@ export function ProjectGanttCard({
                 {/* Columna Izquierda Fija: Avatar + Nombre + Cargo (STICKY LEFT-0 Z-20) */}
                 <div
                   onClick={() => handleOpenPM(undefined, todayStr)}
-                  className="sticky left-0 z-20 bg-[#0f172a] px-2 flex items-center gap-2 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer group-hover:bg-slate-850"
+                  className="sticky left-0 z-20 bg-slate-900/85 backdrop-blur-md px-2 flex items-center gap-2 border-r border-slate-800 shadow-[3px_0_6px_rgba(0,0,0,0.6)] shrink-0 cursor-pointer group-hover:bg-slate-850"
                   style={{ width: `${STICKY_COL_WIDTH}px`, height: `${row.rowHeight}px` }}
                   title={`${row.profile.name} - ${row.profile.role} (Clic para abrir PM)`}
                 >
