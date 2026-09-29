@@ -43,6 +43,18 @@ export function ReportModal({
   const [includeGantt, setIncludeGantt] = useState<boolean>(true);
   const [includeUnitsProgress, setIncludeUnitsProgress] = useState<boolean>(true);
   const [onlyGanttLandscape, setOnlyGanttLandscape] = useState<boolean>(false);
+  const [ganttScale, setGanttScale] = useState<'weeks' | 'months'>('weeks');
+  const [paperSize, setPaperSize] = useState<'a4' | 'a3'>('a4');
+
+  // Add report-modal-open class to body while modal is open for print isolation
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('report-modal-open');
+      return () => {
+        document.body.classList.remove('report-modal-open');
+      };
+    }
+  }, [isOpen]);
 
   // Synchronize scope with defaultScope on open or when defaultScope changes
   useEffect(() => {
@@ -164,34 +176,59 @@ export function ReportModal({
     let minD = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : now;
     let maxD = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : now;
 
-    // Expand to cover full months and ensure at least 3 months window
-    const startYear = minD.getFullYear();
-    const startMonth = minD.getMonth();
-    const startDate = new Date(startYear, startMonth, 1);
+    let startDate: Date;
+    let endDate: Date;
 
-    let endYear = maxD.getFullYear();
-    let endMonth = maxD.getMonth();
-    const monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth);
-    if (monthDiff < 3) {
-      endMonth += (3 - monthDiff);
-      if (endMonth > 11) {
-        endYear += Math.floor(endMonth / 12);
-        endMonth = endMonth % 12;
+    if (ganttScale === 'weeks') {
+      const startDayOfWeek = minD.getDay(); // 0 is Sunday, 1 is Monday
+      const mondayOffset = (startDayOfWeek === 0 ? -6 : 1) - startDayOfWeek;
+      const wStart = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate() + mondayOffset);
+      wStart.setHours(0, 0, 0, 0);
+
+      const endDayOfWeek = maxD.getDay();
+      const sundayOffset = endDayOfWeek === 0 ? 0 : (7 - endDayOfWeek);
+      let wEnd = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate() + sundayOffset);
+      wEnd.setHours(23, 59, 59, 999);
+
+      // Ensure at least 6 weeks (42 days)
+      const diffDays = Math.round((wEnd.getTime() - wStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays < 42) {
+        wEnd = new Date(wStart.getTime() + 42 * 24 * 60 * 60 * 1000 - 1);
       }
+      startDate = wStart;
+      endDate = wEnd;
+    } else {
+      // Month scale
+      const startYear = minD.getFullYear();
+      const startMonth = minD.getMonth();
+      startDate = new Date(startYear, startMonth, 1);
+
+      let endYear = maxD.getFullYear();
+      let endMonth = maxD.getMonth();
+      const monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth);
+      if (monthDiff < 3) {
+        endMonth += (3 - monthDiff);
+        if (endMonth > 11) {
+          endYear += Math.floor(endMonth / 12);
+          endMonth = endMonth % 12;
+        }
+      }
+      endDate = new Date(endYear, endMonth + 1, 0, 23, 59, 59);
     }
-    const endDate = new Date(endYear, endMonth + 1, 0);
 
     const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
 
     // Generate month segments for header
     const months: { name: string; year: number; widthPct: number }[] = [];
-    let curMonthDate = new Date(startDate);
+    let curMonthDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
     let iter = 0;
     while (curMonthDate <= endDate && iter < 36) {
       iter++;
       const y = curMonthDate.getFullYear();
       const m = curMonthDate.getMonth();
-      const daysInM = new Date(y, m + 1, 0).getDate();
+      const segStart = Math.max(startDate.getTime(), new Date(y, m, 1).getTime());
+      const segEnd = Math.min(endDate.getTime(), new Date(y, m + 1, 0, 23, 59, 59).getTime());
+      const daysInM = Math.max(1, Math.round((segEnd - segStart) / (1000 * 60 * 60 * 24)));
       const mName = curMonthDate.toLocaleDateString('es-ES', { month: 'short' });
       months.push({
         name: mName.toUpperCase(),
@@ -199,6 +236,41 @@ export function ReportModal({
         widthPct: (daysInM / totalDays) * 100
       });
       curMonthDate = new Date(y, m + 1, 1);
+    }
+
+    // Generate week segments for weekly scale
+    const weeks: {
+      index: number;
+      label: string;
+      subLabel: string;
+      shortLabel: string;
+      monthName: string;
+      widthPct: number;
+    }[] = [];
+
+    if (ganttScale === 'weeks') {
+      let curW = new Date(startDate.getTime());
+      let wIdx = 1;
+      while (curW < endDate && wIdx <= 52) {
+        const endW = new Date(curW.getTime() + 6 * 24 * 60 * 60 * 1000);
+        const d1 = curW.getDate().toString().padStart(2, '0');
+        const m1 = (curW.getMonth() + 1).toString().padStart(2, '0');
+        const d2 = endW.getDate().toString().padStart(2, '0');
+        const m2 = (endW.getMonth() + 1).toString().padStart(2, '0');
+        const mName = curW.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase();
+
+        weeks.push({
+          index: wIdx,
+          label: `Sem ${wIdx}`,
+          shortLabel: `S${wIdx}`,
+          subLabel: `${d1}/${m1} - ${d2}/${m2}`,
+          monthName: mName,
+          widthPct: (7 / totalDays) * 100
+        });
+
+        curW = new Date(curW.getTime() + 7 * 24 * 60 * 60 * 1000);
+        wIdx++;
+      }
     }
 
     const getDayOffset = (dateStr?: string) => {
@@ -212,7 +284,7 @@ export function ReportModal({
       const s = startStr || endStr;
       const e = endStr || startStr;
       const startDay = getDayOffset(s);
-      const endDay = Math.max(startDay + 2, getDayOffset(e));
+      const endDay = Math.max(startDay + (ganttScale === 'weeks' ? 2 : 2), getDayOffset(e));
       const leftPct = (startDay / totalDays) * 100;
       const widthPct = Math.max(2.5, Math.min(100 - leftPct, ((endDay - startDay) / totalDays) * 100));
       return { leftPct, widthPct };
@@ -223,6 +295,7 @@ export function ReportModal({
       endDate,
       totalDays,
       months,
+      weeks,
       getPercentPosition,
       tasks,
       milestones
@@ -238,8 +311,8 @@ export function ReportModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-3 overflow-y-auto">
-      <div className="bg-white w-full max-w-6xl rounded-t-2xl sm:rounded-2xl max-h-[96vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
+    <div className="report-modal-backdrop fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-3 overflow-y-auto">
+      <div className="report-modal-dialog bg-white w-full max-w-6xl rounded-t-2xl sm:rounded-2xl max-h-[96vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
         {/* Non-Printable Header Bar */}
         <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 no-print">
           <div className="flex items-center space-x-2.5">
@@ -251,7 +324,7 @@ export function ReportModal({
                 Reporte Técnico de Inspección
               </h3>
               <p className="text-[10px] text-amber-400 font-bold">
-                Exportación Oficial PDF / A4 de Obra
+                Exportación Oficial PDF / Hoja {paperSize.toUpperCase()} Apaisada
               </p>
             </div>
           </div>
@@ -343,6 +416,64 @@ export function ReportModal({
               </span>
             </label>
 
+            {/* Escala Temporal: Por Semanas vs Por Meses */}
+            <div className="inline-flex items-center rounded-xl bg-slate-200/90 p-0.5 border border-slate-300 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setGanttScale('weeks')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
+                  ganttScale === 'weeks'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+                title="Ver cronograma desglosado por semanas de obra"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Por Semanas</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGanttScale('months')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
+                  ganttScale === 'months'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+                title="Ver cronograma consolidado por meses"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Por Meses</span>
+              </button>
+            </div>
+
+            {/* Selector de Papel: A4 vs A3 */}
+            <div className="inline-flex items-center rounded-xl bg-slate-200/90 p-0.5 border border-slate-300 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setPaperSize('a4')}
+                className={`px-2 py-1 rounded-lg text-[11px] font-black transition-all flex items-center gap-1 ${
+                  paperSize === 'a4'
+                    ? 'bg-slate-900 text-amber-400 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+                title="Adaptar para imprimir en hoja A4 Apaisada"
+              >
+                <span>A4 Apaisada</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaperSize('a3')}
+                className={`px-2 py-1 rounded-lg text-[11px] font-black transition-all flex items-center gap-1 ${
+                  paperSize === 'a3'
+                    ? 'bg-slate-900 text-amber-400 shadow-xs'
+                    : 'text-slate-700 hover:text-slate-950'
+                }`}
+                title="Adaptar para imprimir en hoja A3 Apaisada (Formato Grande)"
+              >
+                <span>A3 Apaisada</span>
+              </button>
+            </div>
+
             {/* Botón directo para apagar / encender departamentos */}
             <button
               type="button"
@@ -429,24 +560,81 @@ export function ReportModal({
         </div>
 
         {/* Printable Document Sheet - Panoramic Landscape Layout */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/80">
+        <div className="report-sheet-wrapper flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/80">
           {/* Dynamic print stylesheet for landscape orientation */}
           <style>{`
             @media print {
               @page {
-                size: landscape !important;
-                margin: 6mm !important;
+                size: ${paperSize === 'a3' ? 'A3 landscape' : 'A4 landscape'} !important;
+                margin: 5mm !important;
               }
-              body {
+              html, body, #root, #root > div {
                 background: #ffffff !important;
+                background-color: #ffffff !important;
+                background-image: none !important;
+                color: #000000 !important;
+                min-height: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              header, nav, main, footer,
+              #root > div > header,
+              #root > div > main,
+              #root > div > nav,
+              .no-print,
+              [class*="wallpaper"],
+              [class*="luminous"],
+              [class*="blur-"] {
+                display: none !important;
+              }
+              .report-modal-backdrop {
+                position: static !important;
+                inset: auto !important;
+                background: #ffffff !important;
+                background-color: #ffffff !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                display: block !important;
+              }
+              .report-modal-dialog {
+                position: static !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                max-height: none !important;
+                height: auto !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+              }
+              .report-sheet-wrapper {
+                background: #ffffff !important;
+                background-color: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
               }
               .printable-document-container {
                 width: 100% !important;
                 max-width: 100% !important;
                 padding: 0 !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
                 border: none !important;
                 box-shadow: none !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
             }
           `}</style>
@@ -558,29 +746,77 @@ export function ReportModal({
                     {onlyGanttLandscape ? 'Diagrama de Gantt con Responsables y Cronograma Integral' : '2. Cronograma de Obra y Diagrama de Gantt'}
                   </h4>
                   <span className="text-[10px] font-bold text-slate-600 font-mono">
-                    Período: {ganttData.startDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })} — {ganttData.endDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
+                    Período: {ganttData.startDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} — {ganttData.endDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {ganttScale === 'weeks' && ` • (${ganttData.weeks.length} semanas)`}
                   </span>
                 </div>
 
                 {/* Timeline Box */}
                 <div className="border border-slate-300 rounded-lg overflow-hidden bg-slate-50/50 shadow-2xs">
-                  {/* Timeline Header (Months) */}
-                  <div className="flex border-b border-slate-300 bg-slate-100 text-[10px] font-black text-slate-700">
-                    <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-500 text-[9px] font-black">
-                      Responsable / Cuadrilla
-                    </div>
-                    <div className="flex-1 flex relative">
-                      {ganttData.months.map((m, idx) => (
-                        <div
-                          key={idx}
-                          style={{ width: `${m.widthPct}%` }}
-                          className="p-1 text-center border-r border-slate-200 truncate text-[9px] font-bold text-slate-700 bg-slate-100"
-                        >
-                          {m.name} {m.year}
+                  {/* Timeline Header */}
+                  {ganttScale === 'weeks' ? (
+                    <div className="border-b border-slate-300 bg-slate-100 text-slate-700">
+                      {/* Sub-row 1: Meses agrupadores */}
+                      <div className="flex border-b border-slate-200 bg-slate-200/80 text-[9px] font-black">
+                        <div className="w-40 p-1 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[8px] font-black flex items-center justify-between px-2">
+                          <span>Escala Semanal</span>
+                          <span className="text-amber-800 font-mono">({ganttData.weeks.length} sem)</span>
                         </div>
-                      ))}
+                        <div className="flex-1 flex relative">
+                          {ganttData.months.map((m, idx) => (
+                            <div
+                              key={idx}
+                              style={{ width: `${m.widthPct}%` }}
+                              className="p-0.5 text-center border-r border-slate-300 truncate text-[8px] font-black text-slate-700 tracking-wider"
+                            >
+                              {m.name} {m.year}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Sub-row 2: Semanas numeradas y rango de fechas */}
+                      <div className="flex text-[10px] font-black">
+                        <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[9px] font-black flex items-center px-2">
+                          Responsable / Cuadrilla
+                        </div>
+                        <div className="flex-1 flex relative">
+                          {ganttData.weeks.map((w, idx) => (
+                            <div
+                              key={idx}
+                              style={{ width: `${w.widthPct}%` }}
+                              className="p-1 text-center border-r border-slate-200/90 truncate bg-slate-100"
+                            >
+                              <span className="block text-[9px] font-black text-slate-900 leading-tight">
+                                {w.label}
+                              </span>
+                              <span className="block text-[7.5px] font-semibold text-slate-500 font-mono tracking-tighter truncate">
+                                {w.subLabel}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Timeline Header (Months) */
+                    <div className="flex border-b border-slate-300 bg-slate-100 text-[10px] font-black text-slate-700">
+                      <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-500 text-[9px] font-black flex items-center px-2">
+                        Responsable / Cuadrilla
+                      </div>
+                      <div className="flex-1 flex relative">
+                        {ganttData.months.map((m, idx) => (
+                          <div
+                            key={idx}
+                            style={{ width: `${m.widthPct}%` }}
+                            className="p-1.5 text-center border-r border-slate-200 truncate text-[9px] font-bold text-slate-700 bg-slate-100"
+                          >
+                            {m.name} {m.year}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Milestones Track */}
                   {ganttData.milestones.length > 0 && (
@@ -590,6 +826,16 @@ export function ReportModal({
                         <span>Hitos Clave ({ganttData.milestones.length})</span>
                       </div>
                       <div className="flex-1 relative h-6">
+                        {/* Vertical guides */}
+                        <div className="absolute inset-0 flex pointer-events-none opacity-30">
+                          {(ganttScale === 'weeks' ? ganttData.weeks : ganttData.months).map((col, cIdx) => (
+                            <div
+                              key={cIdx}
+                              style={{ width: `${col.widthPct}%` }}
+                              className="border-r border-amber-300/80 h-full shrink-0"
+                            />
+                          ))}
+                        </div>
                         {ganttData.milestones.map((m, idx) => {
                           const pos = ganttData.getPercentPosition(m.startDate || m.targetDate, m.targetDate);
                           const isDone = m.manualCompleted || (m.progressPercentage !== undefined && m.progressPercentage >= 100);
@@ -650,13 +896,23 @@ export function ReportModal({
                                 {task.assignedRole || task.category || 'Tareas Generales'}
                               </span>
                             </div>
-                            <div className="flex-1 relative h-6 bg-slate-100/60 rounded">
+                            <div className="flex-1 relative h-6 bg-slate-100/60 rounded overflow-hidden">
+                              {/* Vertical column guides */}
+                              <div className="absolute inset-0 flex pointer-events-none opacity-40">
+                                {(ganttScale === 'weeks' ? ganttData.weeks : ganttData.months).map((col, cIdx) => (
+                                  <div
+                                    key={cIdx}
+                                    style={{ width: `${col.widthPct}%` }}
+                                    className="border-r border-slate-300 h-full shrink-0"
+                                  />
+                                ))}
+                              </div>
                               <div
                                 style={{
                                   left: `${pos.leftPct}%`,
                                   width: `${pos.widthPct}%`
                                 }}
-                                className={`absolute top-0.5 bottom-0.5 rounded border ${barBg} flex items-center px-1.5 overflow-hidden shadow-2xs`}
+                                className={`absolute top-0.5 bottom-0.5 rounded border ${barBg} flex items-center px-1.5 overflow-hidden shadow-2xs z-10`}
                               >
                                 {/* Progress fill */}
                                 <div

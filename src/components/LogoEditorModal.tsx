@@ -5,14 +5,14 @@ import { DEFAULT_LOGO_URL } from '../data/initialData';
 import { compressImageFile, hexToRgba } from '../utils/calculations';
 
 export const FONT_FAMILY_PRESETS = [
-  { label: 'Inter (Predeterminada)', value: "'Inter', sans-serif" },
-  { label: 'Roboto (Google)', value: "'Roboto', sans-serif" },
-  { label: 'Montserrat (Arquitectura)', value: "'Montserrat', sans-serif" },
-  { label: 'Poppins (Moderna)', value: "'Poppins', sans-serif" },
-  { label: 'Plus Jakarta Sans (Ejecutiva)', value: "'Plus Jakarta Sans', sans-serif" },
-  { label: 'Outfit (Minimalista Tech)', value: "'Outfit', sans-serif" },
-  { label: 'Space Grotesk (Ingeniería)', value: "'Space Grotesk', sans-serif" },
-  { label: 'Sistema / Estándar', value: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }
+  { label: 'Inter (Predeterminada)', value: 'Inter, sans-serif' },
+  { label: 'Roboto (Google)', value: 'Roboto, sans-serif' },
+  { label: 'Montserrat (Arquitectura)', value: 'Montserrat, sans-serif' },
+  { label: 'Poppins (Moderna)', value: 'Poppins, sans-serif' },
+  { label: 'Plus Jakarta Sans (Ejecutiva)', value: '"Plus Jakarta Sans", sans-serif' },
+  { label: 'Outfit (Minimalista Tech)', value: 'Outfit, sans-serif' },
+  { label: 'Space Grotesk (Ingeniería)', value: '"Space Grotesk", sans-serif' },
+  { label: 'Sistema / Estándar', value: 'system-ui, -apple-system, sans-serif' }
 ];
 
 interface LogoEditorModalProps {
@@ -144,7 +144,7 @@ export function LogoEditorModal({
   localAppBackgroundImage = '',
   localPresentationBackground = '',
   localNeonColor = '#00f2fe',
-  localFontFamily = "'Inter', sans-serif",
+  localFontFamily = 'Inter, sans-serif',
   localIsBoldText = false,
   initialTarget = 'header',
   theme = 'dark',
@@ -165,7 +165,7 @@ export function LogoEditorModal({
   const [bgImageUrlInput, setBgImageUrlInput] = useState<string>('');
   const [presentationBg, setPresentationBg] = useState<string>(localPresentationBackground);
   const [neonColor, setNeonColor] = useState<string>(localNeonColor || '#00f2fe');
-  const [fontFamily, setFontFamily] = useState<string>(localFontFamily || "'Inter', sans-serif");
+  const [fontFamily, setFontFamily] = useState<string>(localFontFamily || 'Inter, sans-serif');
   const [isBoldText, setIsBoldText] = useState<boolean>(Boolean(localIsBoldText));
 
   useEffect(() => {
@@ -174,7 +174,7 @@ export function LogoEditorModal({
       setAppBgImage(localAppBackgroundImage || '');
       setPresentationBg(localPresentationBackground);
       setNeonColor(localNeonColor || '#00f2fe');
-      setFontFamily(localFontFamily || "'Inter', sans-serif");
+      setFontFamily(localFontFamily || 'Inter, sans-serif');
       setIsBoldText(Boolean(localIsBoldText));
       setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
     }
@@ -254,7 +254,7 @@ export function LogoEditorModal({
       presentationBackground: presentationBg,
       neonColor: neonColor || '#00f2fe',
       appBackgroundImage: appBgImage,
-      fontFamily: fontFamily || "'Inter', sans-serif",
+      fontFamily: fontFamily || 'Inter, sans-serif',
       isBoldText: isBoldText
     };
     onSaveLogos(updatedLogos, localColors);
@@ -267,14 +267,14 @@ export function LogoEditorModal({
     setAppBgImage('');
     setPresentationBg('');
     setNeonColor('#00f2fe');
-    setFontFamily("'Inter', sans-serif");
+    setFontFamily('Inter, sans-serif');
     setIsBoldText(false);
     onUpdateLocalColors?.({
       appBackground: '',
       appBackgroundImage: '',
       presentationBackground: '',
       neonColor: '#00f2fe',
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: 'Inter, sans-serif',
       isBoldText: false
     });
     onShowToast('Colores, fondo, tipografía y neón restablecidos a los originales', 'RotateCcw');
@@ -291,14 +291,14 @@ export function LogoEditorModal({
       setAppBgImage('');
       setPresentationBg('');
       setNeonColor('#00f2fe');
-      setFontFamily("'Inter', sans-serif");
+      setFontFamily('Inter, sans-serif');
       setIsBoldText(false);
       onUpdateLocalColors?.({
         appBackground: '',
         appBackgroundImage: '',
         presentationBackground: '',
         neonColor: '#00f2fe',
-        fontFamily: "'Inter', sans-serif",
+        fontFamily: 'Inter, sans-serif',
         isBoldText: false
       });
       onSaveLogos(resetLogos, {
@@ -306,7 +306,7 @@ export function LogoEditorModal({
         presentationBackground: '',
         neonColor: '#00f2fe',
         appBackgroundImage: '',
-        fontFamily: "'Inter', sans-serif",
+        fontFamily: 'Inter, sans-serif',
         isBoldText: false
       });
       onClose();
@@ -469,7 +469,7 @@ export function LogoEditorModal({
             </label>
             <div className="grid grid-cols-2 gap-1.5">
               {FONT_FAMILY_PRESETS.map((f) => {
-                const isSelected = (fontFamily || "'Inter', sans-serif").toLowerCase() === f.value.toLowerCase();
+                const isSelected = (fontFamily || 'Inter, sans-serif').toLowerCase() === f.value.toLowerCase();
                 return (
                   <button
                     key={f.label}
@@ -477,6 +477,12 @@ export function LogoEditorModal({
                     onClick={() => {
                       setFontFamily(f.value);
                       onUpdateLocalColors?.({ fontFamily: f.value });
+                      document.documentElement.style.setProperty('--app-font-family', f.value);
+                      document.documentElement.style.setProperty('--font-sans', f.value);
+                      document.body.style.setProperty('--app-font-family', f.value);
+                      document.body.style.setProperty('--font-sans', f.value);
+                      document.documentElement.style.fontFamily = f.value;
+                      document.body.style.fontFamily = f.value;
                     }}
                     style={{ fontFamily: f.value }}
                     className={`py-1.5 px-2 rounded-lg text-xs transition-all text-left flex items-center justify-between border ${
@@ -521,6 +527,13 @@ export function LogoEditorModal({
                 const nextBold = !isBoldText;
                 setIsBoldText(nextBold);
                 onUpdateLocalColors?.({ isBoldText: nextBold });
+                if (nextBold) {
+                  document.documentElement.classList.add('font-bold-mode');
+                  document.body.classList.add('font-bold-mode');
+                } else {
+                  document.documentElement.classList.remove('font-bold-mode');
+                  document.body.classList.remove('font-bold-mode');
+                }
               }}
               className={`px-3 py-1.5 rounded-full text-xs font-black transition-all flex items-center gap-1 shadow-xs ${
                 isBoldText
@@ -542,7 +555,7 @@ export function LogoEditorModal({
           {/* Vista previa en vivo de texto */}
           <div
             className="mt-2 p-2 rounded-lg bg-slate-900 text-white text-center border border-slate-800"
-            style={{ fontFamily: fontFamily || "'Inter', sans-serif" }}
+            style={{ fontFamily: fontFamily || 'Inter, sans-serif' }}
           >
             <p className={`text-xs ${isBoldText ? 'font-black text-amber-400' : 'font-normal text-slate-300'}`}>
               Vista previa: Control de Avance de Obra 2026

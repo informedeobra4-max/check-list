@@ -9,10 +9,36 @@
   --neon-glow: rgba(0, 242, 254, 0.38);
   --neon-glow-soft: rgba(0, 242, 254, 0.15);
   --app-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--app-font-family);
 }
 
-body, button, input, select, textarea {
+/* Aplicar la tipografía dinámicamente a todos los elementos, títulos y tarjetas */
+*,
+*::before,
+*::after,
+html,
+body,
+button,
+input,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+a,
+div {
   font-family: var(--app-font-family) !important;
+}
+
+.font-mono,
+[class*="font-mono"] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
 }
 
 /* Modo Negrita Global (Bold Text Mode) */
@@ -129,34 +155,95 @@ html.font-bold-mode .font-black {
   scrollbar-color: rgba(51, 65, 85, 0.7) transparent;
 }
 
-/* Print specific styles for A4 Technical Inspection Act PDF - Strict Landscape */
+/* Print specific styles for Technical Inspection Act & Gantt PDF - Strict Landscape */
 @media print {
   @page {
     size: landscape;
-    margin: 8mm;
+    margin: 6mm !important;
   }
   *, *:before, *:after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  body {
+  html, body, #root, #root > div {
     background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .no-print {
+  .no-print,
+  header,
+  nav,
+  main,
+  footer,
+  #root > div > header,
+  #root > div > main,
+  #root > div > nav,
+  body::before,
+  body::after,
+  html::before,
+  html::after,
+  [class*="wallpaper"],
+  [class*="luminous"],
+  [class*="blur-"] {
     display: none !important;
+  }
+
+  /* Desactivar backdrop oscuro y centrado fixed del modal para que solo fluya la hoja */
+  .report-modal-backdrop {
+    position: static !important;
+    inset: auto !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  .report-modal-dialog {
+    position: static !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+  .report-sheet-wrapper {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
   }
   .printable-document-container {
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     width: 100% !important;
     max-width: 100% !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
   .page-break-inside-avoid {
     break-inside: avoid !important;

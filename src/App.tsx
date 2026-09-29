@@ -412,9 +412,13 @@ export default function App() {
     document.documentElement.style.setProperty('--neon-glow-soft', hexToRgba(activeNeon, 0.15));
 
     // Aplicar tipografía dinámica y modo negrita
-    const activeFont = localColors.fontFamily || "'Inter', sans-serif";
+    const activeFont = localColors.fontFamily || 'Inter, sans-serif';
     document.documentElement.style.setProperty('--app-font-family', activeFont);
+    document.documentElement.style.setProperty('--font-sans', activeFont);
     document.body.style.setProperty('--app-font-family', activeFont);
+    document.body.style.setProperty('--font-sans', activeFont);
+    document.documentElement.style.fontFamily = activeFont;
+    document.body.style.fontFamily = activeFont;
 
     if (localColors.isBoldText) {
       document.documentElement.classList.add('font-bold-mode');
