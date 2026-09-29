@@ -153,56 +153,203 @@ export function ReportModal({
       }
     };
 
-    // Collect all valid dates
-    const validDates: Date[] = [];
-    [targetProject.startDate, targetProject.estimatedEndDate].forEach(ds => {
-      const d = parseDate(ds);
-      if (d) validDates.push(d);
-    });
+    // 1. Process tasks and calculate their realistic execution spans
+    interface ProcessedTaskItem {
+      task: any;
+      dStart: Date;
+      dEnd: Date;
+      durationDays: number;
+    }
+
+    const processedTasks: ProcessedTaskItem[] = [];
+    const activeDates: Date[] = [];
+
     tasks.forEach(t => {
-      const d1 = parseDate(t.startDate);
-      const d2 = parseDate(t.date);
-      if (d1) validDates.push(d1);
-      if (d2) validDates.push(d2);
+      const dEndRaw = parseDate(t.date);
+      let dStartRaw = parseDate(t.startDate);
+
+      if (dEndRaw) {
+        let dStart: Date;
+        let dEnd = dEndRaw;
+
+        if (!dStartRaw || dStartRaw.getTime() === dEndRaw.getTime()) {
+          // If no start date or start equals deadline:
+          // A task process in construction spans at least 6-7 days leading to deadline
+          dStart = new Date(dEndRaw.getTime() - 6 * 24 * 60 * 60 * 1000);
+        } else if (dStartRaw > dEndRaw) {
+          dStart = dEndRaw;
+          dEnd = dStartRaw;
+        } else {
+          dStart = dStartRaw;
+        }
+
+        const duration = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        processedTasks.push({
+          task: t,
+          dStart,
+          dEnd,
+          durationDays: duration
+        });
+        activeDates.push(dStart, dEnd);
+      }
     });
+
     milestones.forEach(m => {
-      const d1 = parseDate(m.startDate);
-      const d2 = parseDate(m.targetDate);
-      if (d1) validDates.push(d1);
-      if (d2) validDates.push(d2);
+      const dTarget = parseDate(m.targetDate);
+      const dStart = parseDate(m.startDate);
+      if (dTarget) activeDates.push(dTarget);
+      if (dStart) activeDates.push(dStart);
     });
 
     const now = new Date();
-    let minD = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : now;
-    let maxD = validDates.length > 0 ? new Date(Math.max(...validDates.map(d => d.getTime()))) : now;
+    if (activeDates.length === 0) {
+      activeDates.push(now);
+    }
+
+    let minWorkTime = Math.min(...activeDates.map(d => d.getTime()));
+    let maxWorkTime = Math.max(...activeDates.map(d => d.getTime()));
+
+    // Constrain project schedule dates so ancient dates (e.g. 2025) never stretch current work
+    const projStart = parseDate(targetProject.startDate);
+    const projEnd = parseDate(targetProject.estimatedEndDate);
+
+    if (projStart && projStart.getTime() <= minWorkTime) {
+      const diff = Math.round((minWorkTime - projStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff <= 30) {
+        minWorkTime = projStart.getTime();
+      }
+    }
+
+    if (projEnd && projEnd.getTime() >= maxWorkTime) {
+      const diff = Math.round((projEnd.getTime() - maxWorkTime) / (1000 * 60 * 60 * 24));
+      if (diff <= 45) {
+        maxWorkTime = projEnd.getTime();
+      }
+    }
 
     let startDate: Date;
     let endDate: Date;
 
+    const WEEKDAY_INITIALS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+    interface DayCol {
+      date: Date;
+      dateStr: string;
+      dayNum: number;
+      weekdayLetter: string;
+      isWeekend: boolean;
+      widthPct: number;
+      monthName: string;
+      year: number;
+    }
+
+    interface MonthGroup {
+      name: string;
+      year: number;
+      widthPct: number;
+      daysCount: number;
+    }
+
+    interface MonthCol {
+      name: string;
+      year: number;
+      widthPct: number;
+      daysCount: number;
+    }
+
+    const daysList: DayCol[] = [];
+    const monthsGroup: MonthGroup[] = [];
+    const monthsList: MonthCol[] = [];
+
     if (ganttScale === 'weeks') {
-      const startDayOfWeek = minD.getDay(); // 0 is Sunday, 1 is Monday
+      const minD = new Date(minWorkTime);
+      const startDayOfWeek = minD.getDay(); // 0 is Sun, 1 is Mon
       const mondayOffset = (startDayOfWeek === 0 ? -6 : 1) - startDayOfWeek;
-      const wStart = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate() + mondayOffset);
+      // Start 1 week prior on Monday for visual breathing room
+      const wStart = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate() + mondayOffset - 7);
       wStart.setHours(0, 0, 0, 0);
 
+      const maxD = new Date(maxWorkTime);
       const endDayOfWeek = maxD.getDay();
       const sundayOffset = endDayOfWeek === 0 ? 0 : (7 - endDayOfWeek);
-      let wEnd = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate() + sundayOffset);
+      // End 1 week after on Sunday
+      let wEnd = new Date(maxD.getFullYear(), maxD.getMonth(), maxD.getDate() + sundayOffset + 7);
       wEnd.setHours(23, 59, 59, 999);
 
-      // Ensure at least 6 weeks (42 days)
-      const diffDays = Math.round((wEnd.getTime() - wStart.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays < 42) {
-        wEnd = new Date(wStart.getTime() + 42 * 24 * 60 * 60 * 1000 - 1);
+      // Ensure at least 4 weeks (28 days) and cap at 12 weeks
+      let countDays = Math.round((wEnd.getTime() - wStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (countDays < 28) {
+        wEnd = new Date(wStart.getTime() + 28 * 24 * 60 * 60 * 1000 - 1);
       }
+
       startDate = wStart;
       endDate = wEnd;
+
+      const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      // Generate day columns with initial of the day (L, M, M, J, V, S, D)
+      let curD = new Date(startDate.getTime());
+      let dCounter = 0;
+      while (curD <= endDate && dCounter < 84) {
+        const dNum = curD.getDate();
+        const wDay = curD.getDay();
+        const mName = curD.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase();
+        const y = curD.getFullYear();
+        const m = curD.getMonth() + 1;
+        const dStr = `${y}-${String(m).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+
+        daysList.push({
+          date: new Date(curD),
+          dateStr: dStr,
+          dayNum: dNum,
+          weekdayLetter: WEEKDAY_INITIALS[wDay],
+          isWeekend: wDay === 0 || wDay === 6,
+          widthPct: 100 / totalDays,
+          monthName: mName,
+          year: y
+        });
+
+        curD = new Date(curD.getTime() + 24 * 60 * 60 * 1000);
+        dCounter++;
+      }
+
+      // Group days into months for the top header row
+      let currentMonth = '';
+      let currentYear = 0;
+      let countInMonth = 0;
+      daysList.forEach((d, idx) => {
+        if (d.monthName !== currentMonth || d.year !== currentYear) {
+          if (currentMonth) {
+            monthsGroup.push({
+              name: currentMonth,
+              year: currentYear,
+              daysCount: countInMonth,
+              widthPct: (countInMonth / daysList.length) * 100
+            });
+          }
+          currentMonth = d.monthName;
+          currentYear = d.year;
+          countInMonth = 1;
+        } else {
+          countInMonth++;
+        }
+        if (idx === daysList.length - 1) {
+          monthsGroup.push({
+            name: currentMonth,
+            year: currentYear,
+            daysCount: countInMonth,
+            widthPct: (countInMonth / daysList.length) * 100
+          });
+        }
+      });
     } else {
       // Month scale
+      const minD = new Date(minWorkTime);
       const startYear = minD.getFullYear();
       const startMonth = minD.getMonth();
       startDate = new Date(startYear, startMonth, 1);
 
+      const maxD = new Date(maxWorkTime);
       let endYear = maxD.getFullYear();
       let endMonth = maxD.getMonth();
       const monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth);
@@ -214,91 +361,74 @@ export function ReportModal({
         }
       }
       endDate = new Date(endYear, endMonth + 1, 0, 23, 59, 59);
+
+      const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+      let curM = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      let iter = 0;
+      while (curM <= endDate && iter < 24) {
+        iter++;
+        const y = curM.getFullYear();
+        const m = curM.getMonth();
+        const segStart = Math.max(startDate.getTime(), new Date(y, m, 1).getTime());
+        const segEnd = Math.min(endDate.getTime(), new Date(y, m + 1, 0, 23, 59, 59).getTime());
+        const daysInM = Math.max(1, Math.round((segEnd - segStart) / (1000 * 60 * 60 * 24)));
+        const mName = curM.toLocaleDateString('es-ES', { month: 'short' });
+        monthsList.push({
+          name: mName.toUpperCase(),
+          year: y,
+          daysCount: daysInM,
+          widthPct: (daysInM / totalDays) * 100
+        });
+        curM = new Date(y, m + 1, 1);
+      }
     }
 
     const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
 
-    // Generate month segments for header
-    const months: { name: string; year: number; widthPct: number }[] = [];
-    let curMonthDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    let iter = 0;
-    while (curMonthDate <= endDate && iter < 36) {
-      iter++;
-      const y = curMonthDate.getFullYear();
-      const m = curMonthDate.getMonth();
-      const segStart = Math.max(startDate.getTime(), new Date(y, m, 1).getTime());
-      const segEnd = Math.min(endDate.getTime(), new Date(y, m + 1, 0, 23, 59, 59).getTime());
-      const daysInM = Math.max(1, Math.round((segEnd - segStart) / (1000 * 60 * 60 * 24)));
-      const mName = curMonthDate.toLocaleDateString('es-ES', { month: 'short' });
-      months.push({
-        name: mName.toUpperCase(),
-        year: y,
-        widthPct: (daysInM / totalDays) * 100
-      });
-      curMonthDate = new Date(y, m + 1, 1);
-    }
+    // Positioning function for tasks and milestones
+    const getPercentPosition = (dStart: Date, dEnd: Date) => {
+      const sOffset = Math.round((dStart.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const eOffset = Math.round((dEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    // Generate week segments for weekly scale
-    const weeks: {
-      index: number;
-      label: string;
-      subLabel: string;
-      shortLabel: string;
-      monthName: string;
-      widthPct: number;
-    }[] = [];
+      const clampedStart = Math.max(0, Math.min(totalDays, sOffset));
+      const clampedEnd = Math.max(clampedStart + 1, Math.min(totalDays, eOffset));
 
-    if (ganttScale === 'weeks') {
-      let curW = new Date(startDate.getTime());
-      let wIdx = 1;
-      while (curW < endDate && wIdx <= 52) {
-        const endW = new Date(curW.getTime() + 6 * 24 * 60 * 60 * 1000);
-        const d1 = curW.getDate().toString().padStart(2, '0');
-        const m1 = (curW.getMonth() + 1).toString().padStart(2, '0');
-        const d2 = endW.getDate().toString().padStart(2, '0');
-        const m2 = (endW.getMonth() + 1).toString().padStart(2, '0');
-        const mName = curW.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase();
+      const leftPct = (clampedStart / totalDays) * 100;
+      const widthPct = Math.max(3.5, ((clampedEnd - clampedStart) / totalDays) * 100);
 
-        weeks.push({
-          index: wIdx,
-          label: `Sem ${wIdx}`,
-          shortLabel: `S${wIdx}`,
-          subLabel: `${d1}/${m1} - ${d2}/${m2}`,
-          monthName: mName,
-          widthPct: (7 / totalDays) * 100
-        });
+      return {
+        leftPct: Math.min(96.5, leftPct),
+        widthPct: Math.min(100 - leftPct, widthPct)
+      };
+    };
 
-        curW = new Date(curW.getTime() + 7 * 24 * 60 * 60 * 1000);
-        wIdx++;
-      }
-    }
-
-    const getDayOffset = (dateStr?: string) => {
+    const getMilestonePosition = (dateStr?: string) => {
       const d = parseDate(dateStr);
-      if (!d) return 0;
-      const diff = Math.round((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      return Math.max(0, Math.min(totalDays, diff));
+      if (!d) return { leftPct: 50 };
+      const offset = Math.round((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const leftPct = Math.max(1, Math.min(98, (offset / totalDays) * 100));
+      return { leftPct };
     };
 
-    const getPercentPosition = (startStr?: string, endStr?: string) => {
-      const s = startStr || endStr;
-      const e = endStr || startStr;
-      const startDay = getDayOffset(s);
-      const endDay = Math.max(startDay + (ganttScale === 'weeks' ? 2 : 2), getDayOffset(e));
-      const leftPct = (startDay / totalDays) * 100;
-      const widthPct = Math.max(2.5, Math.min(100 - leftPct, ((endDay - startDay) / totalDays) * 100));
-      return { leftPct, widthPct };
-    };
+    const tasksWithPosition = processedTasks.map(item => {
+      const pos = getPercentPosition(item.dStart, item.dEnd);
+      return {
+        ...item,
+        pos
+      };
+    });
 
     return {
       startDate,
       endDate,
       totalDays,
-      months,
-      weeks,
-      getPercentPosition,
-      tasks,
-      milestones
+      daysList,
+      monthsGroup,
+      monthsList,
+      tasksWithPosition,
+      milestones,
+      getMilestonePosition
     };
   })();
 
@@ -747,7 +877,7 @@ export function ReportModal({
                   </h4>
                   <span className="text-[10px] font-bold text-slate-600 font-mono">
                     Período: {ganttData.startDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} — {ganttData.endDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    {ganttScale === 'weeks' && ` • (${ganttData.weeks.length} semanas)`}
+                    {ganttScale === 'weeks' && ` • (${Math.round(ganttData.daysList.length / 7)} semanas / ${ganttData.daysList.length} días)`}
                   </span>
                 </div>
 
@@ -757,17 +887,17 @@ export function ReportModal({
                   {ganttScale === 'weeks' ? (
                     <div className="border-b border-slate-300 bg-slate-100 text-slate-700">
                       {/* Sub-row 1: Meses agrupadores */}
-                      <div className="flex border-b border-slate-200 bg-slate-200/80 text-[9px] font-black">
-                        <div className="w-40 p-1 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[8px] font-black flex items-center justify-between px-2">
-                          <span>Escala Semanal</span>
-                          <span className="text-amber-800 font-mono">({ganttData.weeks.length} sem)</span>
+                      <div className="flex border-b border-slate-200 bg-slate-200/90 text-[9px] font-black">
+                        <div className="w-44 p-1 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[8px] font-black flex items-center justify-between px-2">
+                          <span>Responsable</span>
+                          <span className="text-amber-800 font-mono">({Math.round(ganttData.daysList.length / 7)} sem)</span>
                         </div>
                         <div className="flex-1 flex relative">
-                          {ganttData.months.map((m, idx) => (
+                          {ganttData.monthsGroup.map((m, idx) => (
                             <div
                               key={idx}
                               style={{ width: `${m.widthPct}%` }}
-                              className="p-0.5 text-center border-r border-slate-300 truncate text-[8px] font-black text-slate-700 tracking-wider"
+                              className="p-0.5 text-center border-r border-slate-300 truncate text-[8px] font-black text-slate-800 tracking-wider bg-slate-200/90"
                             >
                               {m.name} {m.year}
                             </div>
@@ -775,23 +905,26 @@ export function ReportModal({
                         </div>
                       </div>
 
-                      {/* Sub-row 2: Semanas numeradas y rango de fechas */}
-                      <div className="flex text-[10px] font-black">
-                        <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[9px] font-black flex items-center px-2">
-                          Responsable / Cuadrilla
+                      {/* Sub-row 2: Cuadros con SOLO la inicial del día (L, M, M, J, V, S, D) y número de día */}
+                      <div className="flex">
+                        <div className="w-44 p-1 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[8.5px] font-black flex items-center px-2">
+                          Cuadrilla / Tarea
                         </div>
                         <div className="flex-1 flex relative">
-                          {ganttData.weeks.map((w, idx) => (
+                          {ganttData.daysList.map((d, idx) => (
                             <div
                               key={idx}
-                              style={{ width: `${w.widthPct}%` }}
-                              className="p-1 text-center border-r border-slate-200/90 truncate bg-slate-100"
+                              style={{ width: `${d.widthPct}%` }}
+                              className={`py-0.5 text-center border-r border-slate-200/80 shrink-0 flex flex-col justify-center items-center ${
+                                d.isWeekend ? 'bg-slate-200/60 text-slate-400' : 'bg-slate-50 text-slate-800'
+                              }`}
+                              title={`${d.weekdayLetter} ${d.dayNum} (${d.dateStr})`}
                             >
-                              <span className="block text-[9px] font-black text-slate-900 leading-tight">
-                                {w.label}
+                              <span className="text-[7.5px] font-black leading-none text-slate-500">
+                                {d.weekdayLetter}
                               </span>
-                              <span className="block text-[7.5px] font-semibold text-slate-500 font-mono tracking-tighter truncate">
-                                {w.subLabel}
+                              <span className="text-[8.5px] font-black leading-none mt-0.5">
+                                {d.dayNum}
                               </span>
                             </div>
                           ))}
@@ -800,20 +933,44 @@ export function ReportModal({
                     </div>
                   ) : (
                     /* Timeline Header (Months) */
-                    <div className="flex border-b border-slate-300 bg-slate-100 text-[10px] font-black text-slate-700">
-                      <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-500 text-[9px] font-black flex items-center px-2">
-                        Responsable / Cuadrilla
+                    <div className="border-b border-slate-300 bg-slate-100 text-slate-700">
+                      {/* Fila 1: Meses */}
+                      <div className="flex border-b border-slate-200 bg-slate-200/90 text-[10px] font-black">
+                        <div className="w-44 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-600 text-[9px] font-black flex items-center px-2">
+                          Responsable / Cuadrilla
+                        </div>
+                        <div className="flex-1 flex relative">
+                          {ganttData.monthsList.map((m, idx) => (
+                            <div
+                              key={idx}
+                              style={{ width: `${m.widthPct}%` }}
+                              className="p-1 text-center border-r border-slate-300 truncate text-[9px] font-black text-slate-800 bg-slate-200/80"
+                            >
+                              {m.name} {m.year} ({m.daysCount}d)
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex-1 flex relative">
-                        {ganttData.months.map((m, idx) => (
-                          <div
-                            key={idx}
-                            style={{ width: `${m.widthPct}%` }}
-                            className="p-1.5 text-center border-r border-slate-200 truncate text-[9px] font-bold text-slate-700 bg-slate-100"
-                          >
-                            {m.name} {m.year}
-                          </div>
-                        ))}
+
+                      {/* Fila 2: Semanas dentro de cada mes */}
+                      <div className="flex text-[8px] font-bold text-slate-500">
+                        <div className="w-44 p-1 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-500 text-[8px] font-bold flex items-center px-2">
+                          Cuadrilla / Tarea
+                        </div>
+                        <div className="flex-1 flex relative">
+                          {ganttData.monthsList.map((m, idx) => (
+                            <div
+                              key={idx}
+                              style={{ width: `${m.widthPct}%` }}
+                              className="flex border-r border-slate-300"
+                            >
+                              <div className="flex-1 text-center border-r border-slate-200/60 py-0.5 truncate text-[7.5px]">S1</div>
+                              <div className="flex-1 text-center border-r border-slate-200/60 py-0.5 truncate text-[7.5px]">S2</div>
+                              <div className="flex-1 text-center border-r border-slate-200/60 py-0.5 truncate text-[7.5px]">S3</div>
+                              <div className="flex-1 text-center py-0.5 truncate text-[7.5px]">S4</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -821,23 +978,33 @@ export function ReportModal({
                   {/* Milestones Track */}
                   {ganttData.milestones.length > 0 && (
                     <div className="flex items-center border-b border-slate-200 bg-amber-50/50 py-1.5">
-                      <div className="w-40 px-2 text-[10px] font-black text-amber-900 shrink-0 flex items-center gap-1">
+                      <div className="w-44 px-2 text-[10px] font-black text-amber-900 shrink-0 flex items-center gap-1">
                         <Flag className="w-3 h-3 text-amber-600" />
                         <span>Hitos Clave ({ganttData.milestones.length})</span>
                       </div>
                       <div className="flex-1 relative h-6">
                         {/* Vertical guides */}
                         <div className="absolute inset-0 flex pointer-events-none opacity-30">
-                          {(ganttScale === 'weeks' ? ganttData.weeks : ganttData.months).map((col, cIdx) => (
-                            <div
-                              key={cIdx}
-                              style={{ width: `${col.widthPct}%` }}
-                              className="border-r border-amber-300/80 h-full shrink-0"
-                            />
-                          ))}
+                          {ganttScale === 'weeks'
+                            ? ganttData.daysList.map((d, cIdx) => (
+                                <div
+                                  key={cIdx}
+                                  style={{ width: `${d.widthPct}%` }}
+                                  className={`h-full shrink-0 ${
+                                    d.weekdayLetter === 'D' ? 'border-r-2 border-amber-400' : 'border-r border-amber-200'
+                                  }`}
+                                />
+                              ))
+                            : ganttData.monthsList.map((m, cIdx) => (
+                                <div
+                                  key={cIdx}
+                                  style={{ width: `${m.widthPct}%` }}
+                                  className="border-r-2 border-amber-400 h-full shrink-0"
+                                />
+                              ))}
                         </div>
                         {ganttData.milestones.map((m, idx) => {
-                          const pos = ganttData.getPercentPosition(m.startDate || m.targetDate, m.targetDate);
+                          const pos = ganttData.getMilestonePosition(m.targetDate || m.startDate);
                           const isDone = m.manualCompleted || (m.progressPercentage !== undefined && m.progressPercentage >= 100);
                           return (
                             <div
@@ -862,13 +1029,13 @@ export function ReportModal({
 
                   {/* Task Rows */}
                   <div className="divide-y divide-slate-200 text-xs">
-                    {ganttData.tasks.length === 0 ? (
+                    {ganttData.tasksWithPosition.length === 0 ? (
                       <div className="p-3 text-center text-slate-500 text-[11px] italic">
                         No hay tareas programadas para esta obra.
                       </div>
                     ) : (
-                      ganttData.tasks.map((task, idx) => {
-                        const pos = ganttData.getPercentPosition(task.startDate || task.date, task.date);
+                      ganttData.tasksWithPosition.map((item, idx) => {
+                        const { task, pos, dStart, dEnd, durationDays } = item;
                         const progress = task.progress !== undefined ? task.progress : (task.completed ? 100 : 0);
                         const isDone = task.completed || progress === 100;
                         const alarms = getTaskAlarms(task);
@@ -881,47 +1048,74 @@ export function ReportModal({
                           : 'bg-cyan-600';
 
                         const barBg = isDone
-                          ? 'bg-emerald-100/80 border-emerald-300'
+                          ? 'bg-emerald-100/90 border-emerald-400'
                           : isCritical
-                          ? 'bg-rose-100/80 border-rose-300'
-                          : 'bg-cyan-100/80 border-cyan-300';
+                          ? 'bg-rose-100/90 border-rose-400'
+                          : 'bg-cyan-100/90 border-cyan-400';
+
+                        const dStartFormatted = `${dStart.getDate().toString().padStart(2, '0')}/${(dStart.getMonth() + 1).toString().padStart(2, '0')}`;
+                        const dEndFormatted = `${dEnd.getDate().toString().padStart(2, '0')}/${(dEnd.getMonth() + 1).toString().padStart(2, '0')}`;
 
                         return (
-                          <div key={task.id || idx} className="flex items-center hover:bg-slate-50 transition-colors py-1">
-                            <div className="w-40 px-2 shrink-0 truncate">
-                              <span className="font-bold text-[10px] text-slate-900 block truncate leading-tight">
+                          <div key={task.id || idx} className="flex items-center hover:bg-slate-50/80 transition-colors py-1.5 border-b border-slate-100">
+                            <div className="w-44 px-2 shrink-0 truncate">
+                              <span className="font-black text-[10px] text-slate-900 block truncate leading-tight">
                                 {task.assignedTo || 'Cuadrilla General'}
                               </span>
-                              <span className="text-[8px] text-slate-500 truncate block">
-                                {task.assignedRole || task.category || 'Tareas Generales'}
+                              <span className="text-[8.5px] text-slate-600 font-semibold truncate block">
+                                {task.title}
                               </span>
                             </div>
-                            <div className="flex-1 relative h-6 bg-slate-100/60 rounded overflow-hidden">
+                            <div className="flex-1 relative h-7 bg-slate-100/50 rounded overflow-hidden">
                               {/* Vertical column guides */}
-                              <div className="absolute inset-0 flex pointer-events-none opacity-40">
-                                {(ganttScale === 'weeks' ? ganttData.weeks : ganttData.months).map((col, cIdx) => (
-                                  <div
-                                    key={cIdx}
-                                    style={{ width: `${col.widthPct}%` }}
-                                    className="border-r border-slate-300 h-full shrink-0"
-                                  />
-                                ))}
+                              <div className="absolute inset-0 flex pointer-events-none opacity-30">
+                                {ganttScale === 'weeks'
+                                  ? ganttData.daysList.map((d, cIdx) => (
+                                      <div
+                                        key={cIdx}
+                                        style={{ width: `${d.widthPct}%` }}
+                                        className={`h-full shrink-0 ${
+                                          d.weekdayLetter === 'D' ? 'border-r-2 border-slate-400' : 'border-r border-slate-200'
+                                        } ${d.isWeekend ? 'bg-slate-200/20' : ''}`}
+                                      />
+                                    ))
+                                  : ganttData.monthsList.map((m, cIdx) => (
+                                      <div
+                                        key={cIdx}
+                                        style={{ width: `${m.widthPct}%` }}
+                                        className="border-r-2 border-slate-400 h-full shrink-0 flex"
+                                      >
+                                        <div className="flex-1 border-r border-slate-200 h-full" />
+                                        <div className="flex-1 border-r border-slate-200 h-full" />
+                                        <div className="flex-1 border-r border-slate-200 h-full" />
+                                        <div className="flex-1 h-full" />
+                                      </div>
+                                    ))}
                               </div>
+
+                              {/* Task Bar */}
                               <div
                                 style={{
                                   left: `${pos.leftPct}%`,
                                   width: `${pos.widthPct}%`
                                 }}
-                                className={`absolute top-0.5 bottom-0.5 rounded border ${barBg} flex items-center px-1.5 overflow-hidden shadow-2xs z-10`}
+                                className={`absolute top-0.5 bottom-0.5 rounded-md border ${barBg} flex items-center px-1.5 overflow-hidden shadow-xs z-10 transition-all`}
+                                title={`${task.title} | ${task.assignedTo || 'Cuadrilla'} | ${dStartFormatted} al ${dEndFormatted} (${durationDays} días) | ${progress}%`}
                               >
                                 {/* Progress fill */}
                                 <div
                                   style={{ width: `${progress}%` }}
-                                  className={`absolute left-0 top-0 bottom-0 ${barColor} opacity-80 transition-all`}
+                                  className={`absolute left-0 top-0 bottom-0 ${barColor} opacity-85 transition-all`}
                                 />
-                                <div className="relative z-10 flex items-center justify-between w-full gap-1 text-[9px] font-black text-slate-900 truncate">
-                                  <span className="truncate">{task.title}</span>
-                                  <span className="font-mono text-[8px] bg-white/95 px-1 py-0.2 rounded shadow-2xs shrink-0 font-bold">
+                                <div className="relative z-10 flex items-center justify-between w-full gap-1.5 text-[9px] font-black text-slate-900 truncate">
+                                  <span className="truncate flex items-center gap-1">
+                                    {isDone && <CheckCircle2 className="w-3 h-3 text-emerald-800 shrink-0 inline" />}
+                                    <span className="truncate">{task.title}</span>
+                                    <span className="text-[7.5px] text-slate-600 font-mono font-normal opacity-90 hidden sm:inline">
+                                      ({dStartFormatted} - {dEndFormatted})
+                                    </span>
+                                  </span>
+                                  <span className="font-mono text-[8px] bg-white/95 px-1 py-0.2 rounded shadow-2xs shrink-0 font-bold border border-slate-300">
                                     {progress}%
                                   </span>
                                 </div>
@@ -938,18 +1132,18 @@ export function ReportModal({
                 <div className="grid grid-cols-4 gap-2 mt-2 text-center text-xs">
                   <div className="bg-slate-100 p-1.5 rounded border border-slate-200">
                     <span className="block text-[8px] font-bold text-slate-500 uppercase">Total Tareas</span>
-                    <span className="font-mono font-black text-slate-800 text-xs">{ganttData.tasks.length}</span>
+                    <span className="font-mono font-black text-slate-800 text-xs">{ganttData.tasksWithPosition.length}</span>
                   </div>
                   <div className="bg-emerald-50 p-1.5 rounded border border-emerald-200">
                     <span className="block text-[8px] font-bold text-emerald-700 uppercase">Completadas</span>
                     <span className="font-mono font-black text-emerald-800 text-xs">
-                      {ganttData.tasks.filter(t => t.completed || t.progress === 100).length}
+                      {ganttData.tasksWithPosition.filter(t => t.task.completed || t.task.progress === 100).length}
                     </span>
                   </div>
                   <div className="bg-cyan-50 p-1.5 rounded border border-cyan-200">
                     <span className="block text-[8px] font-bold text-cyan-700 uppercase">En Curso</span>
                     <span className="font-mono font-black text-cyan-800 text-xs">
-                      {ganttData.tasks.filter(t => !t.completed && (t.progress || 0) > 0 && (t.progress || 0) < 100).length}
+                      {ganttData.tasksWithPosition.filter(t => !t.task.completed && (t.task.progress || 0) > 0 && (t.task.progress || 0) < 100).length}
                     </span>
                   </div>
                   <div className="bg-amber-50 p-1.5 rounded border border-amber-200">
