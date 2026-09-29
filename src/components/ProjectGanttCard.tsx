@@ -55,7 +55,8 @@ function normalizeDateStr(d?: string): string {
   return clean;
 }
 
-const DAY_WIDTH = 28; // Ancho en píxeles de cada columna de día
+export type GanttTimeScale = 'week' | 'month' | 'year';
+
 const STICKY_COL_WIDTH = 145; // Ancho de la columna izquierda de responsables
 
 export function ProjectGanttCard({
@@ -70,6 +71,30 @@ export function ProjectGanttCard({
 }: ProjectGanttCardProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
+
+  // Escala temporal: Semana (zoom in), Mes (estándar), Anual (macro overview)
+  const [timeScale, setTimeScale] = useState<GanttTimeScale>(() => {
+    try {
+      const saved = localStorage.getItem('gantt_time_scale');
+      if (saved === 'week' || saved === 'month' || saved === 'year') return saved;
+    } catch (e) {
+      // ignore
+    }
+    return 'month';
+  });
+
+  // Ancho dinámico en píxeles de cada columna de día según la escala seleccionada
+  const dayWidth = useMemo(() => {
+    switch (timeScale) {
+      case 'week':
+        return 50; // Gran detalle semanal con días anchos
+      case 'year':
+        return 10; // Vista panorámica anual compacta
+      case 'month':
+      default:
+        return 28; // Vista estándar mensual equilibrada
+    }
+  }, [timeScale]);
 
   const [quickProgressTask, setQuickProgressTask] = useState<{ task: ProjectCalendarEvent; progress: number } | null>(null);
 
@@ -334,8 +359,8 @@ export function ProjectGanttCard({
 
         positionedTasks.push({
           event: task,
-          leftOffset: startIdx * DAY_WIDTH + 2,
-          width: Math.max(DAY_WIDTH - 4, spanDays * DAY_WIDTH - 4),
+          leftOffset: startIdx * dayWidth + 2,
+          width: Math.max(dayWidth - 4, spanDays * dayWidth - 4),
           lane: assignedLane,
           taskStart,
           taskEnd,
@@ -359,7 +384,7 @@ export function ProjectGanttCard({
         totalLanes
       };
     });
-  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays, todayStr]);
+  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays, todayStr, dayWidth]);
 
   // Estadísticas globales del Gantt
   const stats = useMemo(() => {
@@ -377,10 +402,12 @@ export function ProjectGanttCard({
   }, [allEvents, todayStr]);
 
   // Función para centrar exactamente en el día de hoy
-  const scrollToToday = (behavior: ScrollBehavior = 'smooth') => {
+  const scrollToToday = (behavior: ScrollBehavior = 'smooth', overrideScale?: GanttTimeScale) => {
     if (!scrollRef.current || todayIndex < 0) return;
+    const currentScale = overrideScale || timeScale;
+    const currentDayWidth = currentScale === 'week' ? 50 : currentScale === 'year' ? 10 : 28;
     const containerW = scrollRef.current.clientWidth || 600;
-    const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
+    const targetX = Math.max(0, todayIndex * currentDayWidth - (containerW / 2) + (STICKY_COL_WIDTH / 2));
     scrollRef.current.scrollTo({ left: targetX, behavior });
   };
 
@@ -401,6 +428,20 @@ export function ProjectGanttCard({
     }
   }, [todayIndex]);
 
+  // Cambio de escala con persistencia y recentrado suave
+  const handleScaleChange = (scale: GanttTimeScale) => {
+    setTimeScale(scale);
+    try {
+      localStorage.setItem('gantt_time_scale', scale);
+    } catch (e) {
+      // ignore
+    }
+    // Re-centrar suavemente con la nueva escala
+    setTimeout(() => {
+      scrollToToday('smooth', scale);
+    }, 40);
+  };
+
   // Navegación rápida con botones
   const handleScrollToToday = () => {
     scrollToToday('smooth');
@@ -408,7 +449,8 @@ export function ProjectGanttCard({
 
   const handleScrollDelta = (dir: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    const delta = dir === 'right' ? 500 : -500;
+    const step = timeScale === 'week' ? (7 * 50) : timeScale === 'year' ? 800 : 500;
+    const delta = dir === 'right' ? step : -step;
     scrollRef.current.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
@@ -504,6 +546,46 @@ export function ProjectGanttCard({
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {/* Selector de Escala Temporal: Semana / Mes / Anual */}
+            <div className="inline-flex items-center rounded-lg bg-slate-950/80 p-0.5 border border-slate-700/80 ml-1.5 shadow-inner shrink-0">
+              <button
+                type="button"
+                onClick={() => handleScaleChange('week')}
+                className={`px-2 py-0.5 rounded text-[9px] sm:text-[9.5px] font-black tracking-wide transition-all ${
+                  timeScale === 'week'
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title="Vista Semanal (zoom en días con alto detalle)"
+              >
+                Semana
+              </button>
+              <button
+                type="button"
+                onClick={() => handleScaleChange('month')}
+                className={`px-2 py-0.5 rounded text-[9px] sm:text-[9.5px] font-black tracking-wide transition-all ${
+                  timeScale === 'month'
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title="Vista Mensual estándar"
+              >
+                Mes
+              </button>
+              <button
+                type="button"
+                onClick={() => handleScaleChange('year')}
+                className={`px-2 py-0.5 rounded text-[9px] sm:text-[9.5px] font-black tracking-wide transition-all ${
+                  timeScale === 'year'
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title="Vista Anual macro (panorama del año completo)"
+              >
+                Anual
+              </button>
+            </div>
           </div>
 
           {/* Badges de Resumen y Acceso a Project Manager */}
@@ -566,8 +648,8 @@ export function ProjectGanttCard({
         <div
           className="relative text-left"
           style={{
-            width: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`,
-            minWidth: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`
+            width: `${STICKY_COL_WIDTH + daysList.length * dayWidth}px`,
+            minWidth: `${STICKY_COL_WIDTH + daysList.length * dayWidth}px`
           }}
         >
           {/* CABECERA FIJA SUPERIOR (STICKY TOP-0 Z-30) */}
@@ -594,7 +676,7 @@ export function ProjectGanttCard({
                     <div
                       key={`${m.year}-${m.monthIndex}`}
                       className="border-r border-slate-800/80 px-2 flex items-center justify-between shrink-0 bg-slate-900/60 h-6"
-                      style={{ width: `${m.daysCount * DAY_WIDTH}px` }}
+                      style={{ width: `${m.daysCount * dayWidth}px` }}
                     >
                       <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300 truncate">
                         {m.name} {m.year}
@@ -618,15 +700,42 @@ export function ProjectGanttCard({
                           ? 'bg-slate-900/60 text-slate-500'
                           : 'text-slate-400'
                       }`}
-                      style={{ width: `${DAY_WIDTH}px`, height: '24px' }}
+                      style={{ width: `${dayWidth}px`, height: '24px' }}
                       title={`${d.dayNum} - ${d.dateStr}`}
                     >
-                      <span className="text-[7.5px] leading-none text-slate-500">
-                        {d.weekdayLetter}
-                      </span>
-                      <span className={`text-[9.5px] leading-tight rounded px-0.5 ${d.isToday ? 'bg-cyan-400 text-slate-950 font-black' : ''}`}>
-                        {d.dayNum}
-                      </span>
+                      {timeScale === 'week' ? (
+                        <>
+                          <span className="text-[8px] font-bold leading-none text-slate-400">
+                            {d.weekdayLetter}
+                          </span>
+                          <span className={`text-[10px] leading-tight rounded px-1 ${d.isToday ? 'bg-cyan-400 text-slate-950 font-black' : 'font-bold'}`}>
+                            {d.dayNum}
+                          </span>
+                        </>
+                      ) : timeScale === 'year' ? (
+                        <div className="flex flex-col items-center justify-center w-full h-full">
+                          {d.isToday ? (
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,1)] animate-pulse" title="Hoy" />
+                          ) : (d.dayNum === 1 || d.dayNum === 15) ? (
+                            <span className="text-[7.5px] font-black text-slate-300 leading-none">
+                              {d.dayNum}
+                            </span>
+                          ) : d.dayNum % 5 === 0 ? (
+                            <span className="w-0.5 h-1.5 bg-slate-600 rounded-full" />
+                          ) : (
+                            <span className="w-px h-1 bg-slate-800" />
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-[7.5px] leading-none text-slate-500">
+                            {d.weekdayLetter}
+                          </span>
+                          <span className={`text-[9.5px] leading-tight rounded px-0.5 ${d.isToday ? 'bg-cyan-400 text-slate-950 font-black' : ''}`}>
+                            {d.dayNum}
+                          </span>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -641,7 +750,7 @@ export function ProjectGanttCard({
               <div
                 className="absolute top-0 bottom-0 pointer-events-none z-10"
                 style={{
-                  left: `${STICKY_COL_WIDTH + todayIndex * DAY_WIDTH + DAY_WIDTH / 2}px`,
+                  left: `${STICKY_COL_WIDTH + todayIndex * dayWidth + dayWidth / 2}px`,
                   width: '2px'
                 }}
               >
@@ -688,7 +797,7 @@ export function ProjectGanttCard({
                       className={`h-full border-r border-slate-800/30 shrink-0 ${
                         d.isWeekend ? 'bg-slate-900/30' : ''
                       } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
-                      style={{ width: `${DAY_WIDTH}px` }}
+                      style={{ width: `${dayWidth}px` }}
                     />
                   ))}
 
@@ -720,7 +829,7 @@ export function ProjectGanttCard({
                       statusLabel = `${m.progress}%`;
                     }
 
-                    const mLeft = Math.max(0, mIdx * DAY_WIDTH - 20);
+                    const mLeft = Math.max(0, mIdx * dayWidth - (timeScale === 'year' ? 10 : 20));
 
                     return (
                       <div
@@ -792,7 +901,7 @@ export function ProjectGanttCard({
                       className={`h-full border-r border-slate-800/30 shrink-0 ${
                         d.isWeekend ? 'bg-slate-900/30' : ''
                       } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
-                      style={{ width: `${DAY_WIDTH}px` }}
+                      style={{ width: `${dayWidth}px` }}
                     />
                   ))}
 

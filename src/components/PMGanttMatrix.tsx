@@ -57,7 +57,8 @@ export function normalizeDateStr(d?: string): string {
   return clean;
 }
 
-const DAY_WIDTH = 30; // Ancho en px de cada columna de día
+export type GanttTimeScale = 'week' | 'month' | 'year';
+
 const STICKY_COL_WIDTH = 190; // Ancho de la columna de responsables
 
 export function PMGanttMatrix({
@@ -74,6 +75,30 @@ export function PMGanttMatrix({
 }: PMGanttMatrixProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
+
+  // Escala temporal: Semana (zoom in), Mes (estándar), Anual (macro overview)
+  const [timeScale, setTimeScale] = useState<GanttTimeScale>(() => {
+    try {
+      const saved = localStorage.getItem('gantt_time_scale');
+      if (saved === 'week' || saved === 'month' || saved === 'year') return saved;
+    } catch (e) {
+      // ignore
+    }
+    return 'month';
+  });
+
+  // Ancho dinámico en píxeles de cada columna de día según la escala seleccionada
+  const dayWidth = useMemo(() => {
+    switch (timeScale) {
+      case 'week':
+        return 50; // Gran detalle semanal
+      case 'year':
+        return 10; // Vista panorámica macro anual
+      case 'month':
+      default:
+        return 30; // Vista estándar mensual equilibrada
+    }
+  }, [timeScale]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -354,8 +379,8 @@ export function PMGanttMatrix({
 
         positionedTasks.push({
           event: task,
-          leftOffset: startIdx * DAY_WIDTH + 2,
-          width: Math.max(DAY_WIDTH - 4, spanDays * DAY_WIDTH - 4),
+          leftOffset: startIdx * dayWidth + 2,
+          width: Math.max(dayWidth - 4, spanDays * dayWidth - 4),
           lane: assignedLane,
           taskStart,
           taskEnd,
@@ -380,7 +405,7 @@ export function PMGanttMatrix({
         totalLanes
       };
     });
-  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays, statusFilter, todayStr]);
+  }, [activeContractors, allEvents, timelineStartStr, timelineEndStr, dateToIndex, totalDays, statusFilter, todayStr, dayWidth]);
 
   // Estadísticas globales del Gantt
   const stats = useMemo(() => {
@@ -397,10 +422,12 @@ export function PMGanttMatrix({
   }, [allEvents, todayStr]);
 
   // Función robusta para centrar en el día de hoy
-  const scrollToToday = (behavior: ScrollBehavior = 'smooth') => {
+  const scrollToToday = (behavior: ScrollBehavior = 'smooth', overrideScale?: GanttTimeScale) => {
     if (!scrollRef.current || todayIndex < 0) return;
+    const currentScale = overrideScale || timeScale;
+    const currentDayWidth = currentScale === 'week' ? 50 : currentScale === 'year' ? 10 : 30;
     const containerW = scrollRef.current.clientWidth || 600;
-    const targetX = Math.max(0, todayIndex * DAY_WIDTH - (containerW / 2) + (STICKY_COL_WIDTH / 2));
+    const targetX = Math.max(0, todayIndex * currentDayWidth - (containerW / 2) + (STICKY_COL_WIDTH / 2));
     scrollRef.current.scrollTo({ left: targetX, behavior });
   };
 
@@ -421,13 +448,27 @@ export function PMGanttMatrix({
     }
   }, [todayIndex]);
 
+  // Cambio de escala con persistencia y recentrado suave
+  const handleScaleChange = (scale: GanttTimeScale) => {
+    setTimeScale(scale);
+    try {
+      localStorage.setItem('gantt_time_scale', scale);
+    } catch (e) {
+      // ignore
+    }
+    setTimeout(() => {
+      scrollToToday('smooth', scale);
+    }, 40);
+  };
+
   const handleScrollToToday = () => {
     scrollToToday('smooth');
   };
 
   const handleScrollDelta = (dir: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    const delta = dir === 'right' ? 500 : -500;
+    const step = timeScale === 'week' ? (7 * 50) : timeScale === 'year' ? 800 : 500;
+    const delta = dir === 'right' ? step : -step;
     scrollRef.current.scrollBy({ left: delta, behavior: 'smooth' });
   };
 
@@ -526,6 +567,46 @@ export function PMGanttMatrix({
             </button>
           </div>
 
+          {/* Selector de Escala Temporal: Semana / Mes / Anual */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 border border-slate-200 dark:border-slate-700/60 shadow-xs">
+            <button
+              type="button"
+              onClick={() => handleScaleChange('week')}
+              className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all ${
+                timeScale === 'week'
+                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Vista Semanal (zoom en días con alto detalle)"
+            >
+              Semana
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScaleChange('month')}
+              className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all ${
+                timeScale === 'month'
+                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Vista Mensual estándar"
+            >
+              Mes
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScaleChange('year')}
+              className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all ${
+                timeScale === 'year'
+                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Vista Anual macro (panorama del año completo)"
+            >
+              Anual
+            </button>
+          </div>
+
           {/* Filtro por Estado */}
           <div className="flex items-center gap-1.5">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
@@ -577,8 +658,8 @@ export function PMGanttMatrix({
         <div
           className="relative text-left"
           style={{
-            width: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`,
-            minWidth: `${STICKY_COL_WIDTH + daysList.length * DAY_WIDTH}px`
+            width: `${STICKY_COL_WIDTH + daysList.length * dayWidth}px`,
+            minWidth: `${STICKY_COL_WIDTH + daysList.length * dayWidth}px`
           }}
         >
           {/* CABECERA FIJA SUPERIOR (STICKY TOP-0 Z-30) */}
@@ -618,7 +699,7 @@ export function PMGanttMatrix({
                     <div
                       key={`${m.year}-${m.monthIndex}`}
                       className="border-r border-slate-200 dark:border-slate-800/80 px-2 flex items-center justify-between shrink-0 bg-slate-200/60 dark:bg-[#0d1527] h-6"
-                      style={{ width: `${m.daysCount * DAY_WIDTH}px` }}
+                      style={{ width: `${m.daysCount * dayWidth}px` }}
                     >
                       <span className="text-[10.5px] font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-300 truncate">
                         {m.name} {m.year}
@@ -642,15 +723,42 @@ export function PMGanttMatrix({
                           ? 'bg-slate-200/40 dark:bg-slate-900/60 text-slate-400 dark:text-slate-500'
                           : 'text-slate-600 dark:text-slate-400'
                       }`}
-                      style={{ width: `${DAY_WIDTH}px`, height: '24px' }}
+                      style={{ width: `${dayWidth}px`, height: '24px' }}
                       title={`${d.dayNum} - ${d.dateStr}`}
                     >
-                      <span className="text-[7.5px] leading-none text-slate-400 dark:text-slate-500">
-                        {d.weekdayLetter}
-                      </span>
-                      <span className={`text-[9.5px] leading-tight rounded px-0.5 ${d.isToday ? 'bg-cyan-500 text-slate-950 font-black' : ''}`}>
-                        {d.dayNum}
-                      </span>
+                      {timeScale === 'week' ? (
+                        <>
+                          <span className="text-[8px] font-bold leading-none text-slate-400 dark:text-slate-500">
+                            {d.weekdayLetter}
+                          </span>
+                          <span className={`text-[10px] leading-tight rounded px-1 font-bold ${d.isToday ? 'bg-cyan-500 text-slate-950 font-black' : ''}`}>
+                            {d.dayNum}
+                          </span>
+                        </>
+                      ) : timeScale === 'year' ? (
+                        <div className="flex flex-col items-center justify-center w-full h-full">
+                          {d.isToday ? (
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,1)] animate-pulse" title="Hoy" />
+                          ) : (d.dayNum === 1 || d.dayNum === 15) ? (
+                            <span className="text-[7.5px] font-black text-slate-700 dark:text-slate-300 leading-none">
+                              {d.dayNum}
+                            </span>
+                          ) : d.dayNum % 5 === 0 ? (
+                            <span className="w-0.5 h-1.5 bg-slate-400 dark:bg-slate-600 rounded-full" />
+                          ) : (
+                            <span className="w-px h-1 bg-slate-300 dark:bg-slate-800" />
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-[7.5px] leading-none text-slate-400 dark:text-slate-500">
+                            {d.weekdayLetter}
+                          </span>
+                          <span className={`text-[9.5px] leading-tight rounded px-0.5 ${d.isToday ? 'bg-cyan-500 text-slate-950 font-black' : ''}`}>
+                            {d.dayNum}
+                          </span>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -665,7 +773,7 @@ export function PMGanttMatrix({
               <div
                 className="absolute top-0 bottom-0 pointer-events-none z-10"
                 style={{
-                  left: `${STICKY_COL_WIDTH + todayIndex * DAY_WIDTH + DAY_WIDTH / 2}px`,
+                  left: `${STICKY_COL_WIDTH + todayIndex * dayWidth + dayWidth / 2}px`,
                   width: '2px'
                 }}
               >
@@ -714,7 +822,7 @@ export function PMGanttMatrix({
                       className={`h-full border-r border-slate-200/50 dark:border-slate-800/30 shrink-0 ${
                         d.isWeekend ? 'bg-slate-100/40 dark:bg-slate-900/30' : ''
                       } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
-                      style={{ width: `${DAY_WIDTH}px` }}
+                      style={{ width: `${dayWidth}px` }}
                     />
                   ))}
 
@@ -746,7 +854,7 @@ export function PMGanttMatrix({
                       statusLabel = `${m.progress}%`;
                     }
 
-                    const mLeft = Math.max(0, mIdx * DAY_WIDTH - 20);
+                    const mLeft = Math.max(0, mIdx * dayWidth - (timeScale === 'year' ? 10 : 20));
 
                     return (
                       <div
@@ -832,7 +940,7 @@ export function PMGanttMatrix({
                       className={`h-full border-r border-slate-200/50 dark:border-slate-800/30 shrink-0 cursor-pointer hover:bg-cyan-500/10 transition-colors ${
                         d.isWeekend ? 'bg-slate-100/40 dark:bg-slate-900/30' : ''
                       } ${d.isToday ? 'bg-cyan-500/10' : ''}`}
-                      style={{ width: `${DAY_WIDTH}px` }}
+                      style={{ width: `${dayWidth}px` }}
                       title={`Clic para asignar tarea a ${row.profile.name} el ${d.dayNum}/${d.monthIndex + 1}`}
                     />
                   ))}
