@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
 import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile, AppTheme } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
@@ -524,6 +524,9 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [dashboardActiveProjectId, setDashboardActiveProjectId] = useState<string>('');
+  const handleActiveProjectChange = useCallback((pId: string) => {
+    setDashboardActiveProjectId(prev => (prev === pId ? prev : pId));
+  }, []);
   const splashJustFinishedRef = useRef(false);
 
   const handleFinishSplash = () => {
@@ -2338,7 +2341,7 @@ export default function App() {
             onDeleteCalendarEvent={handleDeleteCalendarEvent}
             onToggleCalendarEvent={handleToggleCalendarEvent}
             onShowToast={showToast}
-            onActiveProjectChange={(pId) => setDashboardActiveProjectId(pId)}
+            onActiveProjectChange={handleActiveProjectChange}
           />
         )}
 

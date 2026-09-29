@@ -179,7 +179,16 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    // Failsafe: Si por alguna razón no se detecta el toque o el usuario espera, ingresar automáticamente
+    const failsafeTimer = setTimeout(() => {
+      triggerEnter();
+    }, 4500);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(failsafeTimer);
+    };
   }, []);
 
   const triggerEnter = (e?: React.SyntheticEvent) => {
@@ -189,8 +198,12 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     if (triggeredRef.current) return;
     triggeredRef.current = true;
 
-    // Reproducir sonido de tilde inmediatamente
-    playCheckmarkSound();
+    // Reproducir sonido de tilde de forma segura (sin bloquear el ingreso si falla el audio)
+    try {
+      playCheckmarkSound();
+    } catch (err) {
+      console.warn('Audio play notice:', err);
+    }
 
     // En tablets, orientar de forma apaisada (landscape) durante el gesto táctil del usuario
     try {
@@ -207,12 +220,13 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
     // Concluir transición y pasar a la pantalla principal
     setTimeout(() => {
       onFinish();
-    }, 700);
+    }, 600);
   };
 
   return (
     <div
       onClick={triggerEnter}
+      onPointerUp={triggerEnter}
       onPointerDown={() => {
         // En tablets, el primer toque desbloquea el canal de audio del navegador de inmediato
         try {
@@ -236,7 +250,7 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
       }`}
       style={{
         background: 'radial-gradient(ellipse at center, #061e12 0%, #020b06 45%, #000000 100%)',
-        touchAction: 'none'
+        touchAction: 'manipulation'
       }}
       role="button"
       tabIndex={0}
@@ -283,7 +297,10 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
           isExiting ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
         }`}
       >
-        <p className="text-[11px] uppercase tracking-[0.25em] text-emerald-500/50 font-mono">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-400 font-mono animate-pulse">
+          Toca la pantalla para ingresar
+        </p>
+        <p className="text-[10px] uppercase tracking-[0.25em] text-emerald-500/50 font-mono">
           Sistema de Inspección en Obra
         </p>
       </div>
