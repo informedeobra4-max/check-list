@@ -49,6 +49,7 @@ interface DashboardViewProps {
   onDeleteCalendarEvent?: (projectId: string, eventId: string) => void;
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
   onShowToast?: (msg: string, icon?: string) => void;
+  onActiveProjectChange?: (projectId: string) => void;
 }
 
 export function DashboardView({
@@ -71,13 +72,23 @@ export function DashboardView({
   onSaveCalendarEvent,
   onDeleteCalendarEvent,
   onToggleCalendarEvent,
-  onShowToast
+  onShowToast,
+  onActiveProjectChange
 }: DashboardViewProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [hoverTriggers, setHoverTriggers] = useState<Record<string, number>>({});
+
+  // Notify parent of currently active project on hover/touch or initial mount
+  useEffect(() => {
+    if (activeCardId && onActiveProjectChange) {
+      onActiveProjectChange(activeCardId);
+    } else if (!activeCardId && projects.length > 0 && onActiveProjectChange) {
+      onActiveProjectChange(projects[0].id);
+    }
+  }, [activeCardId, projects, onActiveProjectChange]);
 
   // Route any calendar click directly to the new Project Manager & Planning modal
   const handleOpenCalendarModal = (projectId: string, initialDate?: string, selectedEventId?: string) => {

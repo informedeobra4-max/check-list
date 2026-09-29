@@ -523,6 +523,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [dashboardActiveProjectId, setDashboardActiveProjectId] = useState<string>('');
   const splashJustFinishedRef = useRef(false);
 
   const handleFinishSplash = () => {
@@ -2228,19 +2229,25 @@ export default function App() {
     showToast('Respaldo JSON descargado', 'Download');
   };
 
-  // Open Report modal
+  // Open Report modal with intelligent automatic active project recognition
   const handleOpenReportModal = (type: 'auto' | 'project' | 'unit' = 'auto', projId?: string, unitId?: string) => {
-    const pId = projId || selectedProjectId || (projects[0]?.id ?? '');
-    const uId = unitId || selectedUnitId;
+    const resolvedProjectId =
+      projId ||
+      (currentView !== 'dashboard' && selectedProjectId ? selectedProjectId : undefined) ||
+      dashboardActiveProjectId ||
+      selectedProjectId ||
+      (projects[0]?.id ?? '');
 
-    if (type === 'unit' && uId) {
-      setReportDefaultScope(`unit:${pId}:${uId}`);
-    } else if (type === 'project' && pId) {
-      setReportDefaultScope(`proj:${pId}`);
+    const resolvedUnitId = unitId || (currentView === 'checklist' ? selectedUnitId : undefined);
+
+    if (type === 'unit' && resolvedUnitId && resolvedProjectId) {
+      setReportDefaultScope(`unit:${resolvedProjectId}:${resolvedUnitId}`);
+    } else if (type === 'project' && resolvedProjectId) {
+      setReportDefaultScope(`proj:${resolvedProjectId}`);
     } else if (currentView === 'checklist' && selectedUnitId && selectedProjectId) {
       setReportDefaultScope(`unit:${selectedProjectId}:${selectedUnitId}`);
-    } else {
-      setReportDefaultScope(`proj:${pId}`);
+    } else if (resolvedProjectId) {
+      setReportDefaultScope(`proj:${resolvedProjectId}`);
     }
 
     setIsReportModalOpen(true);
@@ -2331,6 +2338,7 @@ export default function App() {
             onDeleteCalendarEvent={handleDeleteCalendarEvent}
             onToggleCalendarEvent={handleToggleCalendarEvent}
             onShowToast={showToast}
+            onActiveProjectChange={(pId) => setDashboardActiveProjectId(pId)}
           />
         )}
 
@@ -2415,15 +2423,15 @@ export default function App() {
             color: localColors.neonColor || '#00f2fe',
             filter: `drop-shadow(0 0 8px ${hexToRgba(localColors.neonColor || '#00f2fe', 0.6)})`
           } : undefined}
-          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
+          className={`group flex flex-col items-center justify-center font-bold text-[11px] touch-target active:scale-95 transition-all ${
             currentView === 'dashboard'
               ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Ir a Obras / Proyectos"
         >
-          <Building2 className="w-5 h-5 mb-0.5" />
-          <span>Proyectos</span>
+          <Building2 className="w-5 h-5 mb-0.5 group-hover:scale-125 group-active:scale-130 active:scale-130 transition-transform duration-200 ease-out" />
+          <span className="group-hover:scale-105 transition-transform duration-150">Proyectos</span>
         </button>
 
         <button
@@ -2432,15 +2440,15 @@ export default function App() {
             color: localColors.neonColor || '#00f2fe',
             filter: `drop-shadow(0 0 8px ${hexToRgba(localColors.neonColor || '#00f2fe', 0.6)})`
           } : undefined}
-          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target transition-colors ${
+          className={`group flex flex-col items-center justify-center font-bold text-[11px] touch-target active:scale-95 transition-all ${
             currentView === 'units'
               ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Ir a Departamentos y Unidades"
         >
-          <DoorOpen className="w-5 h-5 mb-0.5" />
-          <span>Unidades</span>
+          <DoorOpen className="w-5 h-5 mb-0.5 group-hover:scale-125 group-active:scale-130 active:scale-130 transition-transform duration-200 ease-out" />
+          <span className="group-hover:scale-105 transition-transform duration-150">Unidades</span>
         </button>
 
         {/* CROQUIS BUTTON */}
@@ -2450,25 +2458,25 @@ export default function App() {
             setIsCroquisModalOpen(true);
           }}
           style={isCroquisModalOpen ? { color: localColors.neonColor || '#00f2fe' } : undefined}
-          className={`flex flex-col items-center justify-center font-bold text-[11px] touch-target group relative transition-colors ${
+          className={`group flex flex-col items-center justify-center font-bold text-[11px] touch-target active:scale-95 relative transition-all ${
             isCroquisModalOpen
               ? ''
               : 'text-slate-400 hover:text-slate-200'
           }`}
           title="Abrir hoja de croquis a mano alzada para este u otro depto"
         >
-          <PenTool className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
-          <span>Croquis</span>
+          <PenTool className="w-5 h-5 mb-0.5 group-hover:scale-125 group-active:scale-130 active:scale-130 transition-transform duration-200 ease-out" />
+          <span className="group-hover:scale-105 transition-transform duration-150">Croquis</span>
         </button>
 
         {/* EXPORTAR PDF BUTTON */}
         <button
           onClick={() => handleOpenReportModal('auto')}
-          className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 font-bold text-[11px] touch-target group transition-colors"
+          className="group flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 font-bold text-[11px] touch-target active:scale-95 transition-all"
           title="Exportar informe técnico en PDF"
         >
-          <FileText className="w-5 h-5 mb-0.5 group-hover:scale-110 transition-transform" />
-          <span>Exportar PDF</span>
+          <FileText className="w-5 h-5 mb-0.5 group-hover:scale-125 group-active:scale-130 active:scale-130 transition-transform duration-200 ease-out" />
+          <span className="group-hover:scale-105 transition-transform duration-150">Exportar PDF</span>
         </button>
       </nav>
 

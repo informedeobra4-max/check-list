@@ -92,13 +92,23 @@
   scrollbar-color: rgba(51, 65, 85, 0.7) transparent;
 }
 
-/* Print specific styles for A4 Technical Inspection Act PDF */
+/* Print specific styles for A4 Technical Inspection Act PDF - Strict Landscape */
 @media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+  *, *:before, *:after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   body {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .no-print {
     display: none !important;
@@ -107,13 +117,17 @@
     padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
     box-shadow: none !important;
     border: none !important;
-    max-width: 100% !important;
   }
   .page-break-inside-avoid {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  .page-break-before-always {
+    break-before: page !important;
+    page-break-before: always !important;
   }
 }
 
@@ -151,9 +165,71 @@ main,
 .theme-glass,
 .theme-original {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   TEMA 1: APARIENCIA ORIGINAL OSCURA CON VIDRIO ESMERILADO FLOTANTE (DARK GLASS)
+   ========================================================================== */
+
+/* Fondo general ambiente con gradientes profundos para acentuar el vidrio flotante */
+html.theme-original,
+body.theme-original,
+.theme-original {
+  background-color: #0b1120 !important;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.22) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(14, 116, 144, 0.18) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(88, 28, 135, 0.18) 0px, transparent 50%) !important;
+  background-attachment: fixed !important;
+  color: #f1f5f9 !important;
+}
+
+/* Tarjetas y Contenedores Flotantes con Efecto Vidrio Esmerilado (Dark Glassmorphism) */
+.theme-original .bg-\[\#131b2c\],
+.theme-original .bg-\[\#131b2c\]\/80,
+.theme-original .bg-\[\#151f33\],
+.theme-original .bg-\[\#151f33\]\/90,
+.theme-original .bg-\[\#151f33\]\/80,
+.theme-original .bg-\[\#162035\],
+.theme-original .bg-\[\#162035\]\/95,
+.theme-original .bg-\[\#0f172a\],
+.theme-original .bg-\[\#0e1422\],
+.theme-original .bg-\[\#111827\],
+.theme-original .bg-slate-900,
+.theme-original .bg-slate-900\/90,
+.theme-original .bg-slate-900\/80,
+.theme-original .bg-slate-900\/60,
+.theme-original .bg-slate-900\/50,
+.theme-original .bg-slate-950,
+.theme-original .bg-slate-950\/90,
+.theme-original .bg-slate-950\/80,
+.theme-original .bg-slate-850,
+.theme-original .bg-slate-800,
+.theme-original .bg-slate-800\/90,
+.theme-original .bg-slate-800\/80 {
+  background: rgba(19, 27, 44, 0.72) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+}
+
+/* Header y Barra de Navegación Glassmorphism en Tema Original */
+.theme-original header {
+  background: rgba(15, 23, 42, 0.78) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Modales Flotantes en Tema Original */
+.theme-original .fixed.inset-0.bg-black\/80,
+.theme-original .fixed.inset-0.bg-black\/70,
+.theme-original .fixed.inset-0.bg-black\/60 {
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
 }
 
 /* ==========================================================================

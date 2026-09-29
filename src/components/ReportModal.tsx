@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Printer,
@@ -9,10 +9,13 @@ import {
   Building2,
   Calendar,
   UserCheck,
-  MessageSquare
+  MessageSquare,
+  Flag,
+  Check
 } from 'lucide-react';
 import { Project, Unit } from '../types';
-import { calculateUnitProgress, calculateProjectProgress } from '../utils/calculations';
+import { calculateUnitProgress, calculateProjectProgress, getUnitItemCounts } from '../utils/calculations';
+import { formatPMDate, getTaskAlarms } from '../utils/pmCalculations';
 import { MASTER_TRADES_TEMPLATE } from '../data/initialData';
 
 interface ReportModalProps {
@@ -37,6 +40,15 @@ export function ReportModal({
   const [includePhotos, setIncludePhotos] = useState<boolean>(true);
   const [includeComments, setIncludeComments] = useState<boolean>(true);
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
+  const [includeGantt, setIncludeGantt] = useState<boolean>(true);
+  const [includeUnitsProgress, setIncludeUnitsProgress] = useState<boolean>(true);
+
+  // Synchronize scope with defaultScope on open or when defaultScope changes
+  useEffect(() => {
+    if (isOpen && defaultScope) {
+      setSelectedScope(defaultScope);
+    }
+  }, [isOpen, defaultScope]);
 
   if (!isOpen || projects.length === 0) return null;
 
@@ -102,6 +114,117 @@ export function ReportModal({
     });
   });
 
+  // Executive Gantt Timeline for Target Project
+  const ganttData = useMemo(() => {
+    const tasks = targetProject?.calendarEvents || [];
+    const milestones = targetProject?.milestones || [];
+
+    if (tasks.length === 0 && milestones.length === 0) {
+      return null;
+    }
+
+    // Collect all dates
+    const dateStrings: string[] = [];
+    if (targetProject?.startDate) dateStrings.push(targetProject.startDate);
+    if (targetProject?.estimatedEndDate) dateStrings.push(targetProject.estimatedEndDate);
+
+    tasks.forEach(t => {
+      if (t.startDate) dateStrings.push(t.startDate);
+      if (t.date) dateStrings.push(t.date);
+    });
+
+    milestones.forEach(m => {
+      if (m.startDate) dateStrings.push(m.startDate);
+      if (m.targetDate) dateStrings.push(m.targetDate);
+    });
+
+    // Determine min and max dates
+    let minD = new Date();
+    let maxD = new Date();
+
+    if (dateStrings.length > 0) {
+      const validDates = dateStrings
+        .map(ds => {
+          const parts = ds.split('T')[0].split('-').map(Number);
+          return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(ds);
+        })
+        .filter(d => !isNaN(d.getTime()));
+
+      if (validDates.length > 0) {
+        minD = new Date(Math.min(...validDates.map(d => d.getTime())));
+        maxD = new Date(Math.max(...validDates.map(d => d.getTime())));
+      }
+    }
+
+    // Expand to cover full months and ensure at least 3 months window
+    const startYear = minD.getFullYear();
+    const startMonth = minD.getMonth();
+    const startDate = new Date(startYear, startMonth, 1);
+
+    let endYear = maxD.getFullYear();
+    let endMonth = maxD.getMonth();
+    const monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth);
+    if (monthDiff < 3) {
+      endMonth += (3 - monthDiff);
+      if (endMonth > 11) {
+        endYear += Math.floor(endMonth / 12);
+        endMonth = endMonth % 12;
+      }
+    }
+    const endDate = new Date(endYear, endMonth + 1, 0);
+
+    const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Generate month segments for header
+    const months: { name: string; year: number; widthPct: number }[] = [];
+    let curMonthDate = new Date(startDate);
+    while (curMonthDate <= endDate) {
+      const y = curMonthDate.getFullYear();
+      const m = curMonthDate.getMonth();
+      const daysInM = new Date(y, m + 1, 0).getDate();
+      const mName = curMonthDate.toLocaleDateString('es-ES', { month: 'short' });
+      months.push({
+        name: mName.toUpperCase(),
+        year: y,
+        widthPct: (daysInM / totalDays) * 100
+      });
+      curMonthDate = new Date(y, m + 1, 1);
+    }
+
+    const parseDate = (dStr?: string): Date | null => {
+      if (!dStr) return null;
+      const parts = dStr.split('T')[0].split('-').map(Number);
+      return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(dStr);
+    };
+
+    const getDayOffset = (dateStr?: string) => {
+      const d = parseDate(dateStr);
+      if (!d || isNaN(d.getTime())) return 0;
+      const diff = Math.round((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      return Math.max(0, Math.min(totalDays, diff));
+    };
+
+    const getPercentPosition = (startStr?: string, endStr?: string) => {
+      const s = startStr || endStr;
+      const e = endStr || startStr;
+      const startDay = getDayOffset(s);
+      const endDay = Math.max(startDay + 2, getDayOffset(e));
+      const leftPct = (startDay / totalDays) * 100;
+      const widthPct = Math.max(2.5, Math.min(100 - leftPct, ((endDay - startDay) / totalDays) * 100));
+      return { leftPct, widthPct };
+    };
+
+    return {
+      startDate,
+      endDate,
+      totalDays,
+      months,
+      getPercentPosition,
+      tasks,
+      milestones
+    };
+  }, [targetProject]);
+
   const now = new Date();
   const dateString = now.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
   const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -111,8 +234,8 @@ export function ReportModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-2 overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-t-2xl sm:rounded-2xl max-h-[96vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-3 overflow-y-auto">
+      <div className="bg-white w-full max-w-6xl rounded-t-2xl sm:rounded-2xl max-h-[96vh] flex flex-col shadow-2xl border-t-4 border-amber-500 overflow-hidden">
         {/* Non-Printable Header Bar */}
         <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 no-print">
           <div className="flex items-center space-x-2.5">
@@ -188,9 +311,36 @@ export function ReportModal({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-1 text-slate-700">
+          <div className="flex flex-wrap items-center gap-2.5 pt-1 text-slate-700">
             <span className="font-bold text-[10px] uppercase text-slate-600">Incluir en PDF:</span>
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs">
+
+            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+              <input
+                type="checkbox"
+                checked={includeGantt}
+                onChange={(e) => setIncludeGantt(e.target.checked)}
+                className="rounded text-amber-500"
+              />
+              <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-amber-600" />
+                Diagrama de Gantt
+              </span>
+            </label>
+
+            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+              <input
+                type="checkbox"
+                checked={includeUnitsProgress}
+                onChange={(e) => setIncludeUnitsProgress(e.target.checked)}
+                className="rounded text-amber-500"
+              />
+              <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-amber-600" />
+                Avance por Depto ({targetProject.units.length})
+              </span>
+            </label>
+
+            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
               <input
                 type="checkbox"
                 checked={includePhotos}
@@ -198,11 +348,11 @@ export function ReportModal({
                 className="rounded text-amber-500"
               />
               <span className="text-[11px] font-semibold text-slate-800">
-                Evidencias Fotográficas ({totalPhotos})
+                Evidencias ({totalPhotos})
               </span>
             </label>
 
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs">
+            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
               <input
                 type="checkbox"
                 checked={includeComments}
@@ -211,11 +361,11 @@ export function ReportModal({
               />
               <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
                 <MessageSquare className="w-3 h-3 text-amber-600" />
-                Observaciones / Notas ({totalComments})
+                Notas ({totalComments})
               </span>
             </label>
 
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs">
+            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
               <input
                 type="checkbox"
                 checked={includeSignatures}
@@ -223,15 +373,15 @@ export function ReportModal({
                 className="rounded text-amber-500"
               />
               <span className="text-[11px] font-semibold text-slate-800">
-                Bloques de Firma y Recepción
+                Firmas
               </span>
             </label>
           </div>
         </div>
 
-        {/* Printable Document Sheet */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-200/80">
-          <div className="bg-white shadow-xl max-w-2xl mx-auto rounded-lg p-5 sm:p-8 text-slate-900 border border-slate-300 printable-document-container">
+        {/* Printable Document Sheet - Panoramic Landscape Layout */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/80">
+          <div className="bg-white shadow-xl max-w-5xl w-full mx-auto rounded-lg p-5 sm:p-8 text-slate-900 border border-slate-300 printable-document-container">
             {/* Header */}
             <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
@@ -314,10 +464,290 @@ export function ReportModal({
               </div>
             </div>
 
-            {/* Checklist Details and Photo Evidence */}
+            {/* 2. Executive Gantt Chart Section */}
+            {includeGantt && ganttData && (
+              <div className="mb-6 page-break-inside-avoid">
+                <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                    2. Cronograma de Obra y Diagrama de Gantt
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-600 font-mono">
+                    Período: {ganttData.startDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })} — {ganttData.endDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+
+                {/* Timeline Box */}
+                <div className="border border-slate-300 rounded-lg overflow-hidden bg-slate-50/50 shadow-2xs">
+                  {/* Timeline Header (Months) */}
+                  <div className="flex border-b border-slate-300 bg-slate-100 text-[10px] font-black text-slate-700">
+                    <div className="w-40 p-1.5 border-r border-slate-300 shrink-0 uppercase tracking-wider text-slate-500 text-[9px] font-black">
+                      Responsable / Cuadrilla
+                    </div>
+                    <div className="flex-1 flex relative">
+                      {ganttData.months.map((m, idx) => (
+                        <div
+                          key={idx}
+                          style={{ width: `${m.widthPct}%` }}
+                          className="p-1 text-center border-r border-slate-200 truncate text-[9px] font-bold text-slate-700 bg-slate-100"
+                        >
+                          {m.name} {m.year}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Milestones Track */}
+                  {ganttData.milestones.length > 0 && (
+                    <div className="flex items-center border-b border-slate-200 bg-amber-50/50 py-1.5">
+                      <div className="w-40 px-2 text-[10px] font-black text-amber-900 shrink-0 flex items-center gap-1">
+                        <Flag className="w-3 h-3 text-amber-600" />
+                        <span>Hitos Clave ({ganttData.milestones.length})</span>
+                      </div>
+                      <div className="flex-1 relative h-6">
+                        {ganttData.milestones.map((m, idx) => {
+                          const pos = ganttData.getPercentPosition(m.startDate || m.targetDate, m.targetDate);
+                          const isDone = m.manualCompleted || (m.progressPercentage !== undefined && m.progressPercentage >= 100);
+                          return (
+                            <div
+                              key={m.id || idx}
+                              style={{ left: `${pos.leftPct}%` }}
+                              className={`absolute top-0.5 -translate-x-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black shadow-2xs whitespace-nowrap z-10 ${
+                                isDone
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-amber-500 text-slate-950'
+                              }`}
+                              title={`${m.name} (${m.targetDate})`}
+                            >
+                              <span>◆</span>
+                              <span className="truncate max-w-[120px]">{m.name}</span>
+                              <span className="opacity-90 font-mono text-[7px]">{formatPMDate(m.targetDate)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Task Rows */}
+                  <div className="divide-y divide-slate-200 text-xs">
+                    {ganttData.tasks.length === 0 ? (
+                      <div className="p-3 text-center text-slate-500 text-[11px] italic">
+                        No hay tareas programadas para esta obra.
+                      </div>
+                    ) : (
+                      ganttData.tasks.map((task, idx) => {
+                        const pos = ganttData.getPercentPosition(task.startDate || task.date, task.date);
+                        const progress = task.progress !== undefined ? task.progress : (task.completed ? 100 : 0);
+                        const isDone = task.completed || progress === 100;
+                        const alarms = getTaskAlarms(task);
+                        const isCritical = alarms.isCriticalDelay;
+
+                        const barColor = isDone
+                          ? 'bg-emerald-600'
+                          : isCritical
+                          ? 'bg-rose-600'
+                          : 'bg-cyan-600';
+
+                        const barBg = isDone
+                          ? 'bg-emerald-100/80 border-emerald-300'
+                          : isCritical
+                          ? 'bg-rose-100/80 border-rose-300'
+                          : 'bg-cyan-100/80 border-cyan-300';
+
+                        return (
+                          <div key={task.id || idx} className="flex items-center hover:bg-slate-50 transition-colors py-1">
+                            <div className="w-40 px-2 shrink-0 truncate">
+                              <span className="font-bold text-[10px] text-slate-900 block truncate leading-tight">
+                                {task.assignedTo || 'Cuadrilla General'}
+                              </span>
+                              <span className="text-[8px] text-slate-500 truncate block">
+                                {task.assignedRole || task.category || 'Tareas Generales'}
+                              </span>
+                            </div>
+                            <div className="flex-1 relative h-6 bg-slate-100/60 rounded">
+                              <div
+                                style={{
+                                  left: `${pos.leftPct}%`,
+                                  width: `${pos.widthPct}%`
+                                }}
+                                className={`absolute top-0.5 bottom-0.5 rounded border ${barBg} flex items-center px-1.5 overflow-hidden shadow-2xs`}
+                              >
+                                {/* Progress fill */}
+                                <div
+                                  style={{ width: `${progress}%` }}
+                                  className={`absolute left-0 top-0 bottom-0 ${barColor} opacity-80 transition-all`}
+                                />
+                                <div className="relative z-10 flex items-center justify-between w-full gap-1 text-[9px] font-black text-slate-900 truncate">
+                                  <span className="truncate">{task.title}</span>
+                                  <span className="font-mono text-[8px] bg-white/95 px-1 py-0.2 rounded shadow-2xs shrink-0 font-bold">
+                                    {progress}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Timeline Metrics Footer */}
+                <div className="grid grid-cols-4 gap-2 mt-2 text-center text-xs">
+                  <div className="bg-slate-100 p-1.5 rounded border border-slate-200">
+                    <span className="block text-[8px] font-bold text-slate-500 uppercase">Total Tareas</span>
+                    <span className="font-mono font-black text-slate-800 text-xs">{ganttData.tasks.length}</span>
+                  </div>
+                  <div className="bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                    <span className="block text-[8px] font-bold text-emerald-700 uppercase">Completadas</span>
+                    <span className="font-mono font-black text-emerald-800 text-xs">
+                      {ganttData.tasks.filter(t => t.completed || t.progress === 100).length}
+                    </span>
+                  </div>
+                  <div className="bg-cyan-50 p-1.5 rounded border border-cyan-200">
+                    <span className="block text-[8px] font-bold text-cyan-700 uppercase">En Curso</span>
+                    <span className="font-mono font-black text-cyan-800 text-xs">
+                      {ganttData.tasks.filter(t => !t.completed && (t.progress || 0) > 0 && (t.progress || 0) < 100).length}
+                    </span>
+                  </div>
+                  <div className="bg-amber-50 p-1.5 rounded border border-amber-200">
+                    <span className="block text-[8px] font-bold text-amber-700 uppercase">Hitos de Obra</span>
+                    <span className="font-mono font-black text-amber-800 text-xs">{ganttData.milestones.length}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Department / Units Individual Progress Section */}
+            {includeUnitsProgress && targetProject.units.length > 0 && (
+              <div className="mb-6 page-break-inside-avoid">
+                <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                    3. Porcentaje de Avance Individual por Departamento ({targetProject.units.length} Unidades)
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-600 font-mono">
+                    Auditoría Sectorizada
+                  </span>
+                </div>
+
+                {/* Units Summary Metrics */}
+                {(() => {
+                  const unitsStats = targetProject.units.map(u => {
+                    const pct = calculateUnitProgress(u);
+                    const counts = getUnitItemCounts(u);
+                    return { unit: u, pct, counts };
+                  });
+                  const totalUnits = unitsStats.length;
+                  const completedUnits = unitsStats.filter(u => u.pct === 100).length;
+                  const inProgressUnits = unitsStats.filter(u => u.pct > 0 && u.pct < 100).length;
+                  const pendingUnits = unitsStats.filter(u => u.pct === 0).length;
+                  const avgPct = totalUnits > 0
+                    ? Math.round(unitsStats.reduce((acc, u) => acc + u.pct, 0) / totalUnits)
+                    : 0;
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+                        <div className="bg-slate-100 p-2 rounded-lg border border-slate-200">
+                          <span className="block text-[8px] font-bold text-slate-500 uppercase">Total Unidades</span>
+                          <span className="font-mono font-black text-slate-800 text-sm">{totalUnits}</span>
+                        </div>
+                        <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                          <span className="block text-[8px] font-bold text-emerald-700 uppercase">Finalizadas (100%)</span>
+                          <span className="font-mono font-black text-emerald-800 text-sm">{completedUnits}</span>
+                        </div>
+                        <div className="bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          <span className="block text-[8px] font-bold text-amber-700 uppercase">En Ejecución</span>
+                          <span className="font-mono font-black text-amber-800 text-sm">{inProgressUnits}</span>
+                        </div>
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                          <span className="block text-[8px] font-bold text-slate-500 uppercase">Pendientes (0%)</span>
+                          <span className="font-mono font-black text-slate-700 text-sm">{pendingUnits}</span>
+                        </div>
+                        <div className="bg-indigo-50 p-2 rounded-lg border border-indigo-200 col-span-2 sm:col-span-1">
+                          <span className="block text-[8px] font-bold text-indigo-700 uppercase">Promedio Obra</span>
+                          <span className="font-mono font-black text-indigo-800 text-sm">{avgPct}%</span>
+                        </div>
+                      </div>
+
+                      {/* Panoramic 3-column Units Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                        {unitsStats.map(({ unit, pct, counts }) => {
+                          const isComplete = pct === 100;
+                          const isPartial = pct > 0 && !isComplete;
+                          const isTargetScope = targetUnit && targetUnit.id === unit.id;
+
+                          return (
+                            <div
+                              key={unit.id}
+                              className={`p-2.5 rounded-lg border transition-all ${
+                                isTargetScope
+                                  ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-400/40'
+                                  : isComplete
+                                  ? 'bg-emerald-50/50 border-emerald-300'
+                                  : isPartial
+                                  ? 'bg-white border-slate-200'
+                                  : 'bg-slate-50/60 border-slate-200 opacity-80'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-1 mb-1.5">
+                                <div>
+                                  <h5 className="font-black text-xs text-slate-900 leading-tight">
+                                    {unit.name}
+                                  </h5>
+                                  <span className="text-[9px] text-slate-500 font-medium">
+                                    {unit.floorLabel || unit.category || (unit.type === 'common_area' ? 'Área Común' : 'Departamento')}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className={`font-mono font-black text-sm ${
+                                    isComplete ? 'text-emerald-700' : isPartial ? 'text-amber-700' : 'text-slate-400'
+                                  }`}>
+                                    {pct}%
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mb-1.5">
+                                <div
+                                  style={{ width: `${pct}%` }}
+                                  className={`h-full rounded-full transition-all ${
+                                    isComplete
+                                      ? 'bg-emerald-600'
+                                      : isPartial
+                                      ? 'bg-amber-500'
+                                      : 'bg-slate-400'
+                                  }`}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[10px] text-slate-600 font-medium">
+                                <span>{counts.completed} de {counts.total} ítems</span>
+                                {unit.signature ? (
+                                  <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                                    <Check className="w-3 h-3 stroke-[3]" /> Firmado
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">Sin firmar</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* 4. Checklist Details and Photo Evidence */}
             <div className="mb-4">
               <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 border-b border-slate-200 pb-1">
-                2. Detalle de Control y Evidencias Fotográficas ({totalPhotos} Fotos)
+                4. Detalle de Control y Evidencias Fotográficas ({totalPhotos} Fotos)
               </h4>
 
               {tradeSummaries.map(ts => (
@@ -425,7 +855,7 @@ export function ReportModal({
             {includeSignatures && (
               <div className="mt-8 pt-4 border-t-2 border-slate-900 page-break-inside-avoid">
                 <h4 className="text-xs font-black uppercase text-slate-800 mb-6 text-center">
-                  3. Firmas de Conformidad y Recepción Técnica
+                  5. Firmas de Conformidad y Recepción Técnica
                 </h4>
 
                 {isUnitScope && targetUnit?.signature ? (
