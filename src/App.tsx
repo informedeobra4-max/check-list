@@ -2289,7 +2289,7 @@ export default function App() {
       {/* Dynamic Background Image Wallpaper Layer */}
       {localColors.appBackgroundImage && (
         <div
-          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 no-print"
+          className="fixed inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-all duration-700 no-print"
           style={{
             backgroundImage: `url(${localColors.appBackgroundImage})`,
             backgroundAttachment: 'fixed',
@@ -2302,7 +2302,7 @@ export default function App() {
       {/* High-legibility subtle tint overlay for background wallpaper */}
       {localColors.appBackgroundImage && (
         <div
-          className={`fixed inset-0 pointer-events-none z-0 no-print transition-all duration-500 ${
+          className={`fixed inset-0 pointer-events-none -z-10 no-print transition-all duration-500 ${
             theme === 'theme-glass'
               ? 'bg-slate-100/35 backdrop-blur-[2px]'
               : 'bg-[#090e1a]/45 backdrop-blur-[2px]'
@@ -2312,7 +2312,7 @@ export default function App() {
       )}
 
       {/* Dynamic ambient luminous orbs for visible glassmorphism floating depth */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 no-print" aria-hidden="true">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10 no-print" aria-hidden="true">
         <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-cyan-500/18 blur-[100px]" />
         <div className="absolute top-1/4 -right-28 w-[520px] h-[520px] rounded-full bg-indigo-600/18 blur-[120px]" />
         <div className="absolute bottom-1/4 left-1/4 w-[460px] h-[460px] rounded-full bg-purple-600/16 blur-[110px]" />
@@ -2356,7 +2356,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 pb-24 overflow-y-auto">
+      <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 pb-24 overflow-y-auto relative z-10">
         {currentView === 'dashboard' && (
           <DashboardView
             projects={projects}

@@ -244,7 +244,7 @@ export function ChecklistView({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 relative z-10">
       {/* Executive Unit Status Card with Glowing Cyan Donut Chart */}
       <div
         onMouseEnter={() => setUnitCardHoverTrigger(prev => prev + 1)}
@@ -253,7 +253,7 @@ export function ChecklistView({
           borderColor: neonColor,
           boxShadow: `0 0 30px ${hexToRgba(neonColor, 0.28)}`
         }}
-        className="rounded-3xl p-5 sm:p-6 border-2 bg-[#131b2c] text-white relative overflow-hidden"
+        className="rounded-3xl p-5 sm:p-6 border-2 bg-[#131b2c] project-card-glass text-white relative overflow-hidden"
       >
         {/* Subtle background ambient light */}
         <div
@@ -414,7 +414,7 @@ export function ChecklistView({
       )}
 
       {/* Trade Filter & Management Section */}
-      <div className="bg-[#131b2c] p-3 rounded-2xl border border-slate-700/80 shadow-md space-y-3 transition-colors">
+      <div className="bg-[#131b2c] project-card-glass p-3 rounded-2xl border border-slate-700/80 shadow-md space-y-3 transition-colors relative z-10">
         {/* Navigation Tabs Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
           <div className="flex items-center gap-1.5 p-1 bg-[#151f33]/90 border border-slate-700/80 rounded-xl">
@@ -610,7 +610,7 @@ export function ChecklistView({
       </div>
 
       {/* Task Status Filters - Executive Capsule Pills */}
-      <div className="bg-[#131b2c] p-2.5 rounded-2xl border border-slate-700/80 shadow-md space-y-2 transition-colors select-none">
+      <div className="bg-[#131b2c] project-card-glass p-2.5 rounded-2xl border border-slate-700/80 shadow-md space-y-2 transition-colors select-none relative z-10">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-black uppercase tracking-wider text-slate-300">
             Estado de Tareas:
@@ -669,23 +669,23 @@ export function ChecklistView({
       </div>
 
       {/* Expand / Collapse Controls */}
-      <div className="flex gap-2 select-none">
+      <div className="flex gap-2 select-none relative z-10">
         <button
           onClick={() => toggleAll(true)}
-          className="flex-1 bg-[#131b2c] border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+          className="flex-1 bg-[#131b2c] project-card-glass border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
         >
           <ChevronsDown className="w-3.5 h-3.5 text-[#00f2fe]" /> Expandir Todo
         </button>
         <button
           onClick={() => toggleAll(false)}
-          className="flex-1 bg-[#131b2c] border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
+          className="flex-1 bg-[#131b2c] project-card-glass border border-slate-700/80 text-slate-300 hover:text-white hover:border-[#00f2fe]/60 py-2 rounded-xl text-xs font-bold touch-target flex items-center justify-center gap-1.5 shadow-2xs transition-all"
         >
           <ChevronsUp className="w-3.5 h-3.5 text-[#00f2fe]" /> Colapsar
         </button>
       </div>
 
       {/* Trades Accordion */}
-      <div className="space-y-3">
+      <div className="space-y-3 relative z-10">
         {unitTradesList.map(trade => {
           if (!isTradeMatchingFilter(trade, selectedTradeFilter)) {
             return null;
@@ -723,7 +723,7 @@ export function ChecklistView({
                 borderColor: neonColor,
                 boxShadow: `0 0 24px ${hexToRgba(neonColor, 0.32)}`
               } : undefined}
-              className={`rounded-2xl shadow-md overflow-hidden transition-all duration-300 ${
+              className={`rounded-2xl shadow-md overflow-hidden transition-all duration-300 relative z-10 project-card-glass ${
                 isTradeActive
                   ? 'border-2 bg-[#131b2c]'
                   : 'border border-slate-700/80 hover:border-slate-500 bg-[#131b2c]'
