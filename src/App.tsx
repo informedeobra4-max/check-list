@@ -327,7 +327,7 @@ export default function App() {
     };
   });
 
-  // Colores de fondo, presentación, neón e imagen de wallpaper exclusivos y locales de este dispositivo
+  // Colores de fondo, presentación, neón, tipografía e imagen de wallpaper exclusivos y locales de este dispositivo
   const [localColors, setLocalColors] = useState<LocalColors>(() => {
     try {
       const storedColors = localStorage.getItem(STORAGE_KEY_LOCAL_COLORS);
@@ -337,7 +337,9 @@ export default function App() {
           appBackground: parsed.appBackground || '',
           presentationBackground: parsed.presentationBackground || '',
           neonColor: parsed.neonColor || '#00f2fe',
-          appBackgroundImage: parsed.appBackgroundImage || ''
+          appBackgroundImage: parsed.appBackgroundImage || '',
+          fontFamily: parsed.fontFamily || "'Inter', sans-serif",
+          isBoldText: Boolean(parsed.isBoldText)
         };
       }
       // Retrocompatibilidad: si ya se habían guardado colores en STORAGE_KEY_LOGOS en este dispositivo
@@ -349,7 +351,9 @@ export default function App() {
             appBackground: parsed.appBackground || '',
             presentationBackground: parsed.presentationBackground || '',
             neonColor: parsed.neonColor || '#00f2fe',
-            appBackgroundImage: parsed.appBackgroundImage || ''
+            appBackgroundImage: parsed.appBackgroundImage || '',
+            fontFamily: parsed.fontFamily || "'Inter', sans-serif",
+            isBoldText: Boolean(parsed.isBoldText)
           };
           localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(migrated));
           return migrated;
@@ -362,11 +366,13 @@ export default function App() {
       appBackground: '',
       presentationBackground: '',
       neonColor: '#00f2fe',
-      appBackgroundImage: ''
+      appBackgroundImage: '',
+      fontFamily: "'Inter', sans-serif",
+      isBoldText: false
     };
   });
 
-  // Guardado persistente exclusivo en localStorage y sincronización con html, body y variables de neón
+  // Guardado persistente exclusivo en localStorage y sincronización con html, body, fuentes y variables de neón
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_LOCAL_COLORS, JSON.stringify(localColors));
@@ -404,6 +410,19 @@ export default function App() {
     document.documentElement.style.setProperty('--neon-color', activeNeon);
     document.documentElement.style.setProperty('--neon-glow', hexToRgba(activeNeon, 0.38));
     document.documentElement.style.setProperty('--neon-glow-soft', hexToRgba(activeNeon, 0.15));
+
+    // Aplicar tipografía dinámica y modo negrita
+    const activeFont = localColors.fontFamily || "'Inter', sans-serif";
+    document.documentElement.style.setProperty('--app-font-family', activeFont);
+    document.body.style.setProperty('--app-font-family', activeFont);
+
+    if (localColors.isBoldText) {
+      document.documentElement.classList.add('font-bold-mode');
+      document.body.classList.add('font-bold-mode');
+    } else {
+      document.documentElement.classList.remove('font-bold-mode');
+      document.body.classList.remove('font-bold-mode');
+    }
   }, [localColors]);
 
   // Tema: Tema 1 (Apariencia Original Oscura) vs Tema 2 (Nueva Apariencia Minimalista / Glassmorphism)
@@ -2641,6 +2660,8 @@ export default function App() {
         localAppBackgroundImage={localColors.appBackgroundImage}
         localPresentationBackground={localColors.presentationBackground}
         localNeonColor={localColors.neonColor || '#00f2fe'}
+        localFontFamily={localColors.fontFamily}
+        localIsBoldText={localColors.isBoldText}
         initialTarget={logoEditorTarget}
         theme={theme}
         onToggleTheme={handleSetTheme}

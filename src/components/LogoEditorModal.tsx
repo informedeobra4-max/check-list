@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check, Sparkles, Sun, Moon, Tablet, Maximize2, User, Trash2 } from 'lucide-react';
-import { CustomLogos } from '../types';
+import { X, Image as ImageIcon, Upload, Link as LinkIcon, RotateCcw, Save, ShieldCheck, Palette, Check, Sparkles, Sun, Moon, Tablet, Maximize2, User, Trash2, Type, Bold } from 'lucide-react';
+import { CustomLogos, LocalColors } from '../types';
 import { DEFAULT_LOGO_URL } from '../data/initialData';
 import { compressImageFile, hexToRgba } from '../utils/calculations';
+
+export const FONT_FAMILY_PRESETS = [
+  { label: 'Inter (Predeterminada)', value: "'Inter', sans-serif" },
+  { label: 'Roboto (Google)', value: "'Roboto', sans-serif" },
+  { label: 'Montserrat (Arquitectura)', value: "'Montserrat', sans-serif" },
+  { label: 'Poppins (Moderna)', value: "'Poppins', sans-serif" },
+  { label: 'Plus Jakarta Sans (Ejecutiva)', value: "'Plus Jakarta Sans', sans-serif" },
+  { label: 'Outfit (Minimalista Tech)', value: "'Outfit', sans-serif" },
+  { label: 'Space Grotesk (Ingeniería)', value: "'Space Grotesk', sans-serif" },
+  { label: 'Sistema / Estándar', value: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }
+];
 
 interface LogoEditorModalProps {
   isOpen: boolean;
@@ -11,27 +22,19 @@ interface LogoEditorModalProps {
   localAppBackgroundImage?: string;
   localPresentationBackground?: string;
   localNeonColor?: string;
+  localFontFamily?: string;
+  localIsBoldText?: boolean;
   initialTarget?: 'header' | 'banner';
   theme?: 'theme-original' | 'theme-glass' | 'light' | 'dark';
   onToggleTheme?: (theme: 'theme-original' | 'theme-glass' | 'light' | 'dark') => void;
   onForceLandscape?: () => void;
   onClose: () => void;
   onUpdateLocalColors?: (
-    colors: Partial<{
-      appBackground: string;
-      presentationBackground: string;
-      neonColor: string;
-      appBackgroundImage: string;
-    }>
+    colors: Partial<LocalColors>
   ) => void;
   onSaveLogos: (
     logos: CustomLogos,
-    localColors?: {
-      appBackground: string;
-      presentationBackground: string;
-      neonColor?: string;
-      appBackgroundImage?: string;
-    }
+    localColors?: LocalColors
   ) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
@@ -141,6 +144,8 @@ export function LogoEditorModal({
   localAppBackgroundImage = '',
   localPresentationBackground = '',
   localNeonColor = '#00f2fe',
+  localFontFamily = "'Inter', sans-serif",
+  localIsBoldText = false,
   initialTarget = 'header',
   theme = 'dark',
   onToggleTheme,
@@ -160,6 +165,8 @@ export function LogoEditorModal({
   const [bgImageUrlInput, setBgImageUrlInput] = useState<string>('');
   const [presentationBg, setPresentationBg] = useState<string>(localPresentationBackground);
   const [neonColor, setNeonColor] = useState<string>(localNeonColor || '#00f2fe');
+  const [fontFamily, setFontFamily] = useState<string>(localFontFamily || "'Inter', sans-serif");
+  const [isBoldText, setIsBoldText] = useState<boolean>(Boolean(localIsBoldText));
 
   useEffect(() => {
     if (isOpen) {
@@ -167,9 +174,11 @@ export function LogoEditorModal({
       setAppBgImage(localAppBackgroundImage || '');
       setPresentationBg(localPresentationBackground);
       setNeonColor(localNeonColor || '#00f2fe');
+      setFontFamily(localFontFamily || "'Inter', sans-serif");
+      setIsBoldText(Boolean(localIsBoldText));
       setTempPreview(initialTarget === 'header' ? currentLogos.header : currentLogos.banner);
     }
-  }, [isOpen, localAppBackground, localAppBackgroundImage, localPresentationBackground, localNeonColor, currentLogos, initialTarget]);
+  }, [isOpen, localAppBackground, localAppBackgroundImage, localPresentationBackground, localNeonColor, localFontFamily, localIsBoldText, currentLogos, initialTarget]);
 
   if (!isOpen) return null;
 
@@ -240,11 +249,13 @@ export function LogoEditorModal({
       ...currentLogos,
       [target]: tempPreview
     };
-    const localColors = {
+    const localColors: LocalColors = {
       appBackground: appBg,
       presentationBackground: presentationBg,
       neonColor: neonColor || '#00f2fe',
-      appBackgroundImage: appBgImage
+      appBackgroundImage: appBgImage,
+      fontFamily: fontFamily || "'Inter', sans-serif",
+      isBoldText: isBoldText
     };
     onSaveLogos(updatedLogos, localColors);
     onClose();
@@ -256,12 +267,21 @@ export function LogoEditorModal({
     setAppBgImage('');
     setPresentationBg('');
     setNeonColor('#00f2fe');
-    onUpdateLocalColors?.({ appBackground: '', appBackgroundImage: '', presentationBackground: '', neonColor: '#00f2fe' });
-    onShowToast('Colores, fondo y neón restablecidos a los originales en este dispositivo', 'RotateCcw');
+    setFontFamily("'Inter', sans-serif");
+    setIsBoldText(false);
+    onUpdateLocalColors?.({
+      appBackground: '',
+      appBackgroundImage: '',
+      presentationBackground: '',
+      neonColor: '#00f2fe',
+      fontFamily: "'Inter', sans-serif",
+      isBoldText: false
+    });
+    onShowToast('Colores, fondo, tipografía y neón restablecidos a los originales', 'RotateCcw');
   };
 
   const handleReset = () => {
-    if (confirm('¿Restablecer logotipos y colores al diseño original?')) {
+    if (confirm('¿Restablecer logotipos, tipografía y colores al diseño original?')) {
       const resetLogos: CustomLogos = {
         header: DEFAULT_LOGO_URL,
         banner: DEFAULT_LOGO_URL
@@ -271,10 +291,26 @@ export function LogoEditorModal({
       setAppBgImage('');
       setPresentationBg('');
       setNeonColor('#00f2fe');
-      onUpdateLocalColors?.({ appBackground: '', appBackgroundImage: '', presentationBackground: '', neonColor: '#00f2fe' });
-      onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '', neonColor: '#00f2fe', appBackgroundImage: '' });
+      setFontFamily("'Inter', sans-serif");
+      setIsBoldText(false);
+      onUpdateLocalColors?.({
+        appBackground: '',
+        appBackgroundImage: '',
+        presentationBackground: '',
+        neonColor: '#00f2fe',
+        fontFamily: "'Inter', sans-serif",
+        isBoldText: false
+      });
+      onSaveLogos(resetLogos, {
+        appBackground: '',
+        presentationBackground: '',
+        neonColor: '#00f2fe',
+        appBackgroundImage: '',
+        fontFamily: "'Inter', sans-serif",
+        isBoldText: false
+      });
       onClose();
-      onShowToast('Logotipos, fondos y colores restablecidos al original', 'RotateCcw');
+      onShowToast('Logotipos, fondos, colores y tipografía restablecidos al original', 'RotateCcw');
     }
   };
 
@@ -411,6 +447,109 @@ export function LogoEditorModal({
               <RotateCcw className="w-3 h-3 text-slate-500" />
               <span>Rotación Libre</span>
             </button>
+          </div>
+        </div>
+
+        {/* Sector 3: Tipografía y Estilo de Letra (Negrita) */}
+        <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <Type className="w-3.5 h-3.5 text-amber-500" />
+              <span>Tipografía y Estilo de Texto</span>
+            </label>
+            <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+              {isBoldText ? 'Negrita Activa' : 'Normal'}
+            </span>
+          </div>
+
+          {/* Selector de Familia Tipográfica */}
+          <div className="mb-2.5">
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              Fuente para toda la aplicación:
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {FONT_FAMILY_PRESETS.map((f) => {
+                const isSelected = (fontFamily || "'Inter', sans-serif").toLowerCase() === f.value.toLowerCase();
+                return (
+                  <button
+                    key={f.label}
+                    type="button"
+                    onClick={() => {
+                      setFontFamily(f.value);
+                      onUpdateLocalColors?.({ fontFamily: f.value });
+                    }}
+                    style={{ fontFamily: f.value }}
+                    className={`py-1.5 px-2 rounded-lg text-xs transition-all text-left flex items-center justify-between border ${
+                      isSelected
+                        ? 'border-amber-500 bg-white text-slate-950 ring-2 ring-amber-500/30 font-bold shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span className="truncate">{f.label.split(' ')[0]}</span>
+                    {isSelected && (
+                      <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Toggle de Modo Negrita (Bold) */}
+          <div className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                isBoldText ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-100 text-slate-600 font-bold'
+              }`}>
+                <Bold className="w-4 h-4 stroke-[2.5]" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-800 block leading-tight">
+                  Texto en Negrita (Bold)
+                </span>
+                <span className="text-[10px] text-slate-500 block">
+                  Aumenta el grosor de todas las letras de la app
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextBold = !isBoldText;
+                setIsBoldText(nextBold);
+                onUpdateLocalColors?.({ isBoldText: nextBold });
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-black transition-all flex items-center gap-1 shadow-xs ${
+                isBoldText
+                  ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-500/30'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+              }`}
+            >
+              {isBoldText ? (
+                <>
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Activada</span>
+                </>
+              ) : (
+                <span>Desactivada</span>
+              )}
+            </button>
+          </div>
+
+          {/* Vista previa en vivo de texto */}
+          <div
+            className="mt-2 p-2 rounded-lg bg-slate-900 text-white text-center border border-slate-800"
+            style={{ fontFamily: fontFamily || "'Inter', sans-serif" }}
+          >
+            <p className={`text-xs ${isBoldText ? 'font-black text-amber-400' : 'font-normal text-slate-300'}`}>
+              Vista previa: Control de Avance de Obra 2026
+            </p>
+            <p className={`text-[10px] mt-0.5 ${isBoldText ? 'font-bold text-white' : 'font-light text-slate-400'}`}>
+              Tipografía: {FONT_FAMILY_PRESETS.find(f => f.value.toLowerCase() === (fontFamily || '').toLowerCase())?.label || 'Personalizada'} {isBoldText ? '• (Negrita Activa)' : ''}
+            </p>
           </div>
         </div>
 

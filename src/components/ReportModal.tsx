@@ -42,6 +42,7 @@ export function ReportModal({
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
   const [includeGantt, setIncludeGantt] = useState<boolean>(true);
   const [includeUnitsProgress, setIncludeUnitsProgress] = useState<boolean>(true);
+  const [onlyGanttLandscape, setOnlyGanttLandscape] = useState<boolean>(false);
 
   // Synchronize scope with defaultScope on open or when defaultScope changes
   useEffect(() => {
@@ -315,58 +316,103 @@ export function ReportModal({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 pt-1 text-slate-700">
-            <span className="font-bold text-[10px] uppercase text-slate-600">Incluir en PDF:</span>
-
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+            {/* Botón / Switch Exclusivo: Solo Diagrama de Gantt en Hoja Apaisada */}
+            <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border cursor-pointer transition-all shadow-xs ${
+              onlyGanttLandscape
+                ? 'bg-amber-500 text-slate-950 border-amber-600 font-black ring-2 ring-amber-500/40 shadow-sm'
+                : 'bg-white text-slate-800 border-slate-300 hover:border-amber-400 font-bold'
+            }`}>
               <input
                 type="checkbox"
-                checked={includeGantt}
-                onChange={(e) => setIncludeGantt(e.target.checked)}
-                className="rounded text-amber-500"
+                checked={onlyGanttLandscape}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setOnlyGanttLandscape(val);
+                  if (val) {
+                    setIncludeGantt(true);
+                    setIncludeUnitsProgress(false);
+                    setIncludePhotos(false);
+                    setIncludeComments(false);
+                  }
+                }}
+                className="rounded text-amber-500 w-4 h-4"
               />
-              <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-amber-600" />
-                Diagrama de Gantt
+              <span className="text-xs flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                Solo Diagrama de Gantt (Hoja Apaisada)
               </span>
             </label>
 
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
-              <input
-                type="checkbox"
-                checked={includeUnitsProgress}
-                onChange={(e) => setIncludeUnitsProgress(e.target.checked)}
-                className="rounded text-amber-500"
-              />
-              <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
-                <Building2 className="w-3 h-3 text-amber-600" />
-                Avance por Depto ({projectUnits.length})
-              </span>
-            </label>
+            {/* Botón directo para apagar / encender departamentos */}
+            <button
+              type="button"
+              onClick={() => setIncludeUnitsProgress(!includeUnitsProgress)}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                !includeUnitsProgress
+                  ? 'bg-rose-100 text-rose-800 border-rose-300 shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+              }`}
+              title={includeUnitsProgress ? 'Apagar / ocultar todos los departamentos' : 'Encender departamentos'}
+            >
+              {!includeUnitsProgress ? '✕ Deptos Apagados' : 'Apagar todos los Deptos'}
+            </button>
 
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
-              <input
-                type="checkbox"
-                checked={includePhotos}
-                onChange={(e) => setIncludePhotos(e.target.checked)}
-                className="rounded text-amber-500"
-              />
-              <span className="text-[11px] font-semibold text-slate-800">
-                Evidencias ({totalPhotos})
-              </span>
-            </label>
+            <span className="font-bold text-[10px] uppercase text-slate-500 ml-1">Incluir:</span>
 
-            <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
-              <input
-                type="checkbox"
-                checked={includeComments}
-                onChange={(e) => setIncludeComments(e.target.checked)}
-                className="rounded text-amber-500"
-              />
-              <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
-                <MessageSquare className="w-3 h-3 text-amber-600" />
-                Notas ({totalComments})
-              </span>
-            </label>
+            {!onlyGanttLandscape && (
+              <>
+                <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeGantt}
+                    onChange={(e) => setIncludeGantt(e.target.checked)}
+                    className="rounded text-amber-500"
+                  />
+                  <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-amber-600" />
+                    Diagrama de Gantt
+                  </span>
+                </label>
+
+                <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeUnitsProgress}
+                    onChange={(e) => setIncludeUnitsProgress(e.target.checked)}
+                    className="rounded text-amber-500"
+                  />
+                  <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-amber-600" />
+                    Avance por Depto ({projectUnits.length})
+                  </span>
+                </label>
+
+                <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includePhotos}
+                    onChange={(e) => setIncludePhotos(e.target.checked)}
+                    className="rounded text-amber-500"
+                  />
+                  <span className="text-[11px] font-semibold text-slate-800">
+                    Evidencias ({totalPhotos})
+                  </span>
+                </label>
+
+                <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeComments}
+                    onChange={(e) => setIncludeComments(e.target.checked)}
+                    className="rounded text-amber-500"
+                  />
+                  <span className="text-[11px] font-semibold text-slate-800 flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3 text-amber-600" />
+                    Notas ({totalComments})
+                  </span>
+                </label>
+              </>
+            )}
 
             <label className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 cursor-pointer shadow-2xs hover:border-amber-400 transition-colors">
               <input
@@ -384,7 +430,27 @@ export function ReportModal({
 
         {/* Printable Document Sheet - Panoramic Landscape Layout */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-slate-200/80">
-          <div className="bg-white shadow-xl max-w-5xl w-full mx-auto rounded-lg p-5 sm:p-8 text-slate-900 border border-slate-300 printable-document-container">
+          {/* Dynamic print stylesheet for landscape orientation */}
+          <style>{`
+            @media print {
+              @page {
+                size: landscape !important;
+                margin: 6mm !important;
+              }
+              body {
+                background: #ffffff !important;
+              }
+              .printable-document-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+              }
+            }
+          `}</style>
+          <div className={`bg-white shadow-xl ${onlyGanttLandscape ? 'max-w-6xl' : 'max-w-5xl'} w-full mx-auto rounded-lg p-5 sm:p-8 text-slate-900 border border-slate-300 printable-document-container`}>
             {/* Header */}
             <div className="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
@@ -397,7 +463,7 @@ export function ReportModal({
                 </div>
                 <div>
                   <span className="text-[9px] font-black tracking-widest uppercase bg-slate-900 text-amber-400 px-2 py-0.5 rounded">
-                    Acta de Inspección Técnica
+                    {onlyGanttLandscape ? 'Cronograma Técnico & Diagrama de Gantt' : 'Acta de Inspección Técnica'}
                   </span>
                   <h2 className="text-base font-black text-slate-900 uppercase mt-0.5">
                     {targetProject.name}
@@ -409,12 +475,12 @@ export function ReportModal({
               </div>
 
               <div className="text-right flex-shrink-0">
-                <div className="inline-block px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-center">
-                  <span className="text-xl font-black font-mono text-slate-900">
+                <div className="inline-block px-3.5 py-1.5 bg-amber-50 border-2 border-amber-500 rounded-xl text-center shadow-xs">
+                  <span className="text-xl sm:text-2xl font-black font-mono text-slate-950">
                     {overallPct}%
                   </span>
-                  <span className="block text-[9px] font-bold text-slate-500 uppercase">
-                    Avance Auditado
+                  <span className="block text-[8px] sm:text-[9px] font-black text-amber-800 uppercase tracking-wider">
+                    {onlyGanttLandscape ? 'Porcentaje Acumulado Total' : 'Avance Auditado'}
                   </span>
                 </div>
               </div>
@@ -423,49 +489,65 @@ export function ReportModal({
             {/* Metadata Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs mb-4">
               <div>
-                <span className="block text-[9px] text-slate-500 uppercase font-bold">Alcance</span>
-                <span className="font-bold text-slate-800">
-                  {isUnitScope ? targetUnit!.name : `Toda la Obra (${targetProject.units.length} Deptos)`}
+                <span className="block text-[9px] text-slate-500 uppercase font-bold">
+                  {onlyGanttLandscape ? 'Proyecto / Obra' : 'Alcance'}
+                </span>
+                <span className="font-bold text-slate-800 truncate block">
+                  {onlyGanttLandscape
+                    ? `${targetProject.name} (Gantt Completo)`
+                    : isUnitScope
+                    ? targetUnit!.name
+                    : `Toda la Obra (${targetProject.units.length} Deptos)`}
                 </span>
               </div>
               <div>
-                <span className="block text-[9px] text-slate-500 uppercase font-bold">Fecha Emisión</span>
+                <span className="block text-[9px] text-slate-500 uppercase font-bold">Fecha de Emisión</span>
                 <span className="font-bold text-slate-800">{dateString}</span>
               </div>
               <div>
-                <span className="block text-[9px] text-slate-500 uppercase font-bold">Hora</span>
-                <span className="font-bold text-slate-800">{timeString} hs</span>
+                <span className="block text-[9px] text-slate-500 uppercase font-bold">
+                  {onlyGanttLandscape && ganttData ? 'Período Cronograma' : 'Hora'}
+                </span>
+                <span className="font-bold text-slate-800 truncate block">
+                  {onlyGanttLandscape && ganttData
+                    ? `${ganttData.startDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })} — ${ganttData.endDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}`
+                    : `${timeString} hs`}
+                </span>
               </div>
               <div>
-                <span className="block text-[9px] text-slate-500 uppercase font-bold">Inspector</span>
-                <span className="font-bold text-slate-800 truncate block">{inspectorName}</span>
+                <span className="block text-[9px] text-slate-500 uppercase font-bold">Inspector / Supervisor</span>
+                <span className="font-bold text-slate-900 truncate block bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                  {inspectorName || 'No asignado'}
+                </span>
               </div>
             </div>
 
-            {/* Specialty Breakdown */}
-            <div className="mb-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 border-b border-slate-200 pb-1">
-                1. Consolidado de Avance por Especialidad / Gremio
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {tradeSummaries.map(ts => (
-                  <div
-                    key={ts.id}
-                    className="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between"
-                  >
-                    <span className="font-bold text-slate-800">{ts.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {ts.done}/{ts.total}
-                      </span>
-                      <span className={`font-mono font-bold ${ts.pct === 100 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                        {ts.pct}%
-                      </span>
+            {/* Specialty Breakdown (Oculto en modo Solo Gantt) */}
+            {!onlyGanttLandscape && (
+              <div className="mb-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 border-b border-slate-200 pb-1">
+                  1. Consolidado de Avance por Especialidad / Gremio
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {tradeSummaries.map(ts => (
+                    <div
+                      key={ts.id}
+                      className="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between"
+                    >
+                      <span className="font-bold text-slate-800">{ts.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {ts.done}/{ts.total}
+                        </span>
+                        <span className={`font-mono font-bold ${ts.pct === 100 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {ts.pct}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* 2. Executive Gantt Chart Section */}
             {includeGantt && ganttData && (
@@ -473,7 +555,7 @@ export function ReportModal({
                 <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                    2. Cronograma de Obra y Diagrama de Gantt
+                    {onlyGanttLandscape ? 'Diagrama de Gantt con Responsables y Cronograma Integral' : '2. Cronograma de Obra y Diagrama de Gantt'}
                   </h4>
                   <span className="text-[10px] font-bold text-slate-600 font-mono">
                     Período: {ganttData.startDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })} — {ganttData.endDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
@@ -623,7 +705,7 @@ export function ReportModal({
             )}
 
             {/* 3. Department / Units Individual Progress Section */}
-            {includeUnitsProgress && projectUnits.length > 0 && (
+            {includeUnitsProgress && !onlyGanttLandscape && projectUnits.length > 0 && (
               <div className="mb-6 page-break-inside-avoid">
                 <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
@@ -748,10 +830,11 @@ export function ReportModal({
             )}
 
             {/* 4. Checklist Details and Photo Evidence */}
-            <div className="mb-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 border-b border-slate-200 pb-1">
-                4. Detalle de Control y Evidencias Fotográficas ({totalPhotos} Fotos)
-              </h4>
+            {!onlyGanttLandscape && (
+              <div className="mb-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 mb-2 border-b border-slate-200 pb-1">
+                  4. Detalle de Control y Evidencias Fotográficas ({totalPhotos} Fotos)
+                </h4>
 
               {tradeSummaries.map(ts => (
                 <div key={ts.id} className="mb-3 page-break-inside-avoid">
@@ -853,12 +936,13 @@ export function ReportModal({
                 </div>
               ))}
             </div>
+          )}
 
-            {/* Signatures & Acceptance Certificate */}
+          {/* Signatures & Acceptance Certificate */}
             {includeSignatures && (
               <div className="mt-8 pt-4 border-t-2 border-slate-900 page-break-inside-avoid">
                 <h4 className="text-xs font-black uppercase text-slate-800 mb-6 text-center">
-                  5. Firmas de Conformidad y Recepción Técnica
+                  {onlyGanttLandscape ? 'Validación y Firmas Técnicas de Cronograma' : '5. Firmas de Conformidad y Recepción Técnica'}
                 </h4>
 
                 {isUnitScope && targetUnit?.signature ? (

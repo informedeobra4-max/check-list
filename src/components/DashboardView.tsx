@@ -122,7 +122,7 @@ export function DashboardView({
       <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-1 text-xs select-none">
         {/* Left Filter Capsule Pills */}
         <div className="flex items-center space-x-2 sm:space-x-2.5 flex-shrink-0">
-          {/* All */}
+          {/* Todos */}
           <button
             onClick={() => setFilter('all')}
             className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
@@ -132,10 +132,10 @@ export function DashboardView({
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>All</span>
+            <span>Todos</span>
           </button>
 
-          {/* Completed */}
+          {/* Completados */}
           <button
             onClick={() => setFilter('completed')}
             className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
@@ -145,10 +145,10 @@ export function DashboardView({
             }`}
           >
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Completed</span>
+            <span>Completados</span>
           </button>
 
-          {/* In-Process */}
+          {/* En Proceso */}
           <button
             onClick={() => setFilter('in_progress')}
             className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
@@ -158,10 +158,10 @@ export function DashboardView({
             }`}
           >
             <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>In-Process</span>
+            <span>En Proceso</span>
           </button>
 
-          {/* Pending */}
+          {/* Pendientes */}
           <button
             onClick={() => setFilter('pending')}
             className={`px-3.5 sm:px-4 py-1.5 rounded-full font-bold transition-all border text-xs flex items-center gap-1.5 touch-target ${
@@ -171,7 +171,7 @@ export function DashboardView({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-            <span>Pending</span>
+            <span>Pendientes</span>
           </button>
         </div>
 

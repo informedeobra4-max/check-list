@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { FileText, ArrowLeft, Sun, Moon, Cloud, CloudOff, RefreshCw, AlertCircle, Building2, Menu, Bell, User } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { FileText, ArrowLeft, Sun, Moon, Cloud, CloudOff, RefreshCw, Building2, MoreVertical, User } from 'lucide-react';
 import { ViewMode, Project, Unit } from '../types';
 import { compressImageFile } from '../utils/calculations';
 import { CloudSyncStatus } from '../lib/supabase';
@@ -39,6 +39,22 @@ export function Header({
   onOpenCloudSetup
 }: HeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   const handleLogoClick = () => {
     if (onOpenLogoEditor) {
@@ -67,15 +83,162 @@ export function Header({
     <>
       <header className="bg-[#0e1422] text-white border-b border-slate-800/80 sticky top-0 z-40 shadow-lg no-print">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
-          {/* Left: Menu Hamburger + Interactive Logo + CONTROL DE AVANCE */}
+          {/* Left: 3-Dots Menu Dropdown + Interactive Logo + CONTROL DE AVANCE */}
           <div className="flex items-center space-x-2.5">
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 rounded-xl transition-colors touch-target"
-              title="Menú principal"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {/* 3-Dots Menu Trigger */}
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className={`p-1.5 rounded-xl transition-all touch-target flex items-center justify-center ${
+                  isMenuOpen
+                    ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/50'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title="Opciones y Configuración"
+                aria-label="Abrir menú de configuración y temas"
+              >
+                <MoreVertical className="w-5 h-5 stroke-[2.5]" />
+              </button>
+
+              {/* 3-Dots Dropdown Menu */}
+              {isMenuOpen && (
+                <div className="absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl bg-[#0f172a] border border-slate-700/80 shadow-2xl p-2 z-50 text-slate-200 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-2 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                      Menú & Opciones
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">Control Obra</span>
+                  </div>
+
+                  {/* 1. Perfil de Usuario & Tipografía */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenLogoEditor?.();
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800/80 text-white flex items-center gap-3 transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-black text-white">Perfil de Usuario</div>
+                      <div className="text-[10px] text-slate-400 truncate">
+                        Tipografía, negrita, fondos y logotipo
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* 2. Cambiar Tema Visual */}
+                  {onToggleTheme && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onToggleTheme();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800/80 text-white flex items-center gap-3 transition-colors group"
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                        theme === 'theme-glass' || theme === 'light'
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'bg-indigo-500/20 text-indigo-400'
+                      }`}>
+                        {theme === 'theme-glass' || theme === 'light' ? (
+                          <Moon className="w-4 h-4" />
+                        ) : (
+                          <Sun className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-black text-white">Cambiar Tema Visual</div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {theme === 'theme-glass' || theme === 'light'
+                            ? 'Tema 2 Glassmorphism activo (Tocar para Original)'
+                            : 'Tema 1 Original Oscuro activo (Tocar para Glass)'}
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                        theme === 'theme-glass' || theme === 'light'
+                          ? 'bg-amber-400/20 text-amber-300'
+                          : 'bg-indigo-400/20 text-indigo-300'
+                      }`}>
+                        {theme === 'theme-glass' || theme === 'light' ? 'Glass' : 'Original'}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* 3. Sincronización en la Nube Supabase */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onOpenCloudSetup?.();
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800/80 text-white flex items-center gap-3 transition-colors group"
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                      cloudStatus === 'synced'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : cloudStatus === 'syncing'
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-slate-700/40 text-slate-400'
+                    }`}>
+                      {cloudStatus === 'synced' ? (
+                        <Cloud className="w-4 h-4" />
+                      ) : cloudStatus === 'syncing' ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CloudOff className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-black text-white">Sincronización en la Nube</div>
+                      <div className="text-[10px] text-slate-400 truncate">
+                        {cloudStatus === 'synced'
+                          ? 'Supabase: Conectado y Sincronizado'
+                          : cloudStatus === 'syncing'
+                          ? 'Supabase: Guardando cambios...'
+                          : cloudStatus === 'needs_setup'
+                          ? 'Tocar para configurar tabla en la nube'
+                          : 'Modo local activo'}
+                      </div>
+                    </div>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                      cloudStatus === 'synced'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : cloudStatus === 'syncing'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}>
+                      {cloudStatus === 'synced' ? 'Online' : cloudStatus === 'syncing' ? 'Sync' : 'Local'}
+                    </span>
+                  </button>
+
+                  {/* 4. Inicio / Mis Obras */}
+                  <div className="border-t border-slate-800/80 my-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onNavigate('dashboard');
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/80 text-white flex items-center gap-3 transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-black text-white">Panel de Obras</div>
+                        <div className="text-[10px] text-slate-400">Volver a la vista general</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Logo Touch Trigger */}
             <div
@@ -139,77 +302,8 @@ export function Header({
             </span>
           </div>
 
-          {/* Right: Cloud Sync Status + Bell + User Avatar */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {cloudStatus && (
-              <button
-                type="button"
-                onClick={onOpenCloudSetup}
-                title={
-                  cloudStatus === 'synced'
-                    ? 'Nube Supabase: Conectado y Sincronizado'
-                    : cloudStatus === 'syncing'
-                    ? 'Nube Supabase: Sincronizando datos...'
-                    : cloudStatus === 'needs_setup'
-                    ? 'Nube Supabase: Toca aquí para ver cómo activar la tabla'
-                    : 'Nube Supabase: Modo Local'
-                }
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all select-none touch-target ${
-                  cloudStatus === 'synced'
-                    ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-950/70 cursor-pointer'
-                    : cloudStatus === 'syncing'
-                    ? 'text-amber-400 bg-amber-950/40 border border-amber-500/30'
-                    : 'text-slate-400 bg-slate-800/40 border border-slate-700/50'
-                }`}
-              >
-                {cloudStatus === 'synced' && <Cloud className="w-3.5 h-3.5" />}
-                {cloudStatus === 'syncing' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                {cloudStatus !== 'synced' && cloudStatus !== 'syncing' && <CloudOff className="w-3.5 h-3.5" />}
-              </button>
-            )}
-
-            {/* Selector de Tema (Theme Toggle): Tema 1 (Original) vs Tema 2 (Glassmorphism) */}
-            {onToggleTheme && (
-              <button
-                type="button"
-                onClick={onToggleTheme}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm touch-target ${
-                  theme === 'theme-glass' || theme === 'light'
-                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
-                    : 'bg-slate-800/80 hover:bg-slate-700 text-amber-400 hover:text-amber-300'
-                }`}
-                title={
-                  theme === 'theme-glass' || theme === 'light'
-                    ? 'Cambiar a Tema 1 (Apariencia Original Oscura)'
-                    : 'Cambiar a Tema 2 (Nueva Apariencia Minimalista / Glassmorphism)'
-                }
-              >
-                {theme === 'theme-glass' || theme === 'light' ? (
-                  <Moon className="w-4 h-4 text-slate-700" />
-                ) : (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                )}
-              </button>
-            )}
-
-            {/* Notification Bell */}
-            <div
-              className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 flex items-center justify-center text-slate-300 relative cursor-pointer transition-colors"
-              title="Notificaciones de obra"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-rose-500 absolute top-1 right-1" />
-            </div>
-
-            {/* User Profile Avatar */}
-            <div
-              className="w-8 h-8 rounded-full bg-[#5b4eb1] hover:bg-[#6a5cc0] flex items-center justify-center text-white shadow-md cursor-pointer hover:scale-105 transition-transform"
-              title="Perfil de usuario / Configuración"
-              onClick={onOpenLogoEditor}
-            >
-              <User className="w-4 h-4" />
-            </div>
-          </div>
+          {/* Right: Espacio completamente despejado y limpio */}
+          <div className="flex items-center gap-2" />
         </div>
 
         {/* Dynamic header contextual progress bar */}

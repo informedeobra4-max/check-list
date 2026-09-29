@@ -8,6 +8,43 @@
   --neon-color: #00f2fe;
   --neon-glow: rgba(0, 242, 254, 0.38);
   --neon-glow-soft: rgba(0, 242, 254, 0.15);
+  --app-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body, button, input, select, textarea {
+  font-family: var(--app-font-family) !important;
+}
+
+/* Modo Negrita Global (Bold Text Mode) */
+html.font-bold-mode,
+html.font-bold-mode body,
+html.font-bold-mode button,
+html.font-bold-mode input,
+html.font-bold-mode select,
+html.font-bold-mode textarea,
+html.font-bold-mode p,
+html.font-bold-mode span,
+html.font-bold-mode label,
+html.font-bold-mode a {
+  font-weight: 700;
+}
+
+html.font-bold-mode .font-normal {
+  font-weight: 600 !important;
+}
+
+html.font-bold-mode .font-medium {
+  font-weight: 700 !important;
+}
+
+html.font-bold-mode .font-semibold {
+  font-weight: 800 !important;
+}
+
+html.font-bold-mode .font-bold,
+html.font-bold-mode .font-extrabold,
+html.font-bold-mode .font-black {
+  font-weight: 900 !important;
 }
 
 @theme {

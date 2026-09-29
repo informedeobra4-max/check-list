@@ -922,7 +922,7 @@ export function UnitsView({
               }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>All</span>
+              <span>Todos</span>
               <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
                 {tabTotalCount}
               </span>
@@ -937,7 +937,7 @@ export function UnitsView({
               }`}
             >
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Completed</span>
+              <span>Completados</span>
               <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
                 {tabCompletedCount}
               </span>
@@ -952,7 +952,7 @@ export function UnitsView({
               }`}
             >
               <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>In-Process</span>
+              <span>En Proceso</span>
               <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
                 {tabInProgressCount}
               </span>
@@ -967,7 +967,7 @@ export function UnitsView({
               }`}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-              <span>Pending</span>
+              <span>Pendientes</span>
               <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
                 {tabPendingCount}
               </span>

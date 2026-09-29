@@ -630,7 +630,7 @@ export function ChecklistView({
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>All</span>
+            <span>Todos</span>
             <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {counts.total}
             </span>
@@ -645,7 +645,7 @@ export function ChecklistView({
             }`}
           >
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Completed</span>
+            <span>Completados</span>
             <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {counts.completed}
             </span>
@@ -660,7 +660,7 @@ export function ChecklistView({
             }`}
           >
             <Clock className="w-3.5 h-3.5 text-rose-400" />
-            <span>Pending</span>
+            <span>Pendientes</span>
             <span className="bg-slate-950/20 text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {counts.total - counts.completed}
             </span>
