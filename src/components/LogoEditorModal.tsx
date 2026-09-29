@@ -16,6 +16,14 @@ interface LogoEditorModalProps {
   onToggleTheme?: (theme: 'theme-original' | 'theme-glass' | 'light' | 'dark') => void;
   onForceLandscape?: () => void;
   onClose: () => void;
+  onUpdateLocalColors?: (
+    colors: Partial<{
+      appBackground: string;
+      presentationBackground: string;
+      neonColor: string;
+      appBackgroundImage: string;
+    }>
+  ) => void;
   onSaveLogos: (
     logos: CustomLogos,
     localColors?: {
@@ -138,6 +146,7 @@ export function LogoEditorModal({
   onToggleTheme,
   onForceLandscape,
   onClose,
+  onUpdateLocalColors,
   onSaveLogos,
   onShowToast
 }: LogoEditorModalProps) {
@@ -198,9 +207,10 @@ export function LogoEditorModal({
     if (!file) return;
 
     try {
-      // Compresión optimizada para fondo de pantalla full HD liviano
-      const compressed = await compressImageFile(file, 1600, 0.82);
+      // Compresión optimizada para fondo de pantalla full HD liviano y persistente
+      const compressed = await compressImageFile(file, 1280, 0.75);
       setAppBgImage(compressed);
+      onUpdateLocalColors?.({ appBackgroundImage: compressed });
       onShowToast('Fondo de pantalla cargado en vista previa', 'Image');
     } catch (err) {
       onShowToast('Error al cargar imagen de fondo', 'AlertCircle');
@@ -214,12 +224,14 @@ export function LogoEditorModal({
       return;
     }
     setAppBgImage(val);
+    onUpdateLocalColors?.({ appBackgroundImage: val });
     setBgImageUrlInput('');
     onShowToast('Fondo aplicado en vista previa', 'Image');
   };
 
   const handleRemoveBgImage = () => {
     setAppBgImage('');
+    onUpdateLocalColors?.({ appBackgroundImage: '' });
     onShowToast('Fondo de imagen eliminado (vuelve al fondo original)', 'RotateCcw');
   };
 
@@ -244,6 +256,7 @@ export function LogoEditorModal({
     setAppBgImage('');
     setPresentationBg('');
     setNeonColor('#00f2fe');
+    onUpdateLocalColors?.({ appBackground: '', appBackgroundImage: '', presentationBackground: '', neonColor: '#00f2fe' });
     onShowToast('Colores, fondo y neón restablecidos a los originales en este dispositivo', 'RotateCcw');
   };
 
@@ -258,6 +271,7 @@ export function LogoEditorModal({
       setAppBgImage('');
       setPresentationBg('');
       setNeonColor('#00f2fe');
+      onUpdateLocalColors?.({ appBackground: '', appBackgroundImage: '', presentationBackground: '', neonColor: '#00f2fe' });
       onSaveLogos(resetLogos, { appBackground: '', presentationBackground: '', neonColor: '#00f2fe', appBackgroundImage: '' });
       onClose();
       onShowToast('Logotipos, fondos y colores restablecidos al original', 'RotateCcw');
@@ -634,6 +648,7 @@ export function LogoEditorModal({
                       type="button"
                       onClick={() => {
                         setAppBgImage(wp.url);
+                        onUpdateLocalColors?.({ appBackgroundImage: wp.url });
                         onShowToast(`Fondo "${wp.label}" seleccionado`, 'Image');
                       }}
                       className={`group relative rounded-xl overflow-hidden border-2 text-left transition-all aspect-video flex flex-col justify-end p-1.5 ${
@@ -676,7 +691,10 @@ export function LogoEditorModal({
                   <input
                     type="color"
                     value={appBg || '#0f172a'}
-                    onChange={(e) => setAppBg(e.target.value)}
+                    onChange={(e) => {
+                      setAppBg(e.target.value);
+                      onUpdateLocalColors?.({ appBackground: e.target.value });
+                    }}
                     className="w-8 h-8 cursor-pointer opacity-0 absolute"
                   />
                   <span
@@ -695,7 +713,10 @@ export function LogoEditorModal({
                   <button
                     key={p.label}
                     type="button"
-                    onClick={() => setAppBg(p.value)}
+                    onClick={() => {
+                      setAppBg(p.value);
+                      onUpdateLocalColors?.({ appBackground: p.value });
+                    }}
                     className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center justify-center gap-1 ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'
@@ -727,7 +748,10 @@ export function LogoEditorModal({
                   <input
                     type="color"
                     value={presentationBg && !presentationBg.startsWith('linear') ? presentationBg : '#0f172a'}
-                    onChange={(e) => setPresentationBg(e.target.value)}
+                    onChange={(e) => {
+                      setPresentationBg(e.target.value);
+                      onUpdateLocalColors?.({ presentationBackground: e.target.value });
+                    }}
                     className="w-8 h-8 cursor-pointer opacity-0 absolute"
                   />
                   <span
@@ -746,7 +770,10 @@ export function LogoEditorModal({
                   <button
                     key={p.label}
                     type="button"
-                    onClick={() => setPresentationBg(p.value)}
+                    onClick={() => {
+                      setPresentationBg(p.value);
+                      onUpdateLocalColors?.({ presentationBackground: p.value });
+                    }}
                     className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'
@@ -779,7 +806,10 @@ export function LogoEditorModal({
                   <input
                     type="color"
                     value={neonColor || '#00f2fe'}
-                    onChange={(e) => setNeonColor(e.target.value)}
+                    onChange={(e) => {
+                      setNeonColor(e.target.value);
+                      onUpdateLocalColors?.({ neonColor: e.target.value });
+                    }}
                     className="w-8 h-8 cursor-pointer opacity-0 absolute"
                   />
                   <span
@@ -828,7 +858,10 @@ export function LogoEditorModal({
                   <button
                     key={p.label}
                     type="button"
-                    onClick={() => setNeonColor(p.value)}
+                    onClick={() => {
+                      setNeonColor(p.value);
+                      onUpdateLocalColors?.({ neonColor: p.value });
+                    }}
                     className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
                       isSelected
                         ? 'border-amber-500 ring-2 ring-amber-500/40 bg-white text-slate-900 shadow-xs font-black'

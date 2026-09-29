@@ -374,12 +374,30 @@ export default function App() {
       console.error('Error saving local colors to localStorage:', e);
     }
 
+    const hasCustomBg = Boolean(localColors.appBackground || localColors.appBackgroundImage);
+    if (hasCustomBg) {
+      document.documentElement.classList.add('has-custom-bg');
+      document.body.classList.add('has-custom-bg');
+    } else {
+      document.documentElement.classList.remove('has-custom-bg');
+      document.body.classList.remove('has-custom-bg');
+    }
+
     if (localColors.appBackground && !localColors.appBackgroundImage) {
       document.documentElement.style.backgroundColor = localColors.appBackground;
       document.body.style.backgroundColor = localColors.appBackground;
+      document.documentElement.style.backgroundImage = 'none';
+      document.body.style.backgroundImage = 'none';
+    } else if (localColors.appBackgroundImage) {
+      document.documentElement.style.backgroundColor = 'transparent';
+      document.body.style.backgroundColor = 'transparent';
+      document.documentElement.style.backgroundImage = 'none';
+      document.body.style.backgroundImage = 'none';
     } else {
       document.documentElement.style.backgroundColor = '';
       document.body.style.backgroundColor = '';
+      document.documentElement.style.backgroundImage = '';
+      document.body.style.backgroundImage = '';
     }
 
     const activeNeon = localColors.neonColor || '#00f2fe';
@@ -446,7 +464,7 @@ export default function App() {
       document.documentElement.classList.remove('light', 'theme-glass');
       document.body.classList.add('theme-original');
       document.body.classList.remove('theme-glass');
-      if (!localColors.appBackground) {
+      if (!localColors.appBackground && !localColors.appBackgroundImage) {
         document.documentElement.style.backgroundColor = '#0e1422';
         document.body.style.backgroundColor = '#0e1422';
       }
@@ -455,12 +473,12 @@ export default function App() {
       document.documentElement.classList.add('light', 'theme-glass');
       document.body.classList.add('theme-glass');
       document.body.classList.remove('theme-original');
-      if (!localColors.appBackground) {
+      if (!localColors.appBackground && !localColors.appBackgroundImage) {
         document.documentElement.style.backgroundColor = '#f1f4f9';
         document.body.style.backgroundColor = '#f1f4f9';
       }
     }
-  }, [theme, localColors.appBackground]);
+  }, [theme, localColors.appBackground, localColors.appBackgroundImage]);
 
   // Forzar / gestionar orientación apaisada para tablets
   const handleForceLandscape = async () => {
@@ -2277,19 +2295,26 @@ export default function App() {
           : theme === 'theme-glass' ? 'bg-[#f1f4f9] text-slate-900' : 'bg-[#0e1422] text-slate-100'
       }`}
       style={{
-        background: localColors.appBackgroundImage
+        backgroundColor: localColors.appBackgroundImage
           ? 'transparent'
           : localColors.appBackground
           ? localColors.appBackground
           : theme === 'theme-glass'
-          ? 'radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.85) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.85) 0px, transparent 50%), radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.85) 0px, transparent 50%), #f0f3f8'
-          : 'radial-gradient(at 10% 15%, rgba(6, 182, 212, 0.20) 0px, transparent 45%), radial-gradient(at 90% 20%, rgba(99, 102, 241, 0.22) 0px, transparent 50%), radial-gradient(at 50% 85%, rgba(168, 85, 247, 0.18) 0px, transparent 55%), #090e1a'
+          ? '#f0f3f8'
+          : '#090e1a',
+        backgroundImage: localColors.appBackgroundImage
+          ? 'none'
+          : localColors.appBackground
+          ? 'none'
+          : theme === 'theme-glass'
+          ? 'radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.85) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.85) 0px, transparent 50%), radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.85) 0px, transparent 50%)'
+          : 'radial-gradient(at 10% 15%, rgba(6, 182, 212, 0.20) 0px, transparent 45%), radial-gradient(at 90% 20%, rgba(99, 102, 241, 0.22) 0px, transparent 50%), radial-gradient(at 50% 85%, rgba(168, 85, 247, 0.18) 0px, transparent 55%)'
       }}
     >
       {/* Dynamic Background Image Wallpaper Layer */}
       {localColors.appBackgroundImage && (
         <div
-          className="fixed inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-all duration-700 no-print"
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 no-print"
           style={{
             backgroundImage: `url(${localColors.appBackgroundImage})`,
             backgroundAttachment: 'fixed',
@@ -2302,7 +2327,7 @@ export default function App() {
       {/* High-legibility subtle tint overlay for background wallpaper */}
       {localColors.appBackgroundImage && (
         <div
-          className={`fixed inset-0 pointer-events-none -z-10 no-print transition-all duration-500 ${
+          className={`fixed inset-0 pointer-events-none z-0 no-print transition-all duration-500 ${
             theme === 'theme-glass'
               ? 'bg-slate-100/35 backdrop-blur-[2px]'
               : 'bg-[#090e1a]/45 backdrop-blur-[2px]'
@@ -2312,7 +2337,7 @@ export default function App() {
       )}
 
       {/* Dynamic ambient luminous orbs for visible glassmorphism floating depth */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10 no-print" aria-hidden="true">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 no-print" aria-hidden="true">
         <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-cyan-500/18 blur-[100px]" />
         <div className="absolute top-1/4 -right-28 w-[520px] h-[520px] rounded-full bg-indigo-600/18 blur-[120px]" />
         <div className="absolute bottom-1/4 left-1/4 w-[460px] h-[460px] rounded-full bg-purple-600/16 blur-[110px]" />
@@ -2621,6 +2646,12 @@ export default function App() {
         onToggleTheme={handleSetTheme}
         onForceLandscape={handleForceLandscape}
         onClose={() => setIsLogoEditorOpen(false)}
+        onUpdateLocalColors={(updatedColors) => {
+          setLocalColors(prev => ({
+            ...prev,
+            ...updatedColors
+          }));
+        }}
         onSaveLogos={(newLogos, newLocalColors) => {
           setLogos({
             header: newLogos.header,

@@ -173,17 +173,19 @@ main,
    TEMA 1: APARIENCIA ORIGINAL OSCURA CON VIDRIO ESMERILADO FLOTANTE (DARK GLASS)
    ========================================================================== */
 
-/* Fondo general ambiente con gradientes profundos para acentuar el vidrio flotante */
-html.theme-original,
-body.theme-original,
-.theme-original {
-  background-color: #0b1120 !important;
+/* Fondo general ambiente cuando NO hay un fondo de color o wallpaper personalizado */
+html.theme-original:not(.has-custom-bg),
+body.theme-original:not(.has-custom-bg) {
+  background-color: #0b1120;
   background-image: 
     radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.22) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(14, 116, 144, 0.18) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(88, 28, 135, 0.18) 0px, transparent 50%) !important;
-  background-attachment: fixed !important;
-  color: #f1f5f9 !important;
+    radial-gradient(at 50% 100%, rgba(88, 28, 135, 0.18) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+.theme-original {
+  color: #f1f5f9;
 }
 
 /* Tarjetas y Contenedores Flotantes con Efecto Vidrio Esmerilado (Dark Glassmorphism) */
@@ -260,17 +262,25 @@ nav.glass-dock {
    TEMA 2: NUEVA APARIENCIA MINIMALISTA / GLASSMORPHISM (Estilo Dribbble Ref)
    ========================================================================== */
 
-/* Fondo general luminoso con gradiente sutil y elegante */
-html.theme-glass,
-body.theme-glass,
-.theme-glass {
-  background-color: #f0f3f8 !important;
+/* Fondo general luminoso cuando NO hay un fondo de color o wallpaper personalizado */
+html.theme-glass:not(.has-custom-bg),
+body.theme-glass:not(.has-custom-bg) {
+  background-color: #f0f3f8;
   background-image: 
     radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.7) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(207, 250, 254, 0.6) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.6) 0px, transparent 50%) !important;
-  background-attachment: fixed !important;
-  color: #0f172a !important;
+    radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.6) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+.theme-glass {
+  color: #0f172a;
+}
+
+/* Desactivar gradientes base cuando hay fondo de color o wallpaper activo */
+html.has-custom-bg,
+body.has-custom-bg {
+  background-image: none !important;
 }
 
 /* Tarjetas y Contenedores con Efecto Vidrio Esmerilado (Glassmorphism) */
