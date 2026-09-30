@@ -58,6 +58,7 @@ interface UnitsViewProps {
     selectedTaskId?: string
   ) => void;
   onSaveCalendarEvent?: (projectId: string, event: ProjectCalendarEvent) => void;
+  onSaveMilestone?: (projectId: string, milestone: Milestone) => void;
   onOpenUnitBlueprints?: (unit: Unit) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
@@ -82,6 +83,7 @@ export function UnitsView({
   onEditProject,
   onOpenProjectManager,
   onSaveCalendarEvent,
+  onSaveMilestone,
   onOpenUnitBlueprints,
   onAddTrade,
   onDeleteTrade,
@@ -418,6 +420,7 @@ export function UnitsView({
               onOpenProjectManager={onOpenProjectManager}
               onOpenMilestonesConfig={onOpenMilestonesConfig}
               onSaveTask={onSaveCalendarEvent}
+              onSaveMilestone={onSaveMilestone}
               large={true}
             />
           </ErrorBoundary>

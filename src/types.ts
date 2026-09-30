@@ -79,12 +79,16 @@ export interface Milestone {
   buildingPart?: string; // e.g. 'Subsuelo', 'Planta Baja', 'Piso 1', 'Fachada', 'Estructura Global', etc.
   tradeCategory?: string; // e.g. 'Albañilería', 'Estructura', o nuevo rubro personalizado
   progressPercentage?: number; // 0 a 100: avance físico directo
+  progress?: number; // alias para compatibilidad
+  completed?: boolean; // estado completado
   linkType?: 'item' | 'trade' | 'direct';
   linkedTradeId?: string;
   linkedItemName?: string; // specific item title, or blank for all trade
   minPercentageRequired?: number; // default 100
   manualCompleted?: boolean;
   notes?: string;
+  comments?: string; // comentarios u observaciones del hito
+  photos?: string[]; // fotos y evidencias fotográficas del hito (base64 o URLs)
 }
 
 export interface ProjectCustomService {

@@ -2422,6 +2422,7 @@ export default function App() {
             onRequestDeleteProject={handleRequestDeleteProject}
             onExportExcel={handleExportExcel}
             onOpenMilestonesConfig={handleOpenMilestonesConfig}
+            onSaveMilestone={handleSaveMilestone}
             onToggleManualMilestone={handleToggleManualMilestone}
             onUpdateProjectDates={handleUpdateProjectDates}
             onEditProject={(proj) => setEditingProject(proj)}
@@ -2451,6 +2452,7 @@ export default function App() {
               onRequestDeleteProject={handleRequestDeleteProject}
               onExportExcel={handleExportExcel}
               onOpenMilestonesConfig={handleOpenMilestonesConfig}
+              onSaveMilestone={handleSaveMilestone}
               onToggleManualMilestone={handleToggleManualMilestone}
               onUpdateMilestoneProgress={handleUpdateMilestoneProgress}
               onUpdateProjectDates={handleUpdateProjectDates}
@@ -2730,6 +2732,7 @@ export default function App() {
             onToggleSubtask={handleTogglePMSubtask}
             onSaveContractors={handleSaveContractors}
             onOpenMilestonesConfig={handleOpenMilestonesConfig}
+            onSaveMilestone={handleSaveMilestone}
             onShowToast={showToast}
           />
         </ErrorBoundary>

@@ -17,7 +17,7 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { Project, StatusFilter, ProjectCalendarEvent } from '../types';
+import { Project, StatusFilter, ProjectCalendarEvent, Milestone } from '../types';
 import { calculateProjectProgress, calculateUnitProgress, getProjectConsolidatedStats, isUnitCommonArea, hexToRgba } from '../utils/calculations';
 import { ExecutiveDonutChart } from './ExecutiveDonutChart';
 import { ProjectCalendarCard } from './ProjectCalendarCard';
@@ -28,6 +28,7 @@ interface DashboardViewProps {
   bannerLogoUrl: string;
   presentationBg?: string;
   neonColor?: string;
+  onSaveMilestone?: (projectId: string, milestone: Milestone) => void;
   onSelectProject: (projectId: string) => void;
   onOpenNewProjectModal: () => void;
   onOpenLogoEditor: () => void;
@@ -57,6 +58,7 @@ export function DashboardView({
   bannerLogoUrl,
   presentationBg,
   neonColor = '#00f2fe',
+  onSaveMilestone,
   onSelectProject,
   onOpenNewProjectModal,
   onOpenLogoEditor,
@@ -391,6 +393,7 @@ export function DashboardView({
                       onOpenCalendarModal={handleOpenCalendarModal}
                       onOpenMilestonesConfig={onOpenMilestonesConfig}
                       onSaveTask={onSaveCalendarEvent}
+                      onSaveMilestone={onSaveMilestone}
                     />
                   </div>
                 </div>

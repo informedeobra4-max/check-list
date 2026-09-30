@@ -32,7 +32,7 @@ import {
   Paperclip,
   Percent
 } from 'lucide-react';
-import { Project, ProjectCalendarEvent, PMSubtask, PMTaskStatus, CalendarEventType, ContractorProfile } from '../types';
+import { Project, ProjectCalendarEvent, PMSubtask, PMTaskStatus, CalendarEventType, ContractorProfile, Milestone } from '../types';
 import { getTodayString, getTaskAlarms, calculateProjectPMStats, formatPMDate, getDaysDiff } from '../utils/pmCalculations';
 import { DEFAULT_CONTRACTORS, getContractorProfile, getProjectContractors } from '../utils/pmContractors';
 import { PMGanttMatrix } from './PMGanttMatrix';
@@ -53,6 +53,7 @@ interface ProjectManagerModalProps {
   onToggleSubtask?: (projectId: string, taskId: string, subtaskId: string) => void;
   onSaveContractors?: (projectId: string, contractors: ContractorProfile[]) => void;
   onOpenMilestonesConfig?: (projectId: string) => void;
+  onSaveMilestone?: (projectId: string, milestone: Milestone) => void;
   onShowToast: (msg: string, icon?: string) => void;
 }
 
@@ -77,6 +78,7 @@ export function ProjectManagerModal({
   onToggleSubtask,
   onSaveContractors,
   onOpenMilestonesConfig,
+  onSaveMilestone,
   onShowToast
 }: ProjectManagerModalProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'calendar'>(initialTab);
@@ -571,6 +573,7 @@ export function ProjectManagerModal({
                 onOpenContractorManager={() => setIsContractorManagerOpen(true)}
                 onEditContractor={() => setIsContractorManagerOpen(true)}
                 onOpenMilestonesConfig={onOpenMilestonesConfig}
+                onSaveMilestone={onSaveMilestone}
               />
 
               {/* BOTTOM 3-COLUMN MODULAR SECTION */}

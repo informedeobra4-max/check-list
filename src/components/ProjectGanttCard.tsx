@@ -12,12 +12,15 @@ import {
   Pencil,
   Percent,
   Check,
-  X
+  X,
+  Camera,
+  MessageSquare
 } from 'lucide-react';
 import { Project, ProjectCalendarEvent, ContractorProfile, Milestone } from '../types';
 import { getTodayString, getTaskAlarms, formatPMDate, getDaysDiff } from '../utils/pmCalculations';
 import { getContractorProfile, getProjectContractors } from '../utils/pmContractors';
 import { ContractorAvatar } from './ContractorAvatar';
+import { MilestoneDetailModal } from './MilestoneDetailModal';
 
 interface ProjectGanttCardProps {
   project: Project;
@@ -31,6 +34,7 @@ interface ProjectGanttCardProps {
   onOpenCalendarModal?: (projectId: string, initialDate?: string, selectedEventId?: string) => void;
   onOpenMilestonesConfig?: (projectId: string) => void;
   onSaveTask?: (projectId: string, task: ProjectCalendarEvent) => void;
+  onSaveMilestone?: (projectId: string, milestone: Milestone) => void;
   contractors?: ContractorProfile[];
   large?: boolean; // Para vista ampliada al entrar a la obra (UnitsView)
 }
@@ -66,11 +70,15 @@ export function ProjectGanttCard({
   onOpenCalendarModal,
   onOpenMilestonesConfig,
   onSaveTask,
+  onSaveMilestone,
   contractors,
   large = false
 }: ProjectGanttCardProps) {
   const now = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => getTodayString(), []);
+
+  // Hito seleccionado para ver o editar avance, comentarios y fotos directamente
+  const [selectedMilestoneForDetail, setSelectedMilestoneForDetail] = useState<Milestone | null>(null);
 
   // Escala temporal: Semana (zoom in), Mes (estándar), Anual (macro overview)
   const [timeScale, setTimeScale] = useState<GanttTimeScale>(() => {
@@ -801,7 +809,7 @@ export function ProjectGanttCard({
                     />
                   ))}
 
-                  {/* Píldoras de Hitos con color condicional y titilado */}
+                  {/* Píldoras de Hitos con color condicional, avance, fotos y comentarios */}
                   {projectMilestones.map(m => {
                     const mDate = normalizeDateStr(m.targetDate || (m as any).endDate);
                     if (!mDate || mDate < timelineStartStr || mDate > timelineEndStr) return null;
@@ -809,14 +817,23 @@ export function ProjectGanttCard({
                     const mIdx = dateToIndex.get(mDate);
                     if (mIdx === undefined) return null;
 
+                    const mProgress =
+                      m.progressPercentage !== undefined
+                        ? m.progressPercentage
+                        : m.progress !== undefined
+                        ? m.progress
+                        : m.manualCompleted || m.completed
+                        ? 100
+                        : 0;
+
                     const daysDiff = getDaysDiff(mDate, todayStr);
-                    const isDone = Boolean(m.completed || (m.progress !== undefined && m.progress >= 100));
+                    const isDone = Boolean(m.completed || m.manualCompleted || mProgress >= 100);
                     const isOverdue = daysDiff < 0 && !isDone;
                     const isApproaching = daysDiff >= 0 && daysDiff <= 3;
-                    const hasNoProgress = !m.progress || m.progress === 0;
+                    const hasNoProgress = mProgress === 0;
 
-                    let pillClass = 'bg-purple-600 text-white border-purple-400';
-                    let statusLabel = 'Hito';
+                    let pillClass = 'bg-cyan-600 text-white border-cyan-400';
+                    let statusLabel = `${mProgress}% • Hito`;
 
                     if (isDone) {
                       pillClass = 'bg-emerald-500 text-white border-emerald-400 shadow-emerald-500/30';
@@ -824,9 +841,9 @@ export function ProjectGanttCard({
                     } else if (isOverdue || (isApproaching && hasNoProgress)) {
                       pillClass = 'bg-rose-600 text-white border-rose-400 animate-pulse shadow-[0_0_14px_rgba(244,63,94,1)]';
                       statusLabel = isOverdue ? `Atraso +${Math.abs(daysDiff)}d` : daysDiff === 0 ? '¡Vence Hoy!' : `¡Faltan ${daysDiff}d sin avances!`;
-                    } else if (m.progress && m.progress > 0) {
-                      pillClass = 'bg-emerald-600 text-white border-emerald-400';
-                      statusLabel = `${m.progress}%`;
+                    } else if (mProgress > 0) {
+                      pillClass = 'bg-amber-500 text-slate-950 border-amber-300 font-bold';
+                      statusLabel = `${mProgress}% • En curso`;
                     }
 
                     const mLeft = Math.max(0, mIdx * dayWidth - (timeScale === 'year' ? 10 : 20));
@@ -837,18 +854,37 @@ export function ProjectGanttCard({
                         data-interactive="true"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (onOpenMilestonesConfig) onOpenMilestonesConfig(project.id);
+                          setSelectedMilestoneForDetail(m);
                         }}
                         className={`absolute top-1.5 h-6 rounded-xl text-[9px] font-black px-2 flex items-center gap-1 cursor-pointer transition-all shadow-lg hover:scale-105 active:scale-95 z-10 border ${pillClass}`}
                         style={{
                           left: `${mLeft}px`,
-                          minWidth: '85px',
-                          maxWidth: '180px'
+                          minWidth: '95px',
+                          maxWidth: '220px'
                         }}
-                        title={`Hito: ${m.name} (${formatPMDate(mDate)}) • ${statusLabel}`}
+                        title={`Hito: ${m.name} (${formatPMDate(mDate)}) • ${statusLabel} • Clic para editar avance, comentarios y fotos`}
                       >
                         <Flag className="w-2.5 h-2.5 shrink-0" />
+
+                        {/* Badge de porcentaje */}
+                        <span className="px-1 py-0.2 rounded text-[7.5px] font-black bg-black/35 text-white shrink-0">
+                          {mProgress}%
+                        </span>
+
                         <span className="truncate flex-1 font-bold">{m.name}</span>
+
+                        {/* Indicadores de fotos y comentarios */}
+                        {m.photos && m.photos.length > 0 && (
+                          <span className="flex items-center gap-0.5 text-cyan-100 shrink-0" title={`${m.photos.length} foto(s)`}>
+                            <Camera className="w-2.5 h-2.5" />
+                            <span className="text-[7.5px] font-mono">{m.photos.length}</span>
+                          </span>
+                        )}
+
+                        {(m.comments || m.notes) && (
+                          <MessageSquare className="w-2.5 h-2.5 shrink-0 opacity-90" title="Tiene comentarios u observaciones" />
+                        )}
+
                         {isDone && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
                         {(isOverdue || (isApproaching && hasNoProgress)) && (
                           <Flame className="w-2.5 h-2.5 shrink-0 text-white animate-bounce" />
@@ -1124,6 +1160,25 @@ export function ProjectGanttCard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL DE EDICIÓN DE AVANCE, COMENTARIOS Y FOTOS DEL HITO */}
+      {selectedMilestoneForDetail && (
+        <MilestoneDetailModal
+          isOpen={Boolean(selectedMilestoneForDetail)}
+          milestone={selectedMilestoneForDetail}
+          projectId={project.id}
+          projectName={project.name}
+          neonColor={neonColor}
+          onClose={() => setSelectedMilestoneForDetail(null)}
+          onSaveMilestone={(projId, updated) => {
+            if (onSaveMilestone) {
+              onSaveMilestone(projId, updated);
+            }
+            setSelectedMilestoneForDetail(null);
+          }}
+          onOpenAdvancedConfig={onOpenMilestonesConfig}
+        />
       )}
     </div>
   );
