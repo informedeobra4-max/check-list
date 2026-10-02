@@ -62,7 +62,8 @@ interface UnitsViewProps {
   onOpenUnitBlueprints?: (unit: Unit) => void;
   onAddTrade?: (tradeName: string, scope?: 'current_unit' | 'all_units') => void;
   onDeleteTrade?: (tradeId: string, tradeName: string, scope?: 'current_unit' | 'all_units') => void;
-  onOpenCroquis?: () => void;
+  onOpenCroquis?: (unitId?: string) => void;
+  onOpenMonthlyReport?: (projectId: string) => void;
 }
 
 export function UnitsView({
@@ -87,7 +88,8 @@ export function UnitsView({
   onOpenUnitBlueprints,
   onAddTrade,
   onDeleteTrade,
-  onOpenCroquis
+  onOpenCroquis,
+  onOpenMonthlyReport
 }: UnitsViewProps) {
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -366,6 +368,18 @@ export function UnitsView({
             <span>Reporte PDF</span>
           </button>
 
+          {onOpenMonthlyReport && (
+            <button
+              type="button"
+              onClick={() => onOpenMonthlyReport(project.id)}
+              className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(245,158,11,0.2)] active:scale-95"
+              title="Generar Informe Mensual Ejecutivo de Obra para Propietarios (PDF)"
+            >
+              <FileCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Informe de Obra</span>
+            </button>
+          )}
+
           {onExportExcel && (
             <button
               onClick={() => onExportExcel(project.id)}
@@ -379,9 +393,9 @@ export function UnitsView({
 
           {onOpenCroquis && (
             <button
-              onClick={onOpenCroquis}
+              onClick={() => onOpenCroquis()}
               className="px-3 py-1.5 bg-[#00c2ff]/15 hover:bg-[#00c2ff]/25 text-[#00c2ff] border border-[#00c2ff]/40 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95"
-              title="Abrir hoja de croquis para este proyecto"
+              title="Abrir galería de croquis para este proyecto"
             >
               <PenTool className="w-3.5 h-3.5 text-[#00c2ff]" />
               <span>Croquis ({totalProjectSketches})</span>
@@ -1178,13 +1192,18 @@ export function UnitsView({
                           )}
 
                           {unit.sketches && unit.sketches.length > 0 && (
-                            <span
-                              className="text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
-                              title={`${unit.sketches.length} croquis guardados en este espacio`}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCroquis?.(unit.id);
+                              }}
+                              className="text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 font-bold text-[10px] flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
+                              title={`Ver ${unit.sketches.length} croquis guardados en este espacio`}
                             >
                               <PenTool className="w-2.5 h-2.5 text-amber-500" />
                               <span>Croquis ({unit.sketches.length})</span>
-                            </span>
+                            </button>
                           )}
                         </div>
 

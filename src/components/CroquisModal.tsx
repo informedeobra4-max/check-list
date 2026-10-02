@@ -38,7 +38,10 @@ import {
   MoreVertical,
   ZoomIn,
   ZoomOut,
-  Hand
+  Hand,
+  Plus,
+  Tag,
+  CheckSquare
 } from 'lucide-react';
 import { Project, Unit, SketchDocument, BlueprintDocument } from '../types';
 
@@ -188,7 +191,18 @@ export function CroquisModal({
     return '';
   });
 
-  const [activeTab, setActiveTab] = useState<'draw' | 'history'>('draw');
+  const [activeTab, setActiveTab] = useState<'draw' | 'history'>('history');
+  const [galleryUnitFilter, setGalleryUnitFilter] = useState<string>(() => initialUnitId || 'all');
+  const [previewSketchUrl, setPreviewSketchUrl] = useState<string | null>(null);
+  const [previewSketchTitle, setPreviewSketchTitle] = useState<string>('');
+
+  // Destination save modal state
+  const [isSaveLocationModalOpen, setIsSaveLocationModalOpen] = useState<boolean>(false);
+  const [saveDestinationType, setSaveDestinationType] = useState<'unit' | 'item'>('unit');
+  const [saveTradeId, setSaveTradeId] = useState<string>('');
+  const [saveItemId, setSaveItemId] = useState<string>('');
+  const [pendingCompositeDataUrl, setPendingCompositeDataUrl] = useState<string | null>(null);
+
   const [sketchTitle, setSketchTitle] = useState<string>('Croquis en sitio');
   const [tool, setTool] = useState<ToolType>('pen');
   const [color, setColor] = useState<string>('#dc2626'); // Red default for technical markups
@@ -247,6 +261,31 @@ export function CroquisModal({
   const unitSketches = currentUnit?.sketches || [];
   const unitBlueprints = currentUnit?.blueprints || [];
 
+  // All sketches for active project across all units
+  const allProjectSketches = useMemo(() => {
+    if (!activeProject || !Array.isArray(activeProject.units)) return [];
+    const list: SketchDocument[] = [];
+    activeProject.units.forEach(u => {
+      (u.sketches || []).forEach(s => {
+        list.push({
+          ...s,
+          unitId: s.unitId || u.id,
+          unitName: s.unitName || u.name
+        });
+      });
+    });
+    return list;
+  }, [activeProject]);
+
+  // Filtered sketches to display in gallery
+  const displayedSketches = useMemo(() => {
+    if (galleryUnitFilter === 'all') {
+      return allProjectSketches;
+    }
+    const targetUnit = activeProject?.units?.find(u => u.id === galleryUnitFilter);
+    return targetUnit?.sketches || [];
+  }, [galleryUnitFilter, allProjectSketches, activeProject]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -255,6 +294,10 @@ export function CroquisModal({
   // Sync initialProjectId & initialUnitId when prop changes or modal opens
   useEffect(() => {
     if (isOpen) {
+      setActiveTab('history'); // ALWAYS open gallery first as requested!
+      setIsSaveLocationModalOpen(false);
+      setPendingCompositeDataUrl(null);
+
       let targetProjId = selectedProjectId;
       if (initialProjectId && projects.some(p => p.id === initialProjectId)) {
         targetProjId = initialProjectId;
@@ -268,8 +311,10 @@ export function CroquisModal({
       if (targetProj && Array.isArray(targetProj.units)) {
         if (initialUnitId && targetProj.units.some(u => u.id === initialUnitId)) {
           setSelectedUnitId(initialUnitId);
+          setGalleryUnitFilter(initialUnitId);
         } else if (targetProj.units.length > 0 && (!selectedUnitId || !targetProj.units.some(u => u.id === selectedUnitId))) {
           setSelectedUnitId(targetProj.units[0].id);
+          setGalleryUnitFilter(targetProj.units[0].id);
         }
       }
     }
@@ -280,8 +325,10 @@ export function CroquisModal({
     const proj = projects.find(p => p.id === newProjId);
     if (proj && Array.isArray(proj.units) && proj.units.length > 0) {
       setSelectedUnitId(proj.units[0].id);
+      setGalleryUnitFilter('all');
     } else {
       setSelectedUnitId('');
+      setGalleryUnitFilter('all');
     }
   };
 
@@ -1048,8 +1095,8 @@ export function CroquisModal({
     return outCanvas.toDataURL('image/jpeg', 0.82);
   };
 
-  // Save to Department & Supabase Cloud
-  const handleSaveToUnit = async () => {
+  // Open Destination Selection Modal
+  const handleOpenSaveDialog = async () => {
     if (!currentUnit || !activeProject) {
       showToast('Selecciona un proyecto y departamento válido');
       return;
@@ -1059,25 +1106,58 @@ export function CroquisModal({
       showToast('Error al generar la imagen del croquis');
       return;
     }
+    setPendingCompositeDataUrl(finalDataUrl);
+
+    // Initialize trade and item if available
+    const trades = currentUnit.trades || [];
+    if (trades.length > 0) {
+      setSaveTradeId(trades[0].id);
+      setSaveItemId(trades[0].items?.[0]?.id || '');
+    }
+    setSaveDestinationType('unit');
+    setIsSaveLocationModalOpen(true);
+  };
+
+  // Confirm Save with Selected Destination
+  const handleConfirmSave = () => {
+    if (!pendingCompositeDataUrl || !currentUnit || !activeProject) return;
 
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const timestamp = `${dateStr}, ${timeStr} hs`;
 
+    const selectedTrade = currentUnit.trades?.find(t => t.id === saveTradeId);
+    const selectedItem = selectedTrade?.items?.find(i => i.id === saveItemId);
+
+    const isItemLinked = saveDestinationType === 'item' && selectedTrade && selectedItem;
+
     const newSketch: SketchDocument = {
       id: `sk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      title: sketchTitle.trim() || 'Croquis a mano alzada',
-      dataUrl: finalDataUrl,
+      title: sketchTitle.trim() || (isItemLinked ? `Croquis: ${selectedItem.name}` : 'Croquis en sitio'),
+      dataUrl: pendingCompositeDataUrl,
       createdAt: timestamp,
       unitId: currentUnit.id,
       unitName: currentUnit.name,
       projectId: activeProject.id,
-      projectName: activeProject.name
+      projectName: activeProject.name,
+      tradeId: isItemLinked ? selectedTrade.id : undefined,
+      tradeName: isItemLinked ? selectedTrade.name : undefined,
+      itemId: isItemLinked ? selectedItem.id : undefined,
+      itemName: isItemLinked ? selectedItem.name : undefined
     };
 
     onSaveSketch(activeProject.id, currentUnit.id, newSketch);
-    showToast(`Croquis guardado en ${currentUnit.name} (${activeProject.name}) y en la Nube ✔`);
+
+    if (isItemLinked) {
+      showToast(`Croquis vinculado a "${selectedItem.name}" y guardado ✔`);
+    } else {
+      showToast(`Croquis guardado en ${currentUnit.name} (${activeProject.name}) ✔`);
+    }
+
+    setIsSaveLocationModalOpen(false);
+    setPendingCompositeDataUrl(null);
+    setActiveTab('history'); // Directly view in gallery!
   };
 
   // Download Image
@@ -1397,9 +1477,9 @@ export function CroquisModal({
               {/* Quick Save */}
               <button
                 type="button"
-                onClick={handleSaveToUnit}
+                onClick={handleOpenSaveDialog}
                 className="p-2 sm:px-3 sm:py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 touch-target border border-emerald-500 flex items-center gap-1 shrink-0"
-                title="Guardar croquis en la unidad"
+                title="Guardar croquis en la unidad o en un ítem"
               >
                 <Save className="w-4 h-4" />
                 <span className="hidden sm:inline">Guardar</span>
@@ -2142,7 +2222,10 @@ export function CroquisModal({
                   <div className="grid grid-cols-2 gap-2 text-xs font-bold">
                     <button
                       type="button"
-                      onClick={handleSaveToUnit}
+                      onClick={() => {
+                        handleOpenSaveDialog();
+                        setIsToolsMenuOpen(false);
+                      }}
                       className="p-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 touch-target"
                     >
                       <Save className="w-4 h-4" />
@@ -2204,134 +2287,514 @@ export function CroquisModal({
         </div>
       )}
 
-      {/* TAB 2: SKETCHES HISTORY */}
+      {/* TAB 2: SKETCHES HISTORY / GALLERY */}
       {activeTab === 'history' && (
-        <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 p-3 sm:p-5 overflow-y-auto">
-          {/* Top Bar for History */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-900 p-3 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-2">
+        <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-slate-950 overflow-hidden">
+          {/* Top Bar for Gallery */}
+          <div className="bg-slate-900 border-b border-slate-800 p-3 sm:p-4 shrink-0 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                  <PenTool className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-black text-white leading-tight">
+                    Galería de Croquis y Anotaciones
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Planos, relevamientos y fotos técnicas registradas
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('draw')}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all touch-target"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Crear Nuevo Croquis</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors touch-target"
+                  title="Cerrar modal"
+                  aria-label="Cerrar modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter selectors toolbar */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
+              {/* Project selector if multiple projects */}
+              {projects.length > 1 && (
+                <div className="flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1.5 rounded-xl">
+                  <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => {
+                      const newProjId = e.target.value;
+                      setSelectedProjectId(newProjId);
+                      const proj = projects.find(p => p.id === newProjId);
+                      if (proj?.units?.[0]) {
+                        setSelectedUnitId(proj.units[0].id);
+                      }
+                      setGalleryUnitFilter('all');
+                    }}
+                    className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer max-w-[150px] truncate"
+                  >
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Unit Filter Dropdown */}
+              <div className="flex items-center gap-1.5 bg-slate-950/60 border border-slate-800 px-2.5 py-1.5 rounded-xl">
+                <DoorOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <select
+                  value={galleryUnitFilter}
+                  onChange={(e) => {
+                    const newFilter = e.target.value;
+                    setGalleryUnitFilter(newFilter);
+                    if (newFilter !== 'all') {
+                      setSelectedUnitId(newFilter);
+                    }
+                  }}
+                  className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer max-w-[200px] truncate"
+                >
+                  <option value="all" className="bg-slate-900 text-white">
+                    Todas las unidades ({allProjectSketches.length})
+                  </option>
+                  {(activeProject?.units || []).map(u => (
+                    <option key={u.id} value={u.id} className="bg-slate-900 text-white">
+                      {u.name} ({u.sketches?.length || 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/25 ml-auto">
+                {displayedSketches.length} {displayedSketches.length === 1 ? 'croquis' : 'croquis'}
+              </span>
+            </div>
+          </div>
+
+          {/* Main Gallery Scroll Area */}
+          <div className="flex-1 p-3 sm:p-5 overflow-y-auto">
+            {displayedSketches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-slate-900/60 rounded-3xl border border-slate-800/80 max-w-xl mx-auto my-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4">
+                  <PenTool className="w-8 h-8" />
+                </div>
+                <h3 className="text-base font-bold text-white mb-1">
+                  No hay croquis guardados
+                </h3>
+                <p className="text-xs text-slate-400 max-w-sm mb-6 leading-relaxed">
+                  {galleryUnitFilter === 'all'
+                    ? `Aún no se han guardado croquis en la obra ${activeProject?.name}.`
+                    : `No hay croquis para la unidad ${currentUnit?.name || ''}.`}
+                  {' '}Crea uno nuevo a mano alzada o anotando sobre una foto o plano.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('draw')}
+                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-2 active:scale-95 transition-all touch-target"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>Abrir Lienzo en Blanco</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('draw');
+                      setTimeout(() => cameraInputRef.current?.click(), 100);
+                    }}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 flex items-center gap-2 active:scale-95 transition-all touch-target"
+                  >
+                    <Camera className="w-4 h-4 text-amber-400" />
+                    <span>Tomar Foto con Cámara</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {/* Quick Add Card */}
+                <div
+                  onClick={() => setActiveTab('draw')}
+                  className="bg-slate-900/40 hover:bg-slate-900/80 border-2 border-dashed border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all group min-h-[220px]"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 flex items-center justify-center transition-all mb-3">
+                    <Plus className="w-6 h-6 stroke-[3]" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-200 group-hover:text-amber-400 transition-colors">
+                    Crear Nuevo Croquis
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Dibujar o fotografiar detalle técnico
+                  </p>
+                </div>
+
+                {/* Sketch Cards */}
+                {displayedSketches.map((sketch) => (
+                  <div
+                    key={sketch.id}
+                    className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg flex flex-col hover:border-slate-700 transition-all"
+                  >
+                    {/* Thumbnail / Image container */}
+                    <div
+                      onClick={() => {
+                        setPreviewSketchUrl(sketch.dataUrl);
+                        setPreviewSketchTitle(sketch.title);
+                      }}
+                      className="relative aspect-[16/10] bg-slate-950 overflow-hidden border-b border-slate-800 cursor-pointer group"
+                      title="Haz clic para ampliar"
+                    >
+                      <img
+                        src={sketch.dataUrl}
+                        alt={sketch.title}
+                        className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                      <div className="absolute top-2 left-2 flex items-center gap-1">
+                        <span className="text-[10px] font-bold bg-slate-900/90 backdrop-blur-xs text-slate-200 px-2 py-0.5 rounded-lg border border-slate-700">
+                          {sketch.unitName || currentUnit?.name}
+                        </span>
+                      </div>
+                      <div className="absolute top-2 right-2 flex items-center gap-1">
+                        <span className="text-[10px] font-bold bg-slate-900/90 backdrop-blur-xs text-amber-400 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                          {sketch.createdAt}
+                        </span>
+                      </div>
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span className="px-3 py-1.5 rounded-xl bg-slate-900/90 text-amber-400 text-xs font-bold flex items-center gap-1.5 border border-amber-500/30 shadow-lg">
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Ver en grande</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-3 flex-1 flex flex-col justify-between space-y-2.5">
+                      <div>
+                        <h4 className="text-xs font-black text-white truncate" title={sketch.title}>
+                          {sketch.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {sketch.unitName || currentUnit?.name} • {sketch.projectName || activeProject?.name}
+                        </p>
+
+                        {/* Linked Trade & Item Badge */}
+                        {sketch.tradeName && sketch.itemName && (
+                          <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2 py-1 rounded-lg">
+                            <Tag className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span className="truncate">
+                              {sketch.tradeName} • {sketch.itemName}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Actions Footer */}
+                      <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-800">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleShareWhatsApp(sketch.dataUrl, sketch.title)}
+                            className="p-1.5 text-emerald-400 hover:bg-emerald-950/40 rounded-lg transition-colors touch-target"
+                            title="Compartir por WhatsApp"
+                            aria-label="Compartir por WhatsApp"
+                          >
+                            <WhatsAppIcon className="w-4 h-4 fill-emerald-400" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(sketch.dataUrl, sketch.title)}
+                            className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors touch-target"
+                            title="Descargar imagen"
+                            aria-label="Descargar imagen"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleLoadSketchToCanvas(sketch.dataUrl, sketch.title)}
+                            className="px-2 py-1 text-[11px] font-bold text-amber-400 hover:bg-amber-950/40 rounded-lg transition-colors flex items-center gap-1 touch-target"
+                            title="Abrir este croquis en el lienzo para seguir dibujando"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Continuar</span>
+                          </button>
+                        </div>
+
+                        {onDeleteSketch && activeProject && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetUId = sketch.unitId || currentUnit?.id;
+                              if (targetUId) {
+                                onDeleteSketch(activeProject.id, targetUId, sketch.id);
+                                showToast('Croquis eliminado');
+                              }
+                            }}
+                            className="p-1.5 text-rose-500 hover:bg-rose-950/40 rounded-lg transition-colors touch-target"
+                            title="Eliminar croquis"
+                            aria-label="Eliminar croquis"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* DESTINATION SELECTION MODAL (WHEN PRESSING SAVE ON CANVAS) */}
+      {isSaveLocationModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Save className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    Guardar Croquis de Obra
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {activeProject?.name} • {currentUnit?.name}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setActiveTab('draw')}
-                className="px-3 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 touch-target shadow-xs hover:bg-amber-400 transition-colors"
+                onClick={() => setIsSaveLocationModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
               >
-                <ChevronLeft className="w-4 h-4 stroke-[3]" />
-                <span>Volver al Lienzo</span>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4">
+              {/* Thumbnail Preview */}
+              {pendingCompositeDataUrl && (
+                <div className="aspect-[16/9] w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center p-2">
+                  <img
+                    src={pendingCompositeDataUrl}
+                    alt="Vista previa del croquis"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+              )}
+
+              {/* Title input */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Título o Referencia del Croquis
+                </label>
+                <input
+                  type="text"
+                  value={sketchTitle}
+                  onChange={(e) => setSketchTitle(e.target.value)}
+                  placeholder="Ej: Relevamiento viga PB, Croquis cañería cocina..."
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Destination Radio Cards */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
+                  Destino de Guardado
+                </label>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {/* Option 1: General to Unit */}
+                  <div
+                    onClick={() => setSaveDestinationType('unit')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      saveDestinationType === 'unit'
+                        ? 'bg-amber-500/10 border-amber-500/80 text-white'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                      saveDestinationType === 'unit' ? 'border-amber-500 bg-amber-500' : 'border-slate-600'
+                    }`}>
+                      {saveDestinationType === 'unit' && <Check className="w-3 h-3 text-slate-950 stroke-[3]" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <DoorOpen className="w-3.5 h-3.5 text-amber-400" />
+                        <span>A nivel general del departamento</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Se guardará en la galería de {currentUnit?.name} y actualizará el contador de croquis general.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Associate to Checklist Item */}
+                  <div
+                    onClick={() => setSaveDestinationType('item')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      saveDestinationType === 'item'
+                        ? 'bg-amber-500/10 border-amber-500/80 text-white'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                      saveDestinationType === 'item' ? 'border-amber-500 bg-amber-500' : 'border-slate-600'
+                    }`}>
+                      {saveDestinationType === 'item' && <Check className="w-3 h-3 text-slate-950 stroke-[3]" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Asociar a un Ítem específico del Checklist</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Se vinculará a la tarea seleccionada y se añadirá automáticamente a sus fotos de inspección.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trade & Item Dropdowns (If Option 2 Selected) */}
+              {saveDestinationType === 'item' && (
+                <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3 animate-in fade-in duration-150">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      1. Selecciona el Rubro
+                    </label>
+                    <select
+                      value={saveTradeId}
+                      onChange={(e) => {
+                        const newTradeId = e.target.value;
+                        setSaveTradeId(newTradeId);
+                        const trade = currentUnit?.trades?.find(t => t.id === newTradeId);
+                        setSaveItemId(trade?.items?.[0]?.id || '');
+                      }}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                    >
+                      {(currentUnit?.trades || []).map(trade => (
+                        <option key={trade.id} value={trade.id} className="bg-slate-900 text-white">
+                          {trade.name} ({trade.items?.length || 0} ítems)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      2. Selecciona el Ítem de Inspección
+                    </label>
+                    <select
+                      value={saveItemId}
+                      onChange={(e) => setSaveItemId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                    >
+                      {(currentUnit?.trades?.find(t => t.id === saveTradeId)?.items || []).map(item => (
+                        <option key={item.id} value={item.id} className="bg-slate-900 text-white">
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="px-5 py-4 border-t border-slate-800 bg-slate-900/90 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsSaveLocationModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-colors touch-target"
+              >
+                Cancelar
               </button>
 
-              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black">
-                {unitSketches.length} {unitSketches.length === 1 ? 'croquis registrado' : 'croquis registrados'}
+              <button
+                type="button"
+                onClick={handleConfirmSave}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-2 active:scale-95 transition-all touch-target"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>Confirmar y Guardar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX / FULLSCREEN PREVIEW MODAL */}
+      {previewSketchUrl && (
+        <div className="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md flex flex-col animate-in fade-in duration-150">
+          {/* Lightbox Header */}
+          <div className="h-14 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-white truncate max-w-[260px] sm:max-w-md">
+                {previewSketchTitle || 'Croquis'}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">
-                {activeProject?.name} • {currentUnit?.name}
-              </span>
               <button
-                onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white rounded-xl touch-target"
+                type="button"
+                onClick={() => handleShareWhatsApp(previewSketchUrl, previewSketchTitle)}
+                className="p-2 text-emerald-400 hover:bg-emerald-950/40 rounded-xl transition-colors touch-target"
+                title="Compartir por WhatsApp"
+              >
+                <WhatsAppIcon className="w-5 h-5 fill-emerald-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownload(previewSketchUrl, previewSketchTitle)}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors touch-target"
+                title="Descargar imagen"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPreviewSketchUrl(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors touch-target"
+                title="Cerrar vista previa"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          {unitSketches.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-900 rounded-2xl border border-slate-800">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
-                <PenTool className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-200">
-                No hay croquis guardados en {currentUnit?.name || 'esta unidad'} ({activeProject?.name})
-              </h4>
-              <p className="text-xs text-slate-400 max-w-sm mt-1 mb-4">
-                Abre el lienzo para hacer un dibujo a mano alzada o escribir sobre una foto a pantalla completa.
-              </p>
-              <button
-                onClick={() => setActiveTab('draw')}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs"
-              >
-                Comenzar a Croquizar
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {unitSketches.map((sketch) => (
-                <div
-                  key={sketch.id}
-                  className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-lg flex flex-col"
-                >
-                  <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden border-b border-slate-800 group">
-                    <img
-                      src={sketch.dataUrl}
-                      alt={sketch.title}
-                      className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform"
-                    />
-                    <div className="absolute top-2 right-2 flex items-center gap-1">
-                      <span className="text-[10px] font-bold bg-slate-900/90 backdrop-blur-xs text-amber-400 px-2 py-0.5 rounded-lg border border-amber-500/30">
-                        {sketch.createdAt}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 flex-1 flex flex-col justify-between space-y-2.5">
-                    <div>
-                      <h4 className="text-xs font-black text-white truncate">
-                        {sketch.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        {sketch.unitName || currentUnit?.name} • {sketch.projectName || activeProject?.name}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleShareWhatsApp(sketch.dataUrl, sketch.title)}
-                          className="p-1.5 text-emerald-400 hover:bg-emerald-950/40 rounded-lg transition-colors touch-target"
-                          title="Enviar por WhatsApp"
-                        >
-                          <WhatsAppIcon className="w-4 h-4 fill-emerald-400" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(sketch.dataUrl, sketch.title)}
-                          className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors touch-target"
-                          title="Descargar imagen"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleLoadSketchToCanvas(sketch.dataUrl, sketch.title)}
-                          className="px-2 py-1 text-[11px] font-bold text-amber-400 hover:bg-amber-950/40 rounded-lg transition-colors flex items-center gap-1 touch-target"
-                          title="Abrir este croquis en el lienzo para seguir dibujando"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          <span>Continuar</span>
-                        </button>
-                      </div>
-
-                      {onDeleteSketch && activeProject && currentUnit && (
-                        <button
-                          type="button"
-                          onClick={() => onDeleteSketch(activeProject.id, currentUnit.id, sketch.id)}
-                          className="p-1.5 text-rose-500 hover:bg-rose-950/40 rounded-lg transition-colors touch-target"
-                          title="Eliminar croquis"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Lightbox Image View */}
+          <div className="flex-1 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <img
+              src={previewSketchUrl}
+              alt={previewSketchTitle}
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+            />
+          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Building2, DoorOpen, Image as ImageIcon, FileText, Download, ShieldCheck, PenTool } from 'lucide-react';
-import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile, AppTheme } from './types';
+import { Project, Unit, ViewMode, CustomLogos, Milestone, Trade, SketchDocument, LocalColors, ProjectCalendarEvent, PMTaskStatus, ProjectManagerTask, BlueprintDocument, ContractorProfile, AppTheme, InspectionPhoto } from './types';
 import { getInitialMockData, DEFAULT_LOGO_URL, createInitialTrades, MASTER_TRADES_TEMPLATE } from './data/initialData';
 import { compressImageFile, calculateUnitProgress, hexToRgba } from './utils/calculations';
 import { Header } from './components/Header';
@@ -9,6 +9,7 @@ import { UnitsView } from './components/UnitsView';
 import { ChecklistView } from './components/ChecklistView';
 import { PhotoViewerModal } from './components/PhotoViewerModal';
 import { ReportModal } from './components/ReportModal';
+import { MonthlyWorkReportModal } from './components/MonthlyWorkReportModal';
 import { LogoEditorModal } from './components/LogoEditorModal';
 import { EditProjectModal } from './components/EditProjectModal';
 import { BlueprintViewerModal } from './components/BlueprintViewerModal';
@@ -593,6 +594,16 @@ export default function App() {
   const [logoEditorTarget, setLogoEditorTarget] = useState<'header' | 'banner'>('header');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportDefaultScope, setReportDefaultScope] = useState<string>('');
+
+  // Informe de Obra Mensual (PDF para propietarios) modal state
+  const [isMonthlyReportModalOpen, setIsMonthlyReportModalOpen] = useState(false);
+  const [monthlyReportProjectId, setMonthlyReportProjectId] = useState<string>('');
+
+  const handleOpenMonthlyReport = (projectId?: string) => {
+    const targetPid = projectId || selectedProjectId || (projects.length > 0 ? projects[0].id : '');
+    setMonthlyReportProjectId(targetPid);
+    setIsMonthlyReportModalOpen(true);
+  };
 
   // Croquis a mano alzada modal state
   const [isCroquisModalOpen, setIsCroquisModalOpen] = useState(false);
@@ -1802,8 +1813,33 @@ export default function App() {
           ...proj,
           units: proj.units.map(u => {
             if (u.id !== unitId) return u;
+
+            let updatedTrades = u.trades;
+            if (finalSketch.tradeId && finalSketch.itemId) {
+              const newPhoto: InspectionPhoto = {
+                id: `photo_sk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                dataUrl: finalSketch.dataUrl,
+                timestamp: finalSketch.createdAt || new Date().toLocaleString()
+              };
+
+              updatedTrades = (u.trades || []).map(tr => {
+                if (tr.id !== finalSketch.tradeId) return tr;
+                return {
+                  ...tr,
+                  items: tr.items.map(it => {
+                    if (it.id !== finalSketch.itemId) return it;
+                    return {
+                      ...it,
+                      photos: [newPhoto, ...(it.photos || [])]
+                    };
+                  })
+                };
+              });
+            }
+
             return {
               ...u,
+              trades: updatedTrades,
               sketches: [finalSketch, ...(u.sketches || [])]
             };
           })
@@ -2432,6 +2468,7 @@ export default function App() {
             onToggleCalendarEvent={handleToggleCalendarEvent}
             onShowToast={showToast}
             onActiveProjectChange={handleActiveProjectChange}
+            onOpenMonthlyReport={handleOpenMonthlyReport}
           />
         )}
 
@@ -2447,6 +2484,7 @@ export default function App() {
               onSelectUnit={handleSelectUnit}
               onOpenNewUnitModal={() => setIsNewUnitModalOpen(true)}
               onOpenReportModal={handleOpenReportModal}
+              onOpenMonthlyReport={handleOpenMonthlyReport}
               onEditUnit={setEditingUnit}
               onRequestDeleteUnit={handleRequestDeleteUnit}
               onRequestDeleteProject={handleRequestDeleteProject}
@@ -2462,8 +2500,8 @@ export default function App() {
               onOpenUnitBlueprints={(unit) => setActiveBlueprintViewerUnit(unit)}
               onAddTrade={handleAddTrade}
               onDeleteTrade={handleDeleteTrade}
-              onOpenCroquis={() => {
-                setCroquisModalTargetUnitId(undefined);
+              onOpenCroquis={(unitId) => {
+                setCroquisModalTargetUnitId(unitId);
                 setIsCroquisModalOpen(true);
               }}
             />
@@ -2753,6 +2791,15 @@ export default function App() {
             onDeleteSketch={handleDeleteSketch}
           />
         </ErrorBoundary>
+      )}
+
+      {isMonthlyReportModalOpen && (
+        <MonthlyWorkReportModal
+          isOpen={isMonthlyReportModalOpen}
+          project={projects.find(p => p.id === monthlyReportProjectId) || selectedProject || projects[0]}
+          headerLogoUrl={logos.header}
+          onClose={() => setIsMonthlyReportModalOpen(false)}
+        />
       )}
 
       <CloudSetupModal

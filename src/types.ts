@@ -50,6 +50,10 @@ export interface SketchDocument {
   projectId?: string;
   projectName?: string;
   notes?: string;
+  tradeId?: string;
+  tradeName?: string;
+  itemId?: string;
+  itemName?: string;
 }
 
 export interface Unit {

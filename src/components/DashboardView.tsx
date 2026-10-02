@@ -51,6 +51,7 @@ interface DashboardViewProps {
   onToggleCalendarEvent?: (projectId: string, eventId: string) => void;
   onShowToast?: (msg: string, icon?: string) => void;
   onActiveProjectChange?: (projectId: string) => void;
+  onOpenMonthlyReport?: (projectId: string) => void;
 }
 
 export function DashboardView({
@@ -75,7 +76,8 @@ export function DashboardView({
   onDeleteCalendarEvent,
   onToggleCalendarEvent,
   onShowToast,
-  onActiveProjectChange
+  onActiveProjectChange,
+  onOpenMonthlyReport
 }: DashboardViewProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -428,6 +430,21 @@ export function DashboardView({
                       <FileText className="w-3 h-3 text-rose-400" />
                       <span>PDF</span>
                     </button>
+
+                    {onOpenMonthlyReport && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenMonthlyReport(project.id);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-[11px] flex items-center gap-1 border border-amber-500/35 transition-colors shadow-xs"
+                        title="Informe Mensual Ejecutivo de Obra para Propietarios (PDF)"
+                      >
+                        <FileCheck className="w-3 h-3 text-amber-400" />
+                        <span>Informe Mensual</span>
+                      </button>
+                    )}
 
                     {onExportExcel && (
                       <button
