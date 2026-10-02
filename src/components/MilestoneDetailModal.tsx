@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Flag,
@@ -177,18 +178,19 @@ export function MilestoneDetailModal({
     onClose();
   };
 
-  return (
+  const modalContent = (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+        className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in"
+        style={{ zIndex: 99999 }}
         onClick={onClose}
       >
         <div
-          className="w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-left animate-scale-up"
+          className="w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh] sm:max-h-[88vh] text-left animate-scale-up"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 1. CABECERA: TÍTULO, ESTADO Y FECHAS */}
-          <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 flex items-start justify-between gap-3">
+          <div className="p-3.5 sm:p-5 border-b border-slate-800 bg-slate-900 flex items-start justify-between gap-3 shrink-0">
             <div className="flex items-start gap-3 min-w-0">
               <div
                 className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border"
@@ -280,7 +282,7 @@ export function MilestoneDetailModal({
           </div>
 
           {/* 2. CONTENIDO PRINCIPAL SCROLLEABLE */}
-          <div className="p-4 sm:p-5 space-y-5 overflow-y-auto no-scrollbar scrollbar-none flex-1">
+          <div className="p-3.5 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
             {/* SECCIÓN 1: PORCENTAJE DE AVANCE */}
             <div className="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -469,7 +471,7 @@ export function MilestoneDetailModal({
           </div>
 
           {/* 3. PIE DE ACCIONES: CANCELAR, CONFIGURACIÓN AVANZADA Y GUARDAR */}
-          <div className="p-4 sm:p-5 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between gap-2">
+          <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-900 flex items-center justify-between gap-2 shrink-0">
             <div>
               {onOpenAdvancedConfig && (
                 <button
@@ -491,7 +493,7 @@ export function MilestoneDetailModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 Cancelar
               </button>
@@ -499,7 +501,7 @@ export function MilestoneDetailModal({
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-5 py-2 rounded-xl text-xs font-black bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-md active:scale-95 transition-all flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-black bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Check className="w-4 h-4 stroke-[2.5]" />
                 <span>Guardar Hito</span>
@@ -512,7 +514,8 @@ export function MilestoneDetailModal({
       {/* LIGHTBOX PARA PREVISUALIZAR FOTO EN PANTALLA COMPLETA */}
       {previewImage && (
         <div
-          className="fixed inset-0 z-60 bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in"
+          style={{ zIndex: 100000 }}
           onClick={() => setPreviewImage(null)}
         >
           <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -540,4 +543,6 @@ export function MilestoneDetailModal({
       )}
     </>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 }

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -1026,9 +1027,10 @@ export function ProjectGanttCard({
       </div>
 
       {/* MODAL / POPOVER FLOTANTE DE AJUSTE RÁPIDO DE AVANCE (%) */}
-      {quickProgressTask && (
+      {quickProgressTask && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          style={{ zIndex: 99999 }}
           onClick={() => setQuickProgressTask(null)}
         >
           <div
@@ -1159,7 +1161,8 @@ export function ProjectGanttCard({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL DE EDICIÓN DE AVANCE, COMENTARIOS Y FOTOS DEL HITO */}
