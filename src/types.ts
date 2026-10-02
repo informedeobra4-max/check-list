@@ -170,6 +170,9 @@ export interface Project {
   milestones?: Milestone[];
   calendarEvents?: ProjectCalendarEvent[]; // Tareas, eventos y alarmas independientes por obra
   contractors?: ContractorProfile[]; // Cuadrillas y responsables técnicos personalizados con fotos
+  logoUrl?: string; // Logo específico del proyecto inmobiliario
+  developerLogoUrl?: string; // Logo de la empresa desarrolladora
+  developerName?: string; // Nombre comercial de la empresa desarrolladora
   units: Unit[];
 }
 

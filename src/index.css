@@ -253,6 +253,45 @@ html.font-bold-mode .font-black {
     break-before: page !important;
     page-break-before: always !important;
   }
+
+  /* Estilos específicos para Informe Mensual de Obra Ejecutivo Vertical (A4 Portrait) */
+  .monthly-report-page {
+    width: 210mm !important;
+    min-height: 295mm !important;
+    height: auto !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+  }
+  .monthly-report-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}
+
+/* Vista previa en pantalla del informe mensual estilo hoja A4 ejecutiva */
+.monthly-report-preview-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  color: #0f172a;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+@media (max-width: 850px) {
+  .monthly-report-preview-sheet {
+    width: 100%;
+    min-height: auto;
+  }
 }
 
 /* Ocultar insignia/badge de Netlify y cualquier widget o iframe inyectado en el borde */

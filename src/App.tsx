@@ -1969,11 +1969,34 @@ export default function App() {
   // Update Project Data (Ficha Técnica y Administrativa)
   const handleSaveProjectData = (updatedData: Partial<Project>) => {
     if (!editingProject) return;
-    setProjects(prev => prev.map(p => {
-      if (p.id !== editingProject.id) return p;
-      return { ...p, ...updatedData };
-    }));
+    setProjects(prev => {
+      const updated = prev.map(p => {
+        if (p.id !== editingProject.id) return p;
+        return { ...p, ...updatedData };
+      });
+      try {
+        localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+      saveProjectsToCloud(updated);
+      return updated;
+    });
     showToast('Ficha técnica y administrativa actualizada', 'Check');
+  };
+
+  // Generic Update Project Handler (used by MonthlyWorkReportModal, etc.)
+  const handleUpdateProject = (updatedProj: Project) => {
+    setProjects(prev => {
+      const updated = prev.map(p => p.id === updatedProj.id ? updatedProj : p);
+      try {
+        localStorage.setItem(STORAGE_KEY_PROJECTS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+      saveProjectsToCloud(updated);
+      return updated;
+    });
   };
 
   // Unit Blueprints Management
@@ -2799,6 +2822,7 @@ export default function App() {
           project={projects.find(p => p.id === monthlyReportProjectId) || selectedProject || projects[0]}
           headerLogoUrl={logos.header}
           onClose={() => setIsMonthlyReportModalOpen(false)}
+          onUpdateProject={handleUpdateProject}
         />
       )}
 
