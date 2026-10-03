@@ -7,7 +7,12 @@ import {
   Sparkles,
   FileCheck,
   Plus,
-  Trash2
+  Trash2,
+  BarChart2,
+  TrendingUp,
+  ShieldCheck,
+  Clock,
+  Users
 } from 'lucide-react';
 import { Project } from '../types';
 
@@ -76,6 +81,119 @@ function AutoExpandingTextarea({
 }
 
 // -------------------------------------------------------------
+// COMPONENTE: AgustinSummaryBar (Zócalo editable EN RESUMEN + Indicadores)
+// -------------------------------------------------------------
+interface AgustinSummaryBarProps {
+  data: AgustinData;
+  onChange: (patch: Partial<AgustinData>) => void;
+}
+
+function AgustinSummaryBar({ data, onChange }: AgustinSummaryBarProps) {
+  return (
+    <div className="w-full bg-[#f4f7f9] border border-slate-200/90 rounded-2xl px-3 py-2 flex items-center justify-between shadow-xs">
+      {/* 1. Título EN RESUMEN con Ícono BarChart */}
+      <div className="flex flex-col items-center justify-center shrink-0 pr-3 border-r border-slate-200/90">
+        <div className="w-8 h-8 rounded-full bg-[#0091cb] text-white flex items-center justify-center shadow-xs mb-1">
+          <BarChart2 className="w-4 h-4 stroke-[2.5]" />
+        </div>
+        <input
+          type="text"
+          value={data.summaryTitle || 'EN RESUMEN'}
+          onChange={(e) => onChange({ summaryTitle: e.target.value })}
+          className="bg-transparent text-center font-black text-[10.5px] text-[#0a222e] tracking-wider uppercase focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-1 w-24 print:border-none print:shadow-none"
+          title="Haz clic para editar título"
+        />
+        <div className="w-7 h-0.5 bg-[#0091cb] rounded-full mt-0.5" />
+      </div>
+
+      {/* 2. Stat 1: AVANCE GENERAL / 95% */}
+      <div className="flex flex-col items-center justify-center flex-1 px-1.5 border-r border-slate-200/90">
+        <div className="w-7 h-7 rounded-full bg-[#dcf0fa] text-[#0091cb] flex items-center justify-center mb-0.5">
+          <TrendingUp className="w-3.5 h-3.5 stroke-[2.5]" />
+        </div>
+        <input
+          type="text"
+          value={data.summaryStat1Label || 'AVANCE GENERAL'}
+          onChange={(e) => onChange({ summaryStat1Label: e.target.value })}
+          className="bg-transparent text-center font-bold text-[8.5px] text-slate-700 tracking-tight uppercase focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar etiqueta"
+        />
+        <input
+          type="text"
+          value={data.summaryStat1Value || '95%'}
+          onChange={(e) => onChange({ summaryStat1Value: e.target.value })}
+          className="bg-transparent text-center font-black text-[13px] text-[#0091cb] leading-tight focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar porcentaje"
+        />
+      </div>
+
+      {/* 3. Stat 2: CALIDAD / GARANTIZADA */}
+      <div className="flex flex-col items-center justify-center flex-1 px-1.5 border-r border-slate-200/90">
+        <div className="w-7 h-7 rounded-full bg-[#dcf0fa] text-[#0091cb] flex items-center justify-center mb-0.5">
+          <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+        </div>
+        <input
+          type="text"
+          value={data.summaryStat2Label || 'CALIDAD'}
+          onChange={(e) => onChange({ summaryStat2Label: e.target.value })}
+          className="bg-transparent text-center font-bold text-[8.5px] text-slate-700 tracking-tight uppercase focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar etiqueta"
+        />
+        <input
+          type="text"
+          value={data.summaryStat2Value || 'GARANTIZADA'}
+          onChange={(e) => onChange({ summaryStat2Value: e.target.value })}
+          className="bg-transparent text-center font-extrabold text-[10.5px] text-[#0091cb] leading-tight focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar texto o porcentaje"
+        />
+      </div>
+
+      {/* 4. Stat 3: EN TIEMPO / SEGÚN PLAN */}
+      <div className="flex flex-col items-center justify-center flex-1 px-1.5 border-r border-slate-200/90">
+        <div className="w-7 h-7 rounded-full bg-[#dcf0fa] text-[#0091cb] flex items-center justify-center mb-0.5">
+          <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
+        </div>
+        <input
+          type="text"
+          value={data.summaryStat3Label || 'EN TIEMPO'}
+          onChange={(e) => onChange({ summaryStat3Label: e.target.value })}
+          className="bg-transparent text-center font-bold text-[8.5px] text-slate-700 tracking-tight uppercase focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar etiqueta"
+        />
+        <input
+          type="text"
+          value={data.summaryStat3Value || 'SEGÚN PLAN'}
+          onChange={(e) => onChange({ summaryStat3Value: e.target.value })}
+          className="bg-transparent text-center font-extrabold text-[10.5px] text-[#0091cb] leading-tight focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar texto o porcentaje"
+        />
+      </div>
+
+      {/* 5. Stat 4: COMPROMISO / CON VOS */}
+      <div className="flex flex-col items-center justify-center flex-1 pl-1.5">
+        <div className="w-7 h-7 rounded-full bg-[#dcf0fa] text-[#0091cb] flex items-center justify-center mb-0.5">
+          <Users className="w-3.5 h-3.5 stroke-[2.5]" />
+        </div>
+        <input
+          type="text"
+          value={data.summaryStat4Label || 'COMPROMISO'}
+          onChange={(e) => onChange({ summaryStat4Label: e.target.value })}
+          className="bg-transparent text-center font-bold text-[8.5px] text-slate-700 tracking-tight uppercase focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar etiqueta"
+        />
+        <input
+          type="text"
+          value={data.summaryStat4Value || 'CON VOS'}
+          onChange={(e) => onChange({ summaryStat4Value: e.target.value })}
+          className="bg-transparent text-center font-extrabold text-[10.5px] text-[#0091cb] leading-tight focus:outline-none focus:bg-white/80 hover:border-slate-300 border border-transparent rounded px-0.5 w-full print:border-none print:shadow-none"
+          title="Haz clic para editar texto o porcentaje"
+        />
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
 // DEFAULT DATA FOR PARQUE AGUSTÍN (2 PÁGINAS)
 // -------------------------------------------------------------
 interface AgustinData {
@@ -117,6 +235,17 @@ interface AgustinData {
   p2Item7Num: string;
   p2Item7Title: string;
   p2Item7Photo: string;
+
+  // Zócalo Editable "EN RESUMEN" y Porcentajes
+  summaryTitle: string;
+  summaryStat1Label: string;
+  summaryStat1Value: string;
+  summaryStat2Label: string;
+  summaryStat2Value: string;
+  summaryStat3Label: string;
+  summaryStat3Value: string;
+  summaryStat4Label: string;
+  summaryStat4Value: string;
 }
 
 const DEFAULT_AGUSTIN_DATA: AgustinData = {
@@ -171,7 +300,18 @@ La obra mantiene un ritmo de avance firme y sostenido, ingresando progresivament
   p2Item6Photo: '/report_assets/defaults/agustin_p2_item_06.png',
   p2Item7Num: '06',
   p2Item7Title: 'Revestimiento de baños y cocinas hasta el 7° piso',
-  p2Item7Photo: '/report_assets/defaults/agustin_p2_item_07.png'
+  p2Item7Photo: '/report_assets/defaults/agustin_p2_item_07.png',
+
+  // Zócalo Editable "EN RESUMEN" y Porcentajes
+  summaryTitle: 'EN RESUMEN',
+  summaryStat1Label: 'AVANCE GENERAL',
+  summaryStat1Value: '95%',
+  summaryStat2Label: 'CALIDAD',
+  summaryStat2Value: 'GARANTIZADA',
+  summaryStat3Label: 'EN TIEMPO',
+  summaryStat3Value: 'SEGÚN PLAN',
+  summaryStat4Label: 'COMPROMISO',
+  summaryStat4Value: 'CON VOS'
 };
 
 // -------------------------------------------------------------
@@ -776,19 +916,19 @@ export function MonthlyWorkReportModal({
                       </div>
                     </div>
 
-                    {/* Zócalo de Tarjeta: Doble Marca Oficial (Parque Agustín + Tierra Firme) */}
-                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-3">
-                      <div className="bg-white p-1 rounded-sm shadow-xs flex items-center justify-center">
+                    {/* Zócalo de Tarjeta: Doble Marca Oficial con Protagonismo (Parque Agustín + Tierra Firme) */}
+                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-4 shrink-0">
+                      <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
                         <img
                           src="/report_assets/logo_parque_agustin_official.jpg"
                           alt="Parque Agustín"
-                          className="max-h-8 sm:max-h-9 w-auto object-contain"
+                          className="h-10 sm:h-11 w-auto object-contain"
                         />
                       </div>
                       <img
                         src="/report_assets/logo_tierrafirme_white.png"
                         alt="Tierra Firme"
-                        className="max-h-8 sm:max-h-9 max-w-[130px] object-contain"
+                        className="h-10 sm:h-11 max-w-[150px] object-contain drop-shadow-sm"
                       />
                     </div>
                   </div>
@@ -947,24 +1087,24 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              {/* Zócalo Inferior Oficial A4 (EN RESUMEN + Marcas Oficiales) */}
-              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-1.5">
-                <img
-                  src="/report_assets/bar_en_resumen.png"
-                  alt="En Resumen"
-                  className="w-full max-h-[75px] object-contain rounded-xl"
-                />
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
-                  <img
-                    src="/report_assets/logo_parque_agustin_official.jpg"
-                    alt="Parque Agustín Quinta Sección"
-                    className="max-h-7 w-auto object-contain"
-                  />
-                  <img
-                    src="/report_assets/logo_tierrafirme_color.png"
-                    alt="Tierra Firme"
-                    className="max-h-7 w-auto object-contain"
-                  />
+              {/* Zócalo Inferior Oficial A4 (EN RESUMEN Editable + Logos Protagonistas) */}
+              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-2">
+                <AgustinSummaryBar data={agustinData} onChange={updateAgustinData} />
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                  <div className="flex items-center">
+                    <img
+                      src="/report_assets/logo_parque_agustin_official.jpg"
+                      alt="Parque Agustín Quinta Sección"
+                      className="h-12 sm:h-14 w-auto object-contain"
+                    />
+                  </div>
+                  <div className="flex items-center">
+                    <img
+                      src="/report_assets/logo_tierrafirme_color.png"
+                      alt="Tierra Firme"
+                      className="h-11 sm:h-13 w-auto object-contain"
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -988,19 +1128,19 @@ export function MonthlyWorkReportModal({
                       />
                     </div>
 
-                    {/* Zócalo de Tarjeta: Doble Marca Oficial (Parque Agustín + Tierra Firme) */}
-                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-3 shrink-0">
-                      <div className="bg-white p-1 rounded-sm shadow-xs flex items-center justify-center">
+                    {/* Zócalo de Tarjeta: Doble Marca Oficial con Protagonismo (Parque Agustín + Tierra Firme) */}
+                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-4 shrink-0">
+                      <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
                         <img
                           src="/report_assets/logo_parque_agustin_official.jpg"
                           alt="Parque Agustín"
-                          className="max-h-8 sm:max-h-9 w-auto object-contain"
+                          className="h-10 sm:h-11 w-auto object-contain"
                         />
                       </div>
                       <img
                         src="/report_assets/logo_tierrafirme_white.png"
                         alt="Tierra Firme"
-                        className="max-h-8 sm:max-h-9 max-w-[130px] object-contain"
+                        className="h-10 sm:h-11 max-w-[150px] object-contain drop-shadow-sm"
                       />
                     </div>
                   </div>
@@ -1183,24 +1323,24 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              {/* Zócalo Inferior Oficial A4 (EN RESUMEN + Marcas Oficiales) */}
-              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-1.5">
-                <img
-                  src="/report_assets/bar_en_resumen.png"
-                  alt="En Resumen"
-                  className="w-full max-h-[75px] object-contain rounded-xl"
-                />
-                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
-                  <img
-                    src="/report_assets/logo_parque_agustin_official.jpg"
-                    alt="Parque Agustín Quinta Sección"
-                    className="max-h-7 w-auto object-contain"
-                  />
-                  <img
-                    src="/report_assets/logo_tierrafirme_color.png"
-                    alt="Tierra Firme"
-                    className="max-h-7 w-auto object-contain"
-                  />
+              {/* Zócalo Inferior Oficial A4 (EN RESUMEN Editable + Logos Protagonistas) */}
+              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-2">
+                <AgustinSummaryBar data={agustinData} onChange={updateAgustinData} />
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                  <div className="flex items-center">
+                    <img
+                      src="/report_assets/logo_parque_agustin_official.jpg"
+                      alt="Parque Agustín Quinta Sección"
+                      className="h-12 sm:h-14 w-auto object-contain"
+                    />
+                  </div>
+                  <div className="flex items-center">
+                    <img
+                      src="/report_assets/logo_tierrafirme_color.png"
+                      alt="Tierra Firme"
+                      className="h-11 sm:h-13 w-auto object-contain"
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -1272,12 +1412,12 @@ export function MonthlyWorkReportModal({
 
                 {/* Lower Section: Official Andes Logo (Left) + "Etapa de OBRA" Table (Right) */}
                 <div className="grid grid-cols-12 gap-6 items-end pt-4">
-                  {/* Left: Official Parque de los Andes Logo */}
+                  {/* Left: Official Parque de los Andes Logo con Protagonismo */}
                   <div className="col-span-5 flex items-center justify-center p-2">
                     <img
                       src="/report_assets/logo_parque_de_los_andes.png"
                       alt="Edificio Parque de los Andes"
-                      className="max-h-24 max-w-[220px] object-contain"
+                      className="h-28 sm:h-32 max-w-[270px] w-auto object-contain drop-shadow-sm"
                     />
                   </div>
 
@@ -1352,12 +1492,12 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              {/* Bottom Solid Corporate Banner: Official White Tierra Firme Logo */}
-              <div className="bg-[#777c80] text-white px-8 py-5 flex items-center justify-center shrink-0">
+              {/* Bottom Solid Corporate Banner: Official White Tierra Firme Logo con Protagonismo */}
+              <div className="bg-[#777c80] text-white px-8 py-4 flex items-center justify-center shrink-0">
                 <img
                   src="/report_assets/logo_tierrafirme_white.png"
                   alt="Tierra Firme"
-                  className="max-h-12 max-w-[280px] object-contain"
+                  className="h-16 sm:h-20 max-w-[340px] w-auto object-contain"
                 />
               </div>
             </section>
@@ -1446,17 +1586,17 @@ export function MonthlyWorkReportModal({
                       ))}
                     </div>
 
-                    {/* Footer con Doble Logo Oficial */}
+                    {/* Footer con Doble Logo Oficial con Protagonismo */}
                     <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
                       <img
                         src="/report_assets/logo_parque_de_los_andes.png"
                         alt="Edificio Parque de los Andes"
-                        className="max-h-11 max-w-[170px] object-contain"
+                        className="h-13 sm:h-15 max-w-[210px] w-auto object-contain"
                       />
                       <img
                         src="/report_assets/logo_tierrafirme_color.png"
                         alt="Tierra Firme"
-                        className="max-h-10 max-w-[190px] object-contain"
+                        className="h-12 sm:h-14 max-w-[210px] w-auto object-contain"
                       />
                     </div>
                   </div>
@@ -1565,17 +1705,17 @@ export function MonthlyWorkReportModal({
                   />
                 </div>
 
-                {/* Footer with Dual Official Logos */}
+                {/* Footer with Dual Official Logos con Protagonismo */}
                 <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
                   <img
                     src="/report_assets/logo_parque_de_los_andes.png"
                     alt="Edificio Parque de los Andes"
-                    className="max-h-11 max-w-[170px] object-contain"
+                    className="h-13 sm:h-15 max-w-[210px] w-auto object-contain"
                   />
                   <img
                     src="/report_assets/logo_tierrafirme_color.png"
                     alt="Tierra Firme"
-                    className="max-h-10 max-w-[190px] object-contain"
+                    className="h-12 sm:h-14 max-w-[210px] w-auto object-contain"
                   />
                 </div>
               </div>
