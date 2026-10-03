@@ -677,12 +677,12 @@ export function MonthlyWorkReportModal({
           <>
             {/* PÁGINA 1: PARQUE AGUSTÍN */}
             <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
-              <div className="p-8 sm:p-10 flex-1 flex flex-col justify-between">
+              <div className="px-8 sm:px-10 pt-6 pb-2 flex-1 flex flex-col justify-between">
                 {/* Upper Grid: Left Dark Petrol Card + Right Facade Photos */}
-                <div className="grid grid-cols-12 gap-5 items-stretch min-h-[460px]">
+                <div className="grid grid-cols-12 gap-5 items-stretch h-[375px]">
                   {/* Left Column Dark Petrol Card */}
-                  <div className="col-span-5 bg-[#0a222e] text-white rounded-none p-5 sm:p-6 flex flex-col justify-between shadow-md relative overflow-hidden">
-                    <div className="space-y-4">
+                  <div className="col-span-5 bg-[#0a222e] text-white rounded-none p-5 flex flex-col justify-between shadow-md relative overflow-hidden">
+                    <div className="space-y-3">
                       {/* Year & Tagline */}
                       <div>
                         <input
@@ -700,20 +700,20 @@ export function MonthlyWorkReportModal({
                       </div>
 
                       {/* Month Big Title */}
-                      <div className="pt-2">
+                      <div className="pt-1">
                         <input
                           type="text"
                           value={agustinData.month}
                           onChange={(e) => updateAgustinData({ month: e.target.value.toUpperCase() })}
-                          className="bg-transparent text-3xl sm:text-4xl font-black text-white tracking-wider uppercase w-full focus:outline-none leading-none border-b-2 border-cyan-400/80 pb-2"
+                          className="bg-transparent text-3xl sm:text-4xl font-black text-white tracking-wider uppercase w-full focus:outline-none leading-none border-b-2 border-cyan-400/80 pb-1.5"
                         />
                       </div>
 
                       {/* 3 Circular Cyan Progress Badges */}
-                      <div className="space-y-4 pt-3">
+                      <div className="space-y-3 pt-1">
                         {/* Bubble 1 */}
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
+                          <div className="w-11 h-11 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
                             <input
                               type="text"
                               value={agustinData.bubble1Percent}
@@ -734,7 +734,7 @@ export function MonthlyWorkReportModal({
 
                         {/* Bubble 2 */}
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
+                          <div className="w-11 h-11 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
                             <input
                               type="text"
                               value={agustinData.bubble2Percent}
@@ -755,7 +755,7 @@ export function MonthlyWorkReportModal({
 
                         {/* Bubble 3 */}
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
+                          <div className="w-11 h-11 rounded-full bg-[#0091cb] flex items-center justify-center shrink-0 shadow-md">
                             <input
                               type="text"
                               value={agustinData.bubble3Percent}
@@ -776,22 +776,29 @@ export function MonthlyWorkReportModal({
                       </div>
                     </div>
 
-                    {/* Official White Tierra Firme Logo (Protected Brand) */}
-                    <div className="pt-6 border-t border-slate-700/60 mt-4 flex items-center justify-center">
+                    {/* Zócalo de Tarjeta: Doble Marca Oficial (Parque Agustín + Tierra Firme) */}
+                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-3">
+                      <div className="bg-white p-1 rounded-sm shadow-xs flex items-center justify-center">
+                        <img
+                          src="/report_assets/logo_parque_agustin_official.jpg"
+                          alt="Parque Agustín"
+                          className="max-h-8 sm:max-h-9 w-auto object-contain"
+                        />
+                      </div>
                       <img
                         src="/report_assets/logo_tierrafirme_white.png"
                         alt="Tierra Firme"
-                        className="max-h-11 max-w-[200px] object-contain"
+                        className="max-h-8 sm:max-h-9 max-w-[130px] object-contain"
                       />
                     </div>
                   </div>
 
                   {/* Right Upper Area: 2 Facade Photos Side-by-Side */}
-                  <div className="col-span-7 grid grid-cols-2 gap-3 items-stretch">
+                  <div className="col-span-7 grid grid-cols-2 gap-3 items-stretch h-full">
                     {/* Facade Photo 1 */}
                     <div
                       onClick={() => triggerUpload('p1Facade1Photo')}
-                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-sm"
+                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-sm h-full"
                       title="Haz clic para subir o cambiar foto"
                     >
                       <img
@@ -810,7 +817,7 @@ export function MonthlyWorkReportModal({
                     {/* Facade Photo 2 */}
                     <div
                       onClick={() => triggerUpload('p1Facade2Photo')}
-                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-sm"
+                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-sm h-full"
                       title="Haz clic para subir o cambiar foto"
                     >
                       <img
@@ -829,11 +836,11 @@ export function MonthlyWorkReportModal({
                 </div>
 
                 {/* Lower Section: 3 Numbered Columns (01, 02, 03) */}
-                <div className="grid grid-cols-3 gap-5 mt-6 pt-2">
+                <div className="grid grid-cols-3 gap-5 my-auto pt-2">
                   {/* Item 01 */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="flex items-start gap-2">
+                      <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
                           type="text"
                           value={agustinData.p1Item1Num}
@@ -845,12 +852,12 @@ export function MonthlyWorkReportModal({
                         type="text"
                         value={agustinData.p1Item1Title}
                         onChange={(e) => updateAgustinData({ p1Item1Title: e.target.value })}
-                        className="text-xs sm:text-sm font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
+                        className="text-xs font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
                       />
                     </div>
                     <div
                       onClick={() => triggerUpload('p1Item1Photo')}
-                      className="group relative aspect-[4/3] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p1Item1Photo}
@@ -867,9 +874,9 @@ export function MonthlyWorkReportModal({
                   </div>
 
                   {/* Item 02 */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="flex items-start gap-2">
+                      <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
                           type="text"
                           value={agustinData.p1Item2Num}
@@ -881,12 +888,12 @@ export function MonthlyWorkReportModal({
                         type="text"
                         value={agustinData.p1Item2Title}
                         onChange={(e) => updateAgustinData({ p1Item2Title: e.target.value })}
-                        className="text-xs sm:text-sm font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
+                        className="text-xs font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
                       />
                     </div>
                     <div
                       onClick={() => triggerUpload('p1Item2Photo')}
-                      className="group relative aspect-[4/3] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p1Item2Photo}
@@ -903,9 +910,9 @@ export function MonthlyWorkReportModal({
                   </div>
 
                   {/* Item 03 */}
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="flex items-start gap-2">
+                      <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
                           type="text"
                           value={agustinData.p1Item3Num}
@@ -917,12 +924,12 @@ export function MonthlyWorkReportModal({
                         type="text"
                         value={agustinData.p1Item3Title}
                         onChange={(e) => updateAgustinData({ p1Item3Title: e.target.value })}
-                        className="text-xs sm:text-sm font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
+                        className="text-xs font-bold text-slate-800 focus:outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-cyan-500 leading-tight"
                       />
                     </div>
                     <div
                       onClick={() => triggerUpload('p1Item3Photo')}
-                      className="group relative aspect-[4/3] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p1Item3Photo}
@@ -940,58 +947,70 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              {/* Bottom Official Bar: EN RESUMEN */}
-              <div className="px-8 sm:px-10 pb-5 pt-2">
+              {/* Zócalo Inferior Oficial A4 (EN RESUMEN + Marcas Oficiales) */}
+              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-1.5">
                 <img
                   src="/report_assets/bar_en_resumen.png"
                   alt="En Resumen"
-                  className="w-full h-auto object-contain rounded-xl"
+                  className="w-full max-h-[75px] object-contain rounded-xl"
                 />
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <img
+                    src="/report_assets/logo_parque_agustin_official.jpg"
+                    alt="Parque Agustín Quinta Sección"
+                    className="max-h-7 w-auto object-contain"
+                  />
+                  <img
+                    src="/report_assets/logo_tierrafirme_color.png"
+                    alt="Tierra Firme"
+                    className="max-h-7 w-auto object-contain"
+                  />
+                </div>
               </div>
             </section>
 
             {/* PÁGINA 2: PARQUE AGUSTÍN */}
             <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
-              <div className="p-8 sm:p-10 flex-1 flex flex-col justify-between">
+              <div className="px-8 sm:px-10 pt-6 pb-2 flex-1 flex flex-col justify-between">
                 {/* Upper Grid: Left Written Card with Logos + Right 3 Photos */}
-                <div className="grid grid-cols-12 gap-5 items-stretch min-h-[460px]">
+                <div className="grid grid-cols-12 gap-5 items-stretch h-[375px]">
                   {/* Left Column Dark Petrol Card (RESUMEN + LOGOS) */}
-                  <div className="col-span-6 bg-[#0a222e] text-white p-6 flex flex-col justify-between shadow-md">
-                    <div className="space-y-2">
+                  <div className="col-span-6 bg-[#0a222e] text-white p-5 flex flex-col justify-between shadow-md overflow-hidden">
+                    <div className="space-y-1.5 flex-1 overflow-hidden">
                       <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest border-b border-cyan-400/40 pb-1">
                         RESUMEN
                       </h3>
                       <AutoExpandingTextarea
                         value={agustinData.p2ResumenText}
                         onChangeText={(val) => updateAgustinData({ p2ResumenText: val })}
-                        className="w-full bg-transparent text-[10px] leading-relaxed text-slate-200 focus:outline-none"
-                        printClassName="text-[9.5px] leading-relaxed text-slate-200"
+                        className="w-full bg-transparent text-[9.5px] leading-[1.35] text-slate-200 focus:outline-none"
+                        printClassName="text-[8px] leading-[1.25] text-slate-200"
                       />
                     </div>
 
-                    {/* Both Official Logos at bottom of Card */}
-                    <div className="pt-4 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-4">
-                      {/* Logo Parque Agustín (Official) */}
-                      <img
-                        src="/report_assets/logo_parque_agustin.png"
-                        alt="Parque Agustín"
-                        className="max-h-10 max-w-[140px] object-contain brightness-0 invert"
-                      />
-                      {/* Logo Tierra Firme (Official) */}
+                    {/* Zócalo de Tarjeta: Doble Marca Oficial (Parque Agustín + Tierra Firme) */}
+                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-3 shrink-0">
+                      <div className="bg-white p-1 rounded-sm shadow-xs flex items-center justify-center">
+                        <img
+                          src="/report_assets/logo_parque_agustin_official.jpg"
+                          alt="Parque Agustín"
+                          className="max-h-8 sm:max-h-9 w-auto object-contain"
+                        />
+                      </div>
                       <img
                         src="/report_assets/logo_tierrafirme_white.png"
                         alt="Tierra Firme"
-                        className="max-h-9 max-w-[140px] object-contain"
+                        className="max-h-8 sm:max-h-9 max-w-[130px] object-contain"
                       />
                     </div>
                   </div>
 
                   {/* Right Upper Area: 3 Photos Grid */}
-                  <div className="col-span-6 grid grid-cols-2 gap-3 items-stretch">
+                  <div className="col-span-6 grid grid-cols-2 gap-2.5 h-full">
                     {/* Photo 1 (Vertical) */}
                     <div
                       onClick={() => triggerUpload('p2Photo1')}
-                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[190px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p2Photo1}
@@ -1009,7 +1028,7 @@ export function MonthlyWorkReportModal({
                     {/* Photo 2 (Angle Facade) */}
                     <div
                       onClick={() => triggerUpload('p2Photo2')}
-                      className="group relative bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[190px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p2Photo2}
@@ -1027,7 +1046,7 @@ export function MonthlyWorkReportModal({
                     {/* Photo 3 (Full width across two cols) */}
                     <div
                       onClick={() => triggerUpload('p2Photo3')}
-                      className="col-span-2 group relative aspect-[16/7] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="col-span-2 group relative h-[165px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p2Photo3}
@@ -1045,9 +1064,9 @@ export function MonthlyWorkReportModal({
                 </div>
 
                 {/* Lower Section: 4 Numbered Columns (04, 05, 06, 06/07) */}
-                <div className="grid grid-cols-4 gap-4 mt-6 pt-2">
+                <div className="grid grid-cols-4 gap-4 my-auto pt-2">
                   {/* Item 04 */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex flex-col">
                     <div className="flex items-start gap-2">
                       <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
@@ -1066,7 +1085,7 @@ export function MonthlyWorkReportModal({
                     </div>
                     <div
                       onClick={() => triggerUpload('p2Item4Photo')}
-                      className="group relative aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img src={agustinData.p2Item4Photo} alt="Item 04" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
@@ -1076,7 +1095,7 @@ export function MonthlyWorkReportModal({
                   </div>
 
                   {/* Item 05 */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex flex-col">
                     <div className="flex items-start gap-2">
                       <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
@@ -1095,7 +1114,7 @@ export function MonthlyWorkReportModal({
                     </div>
                     <div
                       onClick={() => triggerUpload('p2Item5Photo')}
-                      className="group relative aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img src={agustinData.p2Item5Photo} alt="Item 05" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
@@ -1105,7 +1124,7 @@ export function MonthlyWorkReportModal({
                   </div>
 
                   {/* Item 06 */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex flex-col">
                     <div className="flex items-start gap-2">
                       <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
@@ -1124,7 +1143,7 @@ export function MonthlyWorkReportModal({
                     </div>
                     <div
                       onClick={() => triggerUpload('p2Item6Photo')}
-                      className="group relative aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img src={agustinData.p2Item6Photo} alt="Item 06" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
@@ -1134,7 +1153,7 @@ export function MonthlyWorkReportModal({
                   </div>
 
                   {/* Item 07 */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 flex flex-col">
                     <div className="flex items-start gap-2">
                       <div className="w-7 h-7 rounded-full bg-[#0091cb] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
                         <input
@@ -1153,7 +1172,7 @@ export function MonthlyWorkReportModal({
                     </div>
                     <div
                       onClick={() => triggerUpload('p2Item7Photo')}
-                      className="group relative aspect-[3/4] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative h-[180px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img src={agustinData.p2Item7Photo} alt="Item 07" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
@@ -1164,13 +1183,25 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              {/* Bottom Official Bar: EN RESUMEN */}
-              <div className="px-8 sm:px-10 pb-5 pt-2">
+              {/* Zócalo Inferior Oficial A4 (EN RESUMEN + Marcas Oficiales) */}
+              <div className="px-8 sm:px-10 pb-4 pt-1 shrink-0 space-y-1.5">
                 <img
                   src="/report_assets/bar_en_resumen.png"
                   alt="En Resumen"
-                  className="w-full h-auto object-contain rounded-xl"
+                  className="w-full max-h-[75px] object-contain rounded-xl"
                 />
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <img
+                    src="/report_assets/logo_parque_agustin_official.jpg"
+                    alt="Parque Agustín Quinta Sección"
+                    className="max-h-7 w-auto object-contain"
+                  />
+                  <img
+                    src="/report_assets/logo_tierrafirme_color.png"
+                    alt="Tierra Firme"
+                    className="max-h-7 w-auto object-contain"
+                  />
+                </div>
               </div>
             </section>
           </>
