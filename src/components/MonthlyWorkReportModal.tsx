@@ -2,17 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Printer,
-  Camera,
   RotateCcw,
-  Pencil,
-  Check,
   Upload,
-  Layers,
   Sparkles,
-  Building2,
   FileCheck,
-  Eye,
-  Sliders
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { Project } from '../types';
 
@@ -25,6 +20,60 @@ interface MonthlyWorkReportModalProps {
 }
 
 type TemplateType = 'parque_agustin' | 'parque_andes';
+
+// -------------------------------------------------------------
+// COMPONENTE: AutoExpandingTextarea (Pantalla expande, Imprime nativo)
+// -------------------------------------------------------------
+interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  value: string;
+  onChangeText?: (val: string) => void;
+  printClassName?: string;
+}
+
+function AutoExpandingTextarea({
+  value,
+  onChangeText,
+  onChange,
+  className = '',
+  printClassName = '',
+  rows = 1,
+  ...props
+}: AutoExpandingTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (onChangeText) {
+      onChangeText(e.target.value);
+    } else if (onChange) {
+      onChange(e);
+    }
+  };
+
+  return (
+    <>
+      {/* Modo Pantalla: Textarea autoexpandible, sin scrollbar */}
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        rows={rows}
+        className={`${className} overflow-hidden resize-none print:hidden`}
+        {...props}
+      />
+      {/* Modo Impresión / PDF: Bloque semántico tipográfico nativo sin formularios ni cortes */}
+      <div className={`hidden print:block whitespace-pre-wrap ${printClassName || className}`}>
+        {value}
+      </div>
+    </>
+  );
+}
 
 // -------------------------------------------------------------
 // DEFAULT DATA FOR PARQUE AGUSTÍN (2 PÁGINAS)
@@ -126,8 +175,15 @@ La obra mantiene un ritmo de avance firme y sostenido, ingresando progresivament
 };
 
 // -------------------------------------------------------------
-// DEFAULT DATA FOR PARQUE DE LOS ANDES (3 PÁGINAS)
+// DEFAULT DATA FOR PARQUE DE LOS ANDES (GALERÍA DINÁMICA A4)
 // -------------------------------------------------------------
+export interface AndesGalleryItem {
+  id: string;
+  photo: string;
+  title1: string;
+  title2?: string;
+}
+
 interface AndesData {
   p1TopLeftTitle: string;
   p1TopRightDate: string;
@@ -143,21 +199,12 @@ interface AndesData {
   p1Stage4Pct: string;
   p1Stage4Label: string;
 
-  // Page 2
+  // Galería Dinámica (Páginas de Fachadas)
   p2TabTitle: string;
   p2Subtitle: string;
-  p2Photo1Title1: string;
-  p2Photo1Title2: string;
-  p2Photo1: string;
-  p2Photo2Title1: string;
-  p2Photo2Title2: string;
-  p2Photo2: string;
-  p2Photo3Title: string;
-  p2Photo3: string;
-  p2Photo4Title: string;
-  p2Photo4: string;
+  galleryItems: AndesGalleryItem[];
 
-  // Page 3
+  // Página de Informe Técnico
   p3TabTitle: string;
   p3DocTitle: string;
   p3Paragraph1: string;
@@ -169,6 +216,33 @@ interface AndesData {
   p3NextTasksList: string;
   p3Conclusion: string;
 }
+
+const DEFAULT_ANDES_GALLERY: AndesGalleryItem[] = [
+  {
+    id: '1',
+    photo: '/report_assets/defaults/andes_p2_photo_1.png',
+    title1: 'Revoque fachadas internas',
+    title2: 'Instalacion sanitaria'
+  },
+  {
+    id: '2',
+    photo: '/report_assets/defaults/andes_p2_photo_2.png',
+    title1: 'Recuadros barandas balcón',
+    title2: 'Instalacion sanitaria'
+  },
+  {
+    id: '3',
+    photo: '/report_assets/defaults/andes_p2_photo_3.png',
+    title1: 'Instalacion sanitaria',
+    title2: ''
+  },
+  {
+    id: '4',
+    photo: '/report_assets/defaults/andes_p2_photo_4.png',
+    title1: 'Cubierta 4° piso',
+    title2: ''
+  }
+];
 
 const DEFAULT_ANDES_DATA: AndesData = {
   p1TopLeftTitle: '2026 RECUADROS EXTERIORES',
@@ -185,21 +259,12 @@ const DEFAULT_ANDES_DATA: AndesData = {
   p1Stage4Pct: '50%',
   p1Stage4Label: 'INSTALACION SANITARIA Y ELECTRICA',
 
-  // Page 2
+  // Galería Dinámica
   p2TabTitle: 'FACHADAS',
   p2Subtitle: 'Terminaciones exteriores',
-  p2Photo1Title1: 'Revoque fachadas internas',
-  p2Photo1Title2: 'Instalacion sanitaria',
-  p2Photo1: '/report_assets/defaults/andes_p2_photo_1.png',
-  p2Photo2Title1: 'Recuadros barandas balcón',
-  p2Photo2Title2: 'Instalacion sanitaria',
-  p2Photo2: '/report_assets/defaults/andes_p2_photo_2.png',
-  p2Photo3Title: 'Instalacion sanitaria',
-  p2Photo3: '/report_assets/defaults/andes_p2_photo_3.png',
-  p2Photo4Title: 'Cubierta 4° piso',
-  p2Photo4: '/report_assets/defaults/andes_p2_photo_4.png',
+  galleryItems: DEFAULT_ANDES_GALLERY,
 
-  // Page 3
+  // Página de Informe Técnico
   p3TabTitle: 'INFORME',
   p3DocTitle: 'Informe de Avance de Obra – Parque Los Andes',
   p3Paragraph1: 'Durante el período informado, la obra mantuvo un ritmo sostenido de ejecución, concentrando los esfuerzos en tareas correspondientes a la envolvente exterior y en el avance de las instalaciones de los sectores de servicios.',
@@ -250,11 +315,42 @@ export function MonthlyWorkReportModal({
     return DEFAULT_AGUSTIN_DATA;
   });
 
-  // State for Parque de los Andes
+  // State for Parque de los Andes (con migración para galería dinámica)
   const [andesData, setAndesData] = useState<AndesData>(() => {
     try {
       const saved = localStorage.getItem(storageKeyAndes);
-      if (saved) return { ...DEFAULT_ANDES_DATA, ...JSON.parse(saved) };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!parsed.galleryItems || !Array.isArray(parsed.galleryItems) || parsed.galleryItems.length === 0) {
+          parsed.galleryItems = [
+            {
+              id: '1',
+              photo: parsed.p2Photo1 || DEFAULT_ANDES_GALLERY[0].photo,
+              title1: parsed.p2Photo1Title1 || DEFAULT_ANDES_GALLERY[0].title1,
+              title2: parsed.p2Photo1Title2 || DEFAULT_ANDES_GALLERY[0].title2
+            },
+            {
+              id: '2',
+              photo: parsed.p2Photo2 || DEFAULT_ANDES_GALLERY[1].photo,
+              title1: parsed.p2Photo2Title1 || DEFAULT_ANDES_GALLERY[1].title1,
+              title2: parsed.p2Photo2Title2 || DEFAULT_ANDES_GALLERY[1].title2
+            },
+            {
+              id: '3',
+              photo: parsed.p2Photo3 || DEFAULT_ANDES_GALLERY[2].photo,
+              title1: parsed.p2Photo3Title || DEFAULT_ANDES_GALLERY[2].title1,
+              title2: ''
+            },
+            {
+              id: '4',
+              photo: parsed.p2Photo4 || DEFAULT_ANDES_GALLERY[3].photo,
+              title1: parsed.p2Photo4Title || DEFAULT_ANDES_GALLERY[3].title1,
+              title2: ''
+            }
+          ];
+        }
+        return { ...DEFAULT_ANDES_DATA, ...parsed };
+      }
     } catch {}
     return DEFAULT_ANDES_DATA;
   });
@@ -273,6 +369,50 @@ export function MonthlyWorkReportModal({
   const updateAndesData = (updates: Partial<AndesData>) => {
     setAndesData(prev => {
       const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem(storageKeyAndes, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Manejadores de galería dinámica de Parque de los Andes
+  const handleAddGalleryItem = () => {
+    const newItem: AndesGalleryItem = {
+      id: Date.now().toString(),
+      photo: '/report_assets/defaults/andes_p2_photo_1.png',
+      title1: 'NUEVA FOTO DE AVANCE',
+      title2: 'TERMINACIONES Y DETALLES'
+    };
+    setAndesData(prev => {
+      const next = { ...prev, galleryItems: [...prev.galleryItems, newItem] };
+      try {
+        localStorage.setItem(storageKeyAndes, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleRemoveGalleryItem = (id: string) => {
+    if (andesData.galleryItems.length <= 1) return;
+    setAndesData(prev => {
+      const next = {
+        ...prev,
+        galleryItems: prev.galleryItems.filter(item => item.id !== id)
+      };
+      try {
+        localStorage.setItem(storageKeyAndes, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleUpdateGalleryItem = (id: string, updates: Partial<AndesGalleryItem>) => {
+    setAndesData(prev => {
+      const next = {
+        ...prev,
+        galleryItems: prev.galleryItems.map(item => item.id === id ? { ...item, ...updates } : item)
+      };
       try {
         localStorage.setItem(storageKeyAndes, JSON.stringify(next));
       } catch {}
@@ -309,7 +449,10 @@ export function MonthlyWorkReportModal({
       const base64 = event.target?.result as string;
       if (!base64) return;
 
-      if (activeTemplate === 'parque_agustin') {
+      if (activeUploadTarget.startsWith('gallery_')) {
+        const itemId = activeUploadTarget.replace('gallery_', '');
+        handleUpdateGalleryItem(itemId, { photo: base64 });
+      } else if (activeTemplate === 'parque_agustin') {
         updateAgustinData({ [activeUploadTarget]: base64 });
       } else {
         updateAndesData({ [activeUploadTarget]: base64 });
@@ -322,34 +465,109 @@ export function MonthlyWorkReportModal({
 
   // Print Handler (Strict Portrait A4)
   const handlePrint = () => {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'report-print-enforce';
-    styleEl.innerHTML = `
-      @page {
-        size: A4 portrait !important;
-        margin: 0 !important;
-      }
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #ffffff !important;
-      }
-    `;
-    document.head.appendChild(styleEl);
-
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => {
-        const el = document.getElementById('report-print-enforce');
-        if (el) el.remove();
-      }, 1000);
-    }, 150);
+    window.print();
   };
+
+  // Paginación de la galería de Parque de los Andes en bloques de 4 fotos por hoja A4
+  const andesGalleryChunks: AndesGalleryItem[][] = [];
+  for (let i = 0; i < andesData.galleryItems.length; i += 4) {
+    andesGalleryChunks.push(andesData.galleryItems.slice(i, i + 4));
+  }
 
   if (!isOpen || !project) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white overflow-hidden animate-in fade-in duration-150 report-modal-backdrop">
+      {/* Dynamic print stylesheet para salida 100% limpia en A4 Portrait */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait !important;
+            margin: 0 !important;
+          }
+          html, body {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .no-print,
+          header,
+          nav,
+          footer,
+          #root > div > header,
+          #root > div > main,
+          #root > div > nav,
+          [class*="wallpaper"],
+          [class*="luminous"],
+          [class*="blur-"] {
+            display: none !important;
+          }
+          .report-modal-backdrop {
+            position: static !important;
+            inset: auto !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+          }
+          .monthly-report-sheet-wrapper {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            display: block !important;
+          }
+          .monthly-report-page {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            min-height: 297mm !important;
+            max-height: 297mm !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            position: relative !important;
+            background: #ffffff !important;
+            overflow: hidden !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .monthly-report-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+          .monthly-report-page input,
+          .monthly-report-page textarea {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+          }
+        }
+      `}</style>
+
       {/* Hidden File Input for Image Slots */}
       <input
         ref={fileInputRef}
@@ -400,7 +618,7 @@ export function MonthlyWorkReportModal({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Parque de los Andes (3 Págs)
+            Parque de los Andes ({andesGalleryChunks.length + 2} Págs)
           </button>
         </div>
 
@@ -442,7 +660,7 @@ export function MonthlyWorkReportModal({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-cyan-400" />
           <span>
-            <b>Edición Directa:</b> Haz clic en cualquier imagen para cambiarla/subirla y en los campos de texto para redactar el informe del mes.
+            <b>Edición Directa:</b> Haz clic en cualquier imagen para cambiarla/subirla y en los campos de texto para redactar el informe del mes sin scrollbars.
           </span>
         </div>
         <span className="text-[11px] text-slate-400 hidden sm:inline">
@@ -450,8 +668,8 @@ export function MonthlyWorkReportModal({
         </span>
       </div>
 
-      {/* MAIN SCROLL CONTAINER: RENDER TEMPLATE */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-900/60 flex flex-col items-center gap-10 report-sheet-wrapper">
+      {/* MAIN SCROLL CONTAINER: USA DIV (NO MAIN) PARA NO SER BLOQUEADO POR INDEX.CSS */}
+      <div id="monthly-report-printable-area" className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-900/60 flex flex-col items-center gap-10 monthly-report-sheet-wrapper">
         {/* ========================================================================= */}
         {/* 1. PLANTILLA PARQUE AGUSTÍN (2 PÁGINAS A4 VERTICALES)                     */}
         {/* ========================================================================= */}
@@ -743,11 +961,11 @@ export function MonthlyWorkReportModal({
                       <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest border-b border-cyan-400/40 pb-1">
                         RESUMEN
                       </h3>
-                      <textarea
-                        rows={16}
+                      <AutoExpandingTextarea
                         value={agustinData.p2ResumenText}
-                        onChange={(e) => updateAgustinData({ p2ResumenText: e.target.value })}
-                        className="w-full bg-transparent text-[10.5px] leading-relaxed text-slate-200 focus:outline-none resize-none scrollbar-thin"
+                        onChangeText={(val) => updateAgustinData({ p2ResumenText: val })}
+                        className="w-full bg-transparent text-[10px] leading-relaxed text-slate-200 focus:outline-none"
+                        printClassName="text-[9.5px] leading-relaxed text-slate-200"
                       />
                     </div>
 
@@ -1113,152 +1331,121 @@ export function MonthlyWorkReportModal({
               </div>
             </section>
 
-            {/* PÁGINA 2: PARQUE DE LOS ANDES (FACHADAS) */}
-            <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
-              {/* Right Margin Stripes (Red & Gray) */}
-              <div className="absolute right-0 top-0 bottom-0 w-3 bg-[#777c80] hidden sm:block" />
-              <div className="absolute right-3 top-0 bottom-0 w-1 bg-red-700 hidden sm:block" />
+            {/* PÁGINAS DE FACHADAS: PAGINACIÓN DINÁMICA DE A 4 FOTOS POR HOJA A4 */}
+            {andesGalleryChunks.map((chunk, pageIdx) => (
+              <React.Fragment key={`andes-gallery-chunk-${pageIdx}`}>
+                <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
+                  {/* Right Margin Stripes (Red & Gray) */}
+                  <div className="absolute right-0 top-0 bottom-0 w-3 bg-[#777c80] hidden sm:block" />
+                  <div className="absolute right-3 top-0 bottom-0 w-1 bg-red-700 hidden sm:block" />
 
-              {/* Top Block Tab */}
-              <div className="pt-0 pr-8 sm:pr-12 flex justify-end">
-                <div className="bg-[#777c80] text-white font-black text-sm px-6 py-2.5 rounded-b-xl uppercase tracking-wider shadow-sm">
-                  <input
-                    type="text"
-                    value={andesData.p2TabTitle}
-                    onChange={(e) => updateAndesData({ p2TabTitle: e.target.value })}
-                    className="bg-transparent text-center focus:outline-none w-32"
-                  />
-                </div>
-              </div>
-
-              <div className="p-8 sm:p-10 pr-8 sm:pr-14 flex-1 flex flex-col justify-between">
-                <div>
-                  <input
-                    type="text"
-                    value={andesData.p2Subtitle}
-                    onChange={(e) => updateAndesData({ p2Subtitle: e.target.value })}
-                    className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wide focus:outline-none w-full border-b border-transparent hover:border-slate-300 pb-0.5 mb-4"
-                  />
-                </div>
-
-                {/* 4 Photos Grid with Underlined Epigraphs */}
-                <div className="grid grid-cols-2 gap-5 flex-1">
-                  {/* Photo 1 */}
-                  <div className="space-y-1.5 flex flex-col">
-                    <div className="border-b border-slate-700 pb-0.5">
+                  {/* Top Block Tab */}
+                  <div className="pt-0 pr-8 sm:pr-12 flex justify-end">
+                    <div className="bg-[#777c80] text-white font-black text-sm px-6 py-2 rounded-b-xl uppercase tracking-wider shadow-sm">
                       <input
                         type="text"
-                        value={andesData.p2Photo1Title1}
-                        onChange={(e) => updateAndesData({ p2Photo1Title1: e.target.value })}
-                        className="text-[11px] font-bold text-slate-800 uppercase focus:outline-none w-full"
+                        value={pageIdx === 0 ? andesData.p2TabTitle : `${andesData.p2TabTitle} (CONT. ${pageIdx + 1})`}
+                        onChange={(e) => {
+                          if (pageIdx === 0) updateAndesData({ p2TabTitle: e.target.value });
+                        }}
+                        className="bg-transparent text-center focus:outline-none w-36"
                       />
-                      <input
-                        type="text"
-                        value={andesData.p2Photo1Title2}
-                        onChange={(e) => updateAndesData({ p2Photo1Title2: e.target.value })}
-                        className="text-[10px] text-slate-500 uppercase focus:outline-none w-full"
-                      />
-                    </div>
-                    <div
-                      onClick={() => triggerUpload('p2Photo1')}
-                      className="group relative flex-1 min-h-[170px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200"
-                    >
-                      <img src={andesData.p2Photo1} alt="P2 Foto 1" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="p-1.5 bg-slate-900/90 text-amber-300 rounded text-xs font-bold">Cambiar</span>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Photo 2 */}
-                  <div className="space-y-1.5 flex flex-col">
-                    <div className="border-b border-slate-700 pb-0.5">
+                  <div className="px-8 sm:px-10 pr-8 sm:pr-14 pt-2 pb-4 flex-1 flex flex-col justify-between">
+                    <div>
                       <input
                         type="text"
-                        value={andesData.p2Photo2Title1}
-                        onChange={(e) => updateAndesData({ p2Photo2Title1: e.target.value })}
-                        className="text-[11px] font-bold text-slate-800 uppercase focus:outline-none w-full"
-                      />
-                      <input
-                        type="text"
-                        value={andesData.p2Photo2Title2}
-                        onChange={(e) => updateAndesData({ p2Photo2Title2: e.target.value })}
-                        className="text-[10px] text-slate-500 uppercase focus:outline-none w-full"
+                        value={andesData.p2Subtitle}
+                        onChange={(e) => updateAndesData({ p2Subtitle: e.target.value })}
+                        className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wide focus:outline-none w-full border-b border-transparent hover:border-slate-300 pb-0.5 mb-2"
                       />
                     </div>
-                    <div
-                      onClick={() => triggerUpload('p2Photo2')}
-                      className="group relative flex-1 min-h-[170px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200"
-                    >
-                      <img src={andesData.p2Photo2} alt="P2 Foto 2" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="p-1.5 bg-slate-900/90 text-amber-300 rounded text-xs font-bold">Cambiar</span>
-                      </div>
+
+                    {/* Grilla 2x2 Calibrada: Máximo 4 fotos por hoja sin desbordar el A4 */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4 my-auto">
+                      {chunk.map((item) => (
+                        <div key={item.id} className="flex flex-col space-y-1">
+                          {/* Encabezado con Títulos Subrayados */}
+                          <div className="border-b border-slate-700 pb-0.5 flex items-center justify-between">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <input
+                                type="text"
+                                value={item.title1}
+                                onChange={(e) => handleUpdateGalleryItem(item.id, { title1: e.target.value })}
+                                className="text-[11px] font-bold text-slate-800 uppercase focus:outline-none w-full truncate"
+                                placeholder="Título de la tarea o sector"
+                              />
+                              <input
+                                type="text"
+                                value={item.title2 || ''}
+                                onChange={(e) => handleUpdateGalleryItem(item.id, { title2: e.target.value })}
+                                className="text-[10px] text-slate-500 uppercase focus:outline-none w-full truncate"
+                                placeholder="Detalle o rubro adicional"
+                              />
+                            </div>
+                            {/* Botón Eliminar Foto (solo en pantalla, no en impresión) */}
+                            {andesData.galleryItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveGalleryItem(item.id)}
+                                className="no-print p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                title="Eliminar esta foto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Recuadro de Foto con Altura Fija Calibrada (235px) */}
+                          <div
+                            onClick={() => triggerUpload(`gallery_${item.id}`)}
+                            className="group relative h-[230px] sm:h-[235px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                          >
+                            <img src={item.photo} alt={item.title1} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
+                              <span className="p-1.5 bg-slate-900/90 text-amber-300 rounded text-xs font-bold flex items-center gap-1 shadow-md">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Cambiar Foto</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Footer con Doble Logo Oficial */}
+                    <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
+                      <img
+                        src="/report_assets/logo_parque_de_los_andes.png"
+                        alt="Edificio Parque de los Andes"
+                        className="max-h-11 max-w-[170px] object-contain"
+                      />
+                      <img
+                        src="/report_assets/logo_tierrafirme_color.png"
+                        alt="Tierra Firme"
+                        className="max-h-10 max-w-[190px] object-contain"
+                      />
                     </div>
                   </div>
+                </section>
+              </React.Fragment>
+            ))}
 
-                  {/* Photo 3 */}
-                  <div className="space-y-1.5 flex flex-col">
-                    <div className="border-b border-slate-700 pb-0.5">
-                      <input
-                        type="text"
-                        value={andesData.p2Photo3Title}
-                        onChange={(e) => updateAndesData({ p2Photo3Title: e.target.value })}
-                        className="text-[11px] font-bold text-slate-800 uppercase focus:outline-none w-full"
-                      />
-                    </div>
-                    <div
-                      onClick={() => triggerUpload('p2Photo3')}
-                      className="group relative flex-1 min-h-[170px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200"
-                    >
-                      <img src={andesData.p2Photo3} alt="P2 Foto 3" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="p-1.5 bg-slate-900/90 text-amber-300 rounded text-xs font-bold">Cambiar</span>
-                      </div>
-                    </div>
-                  </div>
+            {/* BOTÓN FLOTANTE PARA AGREGAR MÁS FOTOS A LA GALERÍA (SOLO EN PANTALLA) */}
+            <div className="w-full max-w-[210mm] flex justify-center sm:justify-end no-print -my-4 z-20">
+              <button
+                type="button"
+                onClick={handleAddGalleryItem}
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-xl active:scale-95 transition-all touch-target"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Agregar Otra Foto a la Galería (+1 Hoja A4 cada 4 fotos)</span>
+              </button>
+            </div>
 
-                  {/* Photo 4 (Cubierta 4° piso) */}
-                  <div className="space-y-1.5 flex flex-col">
-                    <div className="border-b border-slate-700 pb-0.5">
-                      <input
-                        type="text"
-                        value={andesData.p2Photo4Title}
-                        onChange={(e) => updateAndesData({ p2Photo4Title: e.target.value })}
-                        className="text-[11px] font-bold text-slate-800 uppercase focus:outline-none w-full"
-                      />
-                    </div>
-                    <div
-                      onClick={() => triggerUpload('p2Photo4')}
-                      className="group relative flex-1 min-h-[170px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200"
-                    >
-                      <img src={andesData.p2Photo4} alt="P2 Foto 4" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="p-1.5 bg-slate-900/90 text-amber-300 rounded text-xs font-bold">Cambiar</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer with Dual Official Logos */}
-                <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
-                  {/* Andes Official Logo */}
-                  <img
-                    src="/report_assets/logo_parque_de_los_andes.png"
-                    alt="Edificio Parque de los Andes"
-                    className="max-h-12 max-w-[170px] object-contain"
-                  />
-                  {/* Tierra Firme Color Logo */}
-                  <img
-                    src="/report_assets/logo_tierrafirme_color.png"
-                    alt="Tierra Firme"
-                    className="max-h-11 max-w-[190px] object-contain"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* PÁGINA 3: PARQUE DE LOS ANDES (INFORME TÉCNICO) */}
+            {/* PÁGINA DE INFORME TÉCNICO: TEXTOS FLUIDOS SIN SCROLLBARS */}
             <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
               {/* Right Margin Stripes */}
               <div className="absolute right-0 top-0 bottom-0 w-3 bg-[#777c80] hidden sm:block" />
@@ -1266,7 +1453,7 @@ export function MonthlyWorkReportModal({
 
               {/* Top Block Tab */}
               <div className="pt-0 pr-8 sm:pr-12 flex justify-end">
-                <div className="bg-[#777c80] text-white font-black text-sm px-6 py-2.5 rounded-b-xl uppercase tracking-wider shadow-sm">
+                <div className="bg-[#777c80] text-white font-black text-sm px-6 py-2 rounded-b-xl uppercase tracking-wider shadow-sm">
                   <input
                     type="text"
                     value={andesData.p3TabTitle}
@@ -1276,9 +1463,9 @@ export function MonthlyWorkReportModal({
                 </div>
               </div>
 
-              <div className="p-8 sm:p-10 pr-8 sm:pr-14 flex-1 flex flex-col justify-between space-y-4">
+              <div className="px-8 sm:px-10 pr-8 sm:pr-14 pt-2 pb-4 flex-1 flex flex-col justify-between">
                 {/* Document Title */}
-                <div>
+                <div className="mb-3">
                   <input
                     type="text"
                     value={andesData.p3DocTitle}
@@ -1287,34 +1474,34 @@ export function MonthlyWorkReportModal({
                   />
                 </div>
 
-                {/* Structured Text Paragraphs */}
-                <div className="space-y-3 text-xs sm:text-[12.5px] leading-relaxed text-slate-800 flex-1">
-                  <textarea
-                    rows={3}
+                {/* Structured Text Paragraphs con AutoExpandingTextarea (Sin scrollbars) */}
+                <div className="space-y-2.5 text-xs sm:text-[11.5px] leading-relaxed text-slate-800 flex-1 my-auto">
+                  <AutoExpandingTextarea
                     value={andesData.p3Paragraph1}
-                    onChange={(e) => updateAndesData({ p3Paragraph1: e.target.value })}
-                    className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200"
+                    onChangeText={(val) => updateAndesData({ p3Paragraph1: val })}
+                    className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200"
+                    printClassName="text-slate-800 text-[11px] leading-relaxed"
                   />
 
-                  <textarea
-                    rows={4}
+                  <AutoExpandingTextarea
                     value={andesData.p3Paragraph2}
-                    onChange={(e) => updateAndesData({ p3Paragraph2: e.target.value })}
-                    className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200"
+                    onChangeText={(val) => updateAndesData({ p3Paragraph2: val })}
+                    className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200"
+                    printClassName="text-slate-800 text-[11px] leading-relaxed"
                   />
 
-                  <textarea
-                    rows={2}
+                  <AutoExpandingTextarea
                     value={andesData.p3Paragraph3}
-                    onChange={(e) => updateAndesData({ p3Paragraph3: e.target.value })}
-                    className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200"
+                    onChangeText={(val) => updateAndesData({ p3Paragraph3: val })}
+                    className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200"
+                    printClassName="text-slate-800 text-[11px] leading-relaxed"
                   />
 
-                  <textarea
-                    rows={3}
+                  <AutoExpandingTextarea
                     value={andesData.p3Paragraph4}
-                    onChange={(e) => updateAndesData({ p3Paragraph4: e.target.value })}
-                    className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200"
+                    onChangeText={(val) => updateAndesData({ p3Paragraph4: val })}
+                    className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200"
+                    printClassName="text-slate-800 text-[11px] leading-relaxed"
                   />
 
                   {/* Subheading & Next Tasks */}
@@ -1331,40 +1518,40 @@ export function MonthlyWorkReportModal({
                       onChange={(e) => updateAndesData({ p3NextTasksIntro: e.target.value })}
                       className="text-xs text-slate-700 italic focus:outline-none w-full mb-1"
                     />
-                    <textarea
-                      rows={4}
+                    <AutoExpandingTextarea
                       value={andesData.p3NextTasksList}
-                      onChange={(e) => updateAndesData({ p3NextTasksList: e.target.value })}
-                      className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200 pl-2"
+                      onChangeText={(val) => updateAndesData({ p3NextTasksList: val })}
+                      className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200 pl-2"
+                      printClassName="text-slate-800 text-[11px] leading-relaxed pl-2"
                     />
                   </div>
 
-                  <textarea
-                    rows={3}
+                  <AutoExpandingTextarea
                     value={andesData.p3Conclusion}
-                    onChange={(e) => updateAndesData({ p3Conclusion: e.target.value })}
-                    className="w-full bg-transparent focus:outline-none resize-none border-b border-transparent hover:border-slate-200 pt-1"
+                    onChangeText={(val) => updateAndesData({ p3Conclusion: val })}
+                    className="w-full bg-transparent focus:outline-none border-b border-transparent hover:border-slate-200 pt-1"
+                    printClassName="text-slate-800 text-[11px] leading-relaxed pt-1"
                   />
                 </div>
 
                 {/* Footer with Dual Official Logos */}
-                <div className="pt-4 border-t border-slate-200 flex items-center justify-between shrink-0">
+                <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
                   <img
                     src="/report_assets/logo_parque_de_los_andes.png"
                     alt="Edificio Parque de los Andes"
-                    className="max-h-12 max-w-[170px] object-contain"
+                    className="max-h-11 max-w-[170px] object-contain"
                   />
                   <img
                     src="/report_assets/logo_tierrafirme_color.png"
                     alt="Tierra Firme"
-                    className="max-h-11 max-w-[190px] object-contain"
+                    className="max-h-10 max-w-[190px] object-contain"
                   />
                 </div>
               </div>
             </section>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

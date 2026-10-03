@@ -226,12 +226,16 @@ html.font-bold-mode .font-black {
     margin: 0 !important;
     overflow: visible !important;
   }
-  .report-sheet-wrapper {
+  .report-sheet-wrapper,
+  .monthly-report-sheet-wrapper {
     background: #ffffff !important;
     background-color: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
     overflow: visible !important;
+    display: block !important;
   }
   .printable-document-container {
     padding: 0 !important;
@@ -257,8 +261,9 @@ html.font-bold-mode .font-black {
   /* Estilos específicos para Informe Mensual de Obra Ejecutivo Vertical (A4 Portrait) */
   .monthly-report-page {
     width: 210mm !important;
-    min-height: 295mm !important;
-    height: auto !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
@@ -269,10 +274,21 @@ html.font-bold-mode .font-black {
     position: relative !important;
     background: #ffffff !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .monthly-report-page:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
+  }
+  .monthly-report-page input,
+  .monthly-report-page textarea {
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
 }
 
