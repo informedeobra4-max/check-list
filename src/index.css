@@ -261,9 +261,9 @@ html.font-bold-mode .font-black {
   /* Estilos específicos para Informe Mensual de Obra Ejecutivo Vertical (A4 Portrait) */
   .monthly-report-page {
     width: 210mm !important;
-    height: 297mm !important;
+    height: auto !important;
     min-height: 297mm !important;
-    max-height: 297mm !important;
+    max-height: none !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
@@ -273,7 +273,7 @@ html.font-bold-mode .font-black {
     box-sizing: border-box !important;
     position: relative !important;
     background: #ffffff !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
@@ -300,7 +300,7 @@ html.font-bold-mode .font-black {
   background: #ffffff;
   color: #0f172a;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 @media (max-width: 850px) {

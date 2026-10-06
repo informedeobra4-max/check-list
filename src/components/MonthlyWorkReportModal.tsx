@@ -35,6 +35,34 @@ interface AutoExpandingTextareaProps extends React.TextareaHTMLAttributes<HTMLTe
   printClassName?: string;
 }
 
+// Helper tipográfico adaptativo: si el texto pegado es extenso, calibra proporcionalmente
+// para que el espacio se acomode de forma natural y visualmente elegante
+function getResumenTypography(text: string) {
+  const len = text ? text.length : 0;
+  if (len > 1300) {
+    return {
+      screenClass: 'text-[8px] leading-[1.26] text-slate-200',
+      printClass: 'text-[7.5px] leading-[1.2] text-slate-200',
+    };
+  }
+  if (len > 900) {
+    return {
+      screenClass: 'text-[8.7px] leading-[1.32] text-slate-200',
+      printClass: 'text-[8px] leading-[1.25] text-slate-200',
+    };
+  }
+  if (len > 500) {
+    return {
+      screenClass: 'text-[9.2px] leading-[1.36] text-slate-200',
+      printClass: 'text-[8.5px] leading-[1.28] text-slate-200',
+    };
+  }
+  return {
+    screenClass: 'text-[10px] leading-[1.4] text-slate-200',
+    printClass: 'text-[9px] leading-[1.32] text-slate-200',
+  };
+}
+
 function AutoExpandingTextarea({
   value,
   onChangeText,
@@ -46,11 +74,18 @@ function AutoExpandingTextarea({
 }: AutoExpandingTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
+  const adjustHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 24)}px`;
     }
+  };
+
+  useEffect(() => {
+    adjustHeight();
+    const handleResize = () => adjustHeight();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -59,6 +94,7 @@ function AutoExpandingTextarea({
     } else if (onChange) {
       onChange(e);
     }
+    requestAnimationFrame(adjustHeight);
   };
 
   return (
@@ -68,6 +104,7 @@ function AutoExpandingTextarea({
         ref={textareaRef}
         value={value}
         onChange={handleChange}
+        onInput={adjustHeight}
         rows={rows}
         className={`${className} overflow-hidden resize-none print:hidden`}
         {...props}
@@ -678,9 +715,9 @@ export function MonthlyWorkReportModal({
             flex-direction: column !important;
             justify-content: space-between !important;
             width: 210mm !important;
-            height: 297mm !important;
             min-height: 297mm !important;
-            max-height: 297mm !important;
+            height: auto !important;
+            max-height: none !important;
             page-break-after: always !important;
             break-after: page !important;
             page-break-inside: avoid !important;
@@ -690,7 +727,7 @@ export function MonthlyWorkReportModal({
             box-sizing: border-box !important;
             position: relative !important;
             background: #ffffff !important;
-            overflow: hidden !important;
+            overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -1112,24 +1149,29 @@ export function MonthlyWorkReportModal({
             {/* PÁGINA 2: PARQUE AGUSTÍN */}
             <section className="monthly-report-page monthly-report-preview-sheet flex flex-col justify-between font-sans text-slate-900 bg-white shadow-2xl relative select-text">
               <div className="px-8 sm:px-10 pt-6 pb-2 flex-1 flex flex-col justify-between">
-                {/* Upper Grid: Left Written Card with Logos + Right 3 Photos */}
-                <div className="grid grid-cols-12 gap-5 items-stretch h-[375px]">
-                  {/* Left Column Dark Petrol Card (RESUMEN + LOGOS) */}
-                  <div className="col-span-6 bg-[#0a222e] text-white p-5 flex flex-col justify-between shadow-md overflow-hidden">
-                    <div className="space-y-1.5 flex-1 overflow-hidden">
+                {/* Upper Grid: Left Written Card with Logos + Right 3 Photos (Autoexpandible) */}
+                <div className="grid grid-cols-12 gap-5 items-stretch min-h-[375px] h-auto">
+                  {/* Left Column Dark Petrol Card (RESUMEN + LOGOS) - Autoacomodable sin cortes */}
+                  <div className="col-span-6 bg-[#0a222e] text-white p-5 flex flex-col justify-between shadow-md h-auto min-h-full">
+                    <div className="space-y-2 flex-1 flex flex-col justify-start">
                       <h3 className="text-xs font-black text-cyan-400 uppercase tracking-widest border-b border-cyan-400/40 pb-1">
                         RESUMEN
                       </h3>
-                      <AutoExpandingTextarea
-                        value={agustinData.p2ResumenText}
-                        onChangeText={(val) => updateAgustinData({ p2ResumenText: val })}
-                        className="w-full bg-transparent text-[9.5px] leading-[1.35] text-slate-200 focus:outline-none"
-                        printClassName="text-[8px] leading-[1.25] text-slate-200"
-                      />
+                      {(() => {
+                        const typo = getResumenTypography(agustinData.p2ResumenText);
+                        return (
+                          <AutoExpandingTextarea
+                            value={agustinData.p2ResumenText}
+                            onChangeText={(val) => updateAgustinData({ p2ResumenText: val })}
+                            className={`w-full bg-transparent ${typo.screenClass} focus:outline-none`}
+                            printClassName={typo.printClass}
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* Zócalo de Tarjeta: Doble Marca Oficial con Protagonismo (Parque Agustín + Tierra Firme) */}
-                    <div className="pt-3 border-t border-slate-700/80 mt-2 flex items-center justify-between gap-4 shrink-0">
+                    <div className="pt-3 border-t border-slate-700/80 mt-3 flex items-center justify-between gap-4 shrink-0">
                       <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm flex items-center justify-center">
                         <img
                           src="/report_assets/logo_parque_agustin_official.jpg"
@@ -1145,48 +1187,51 @@ export function MonthlyWorkReportModal({
                     </div>
                   </div>
 
-                  {/* Right Upper Area: 3 Photos Grid */}
-                  <div className="col-span-6 grid grid-cols-2 gap-2.5 h-full">
-                    {/* Photo 1 (Vertical) */}
-                    <div
-                      onClick={() => triggerUpload('p2Photo1')}
-                      className="group relative h-[190px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
-                    >
-                      <img
-                        src={agustinData.p2Photo1}
-                        alt="Foto 1"
-                        className="w-full h-full object-cover group-hover:scale-102 transition-transform"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="px-2.5 py-1 bg-slate-900/90 text-cyan-300 text-xs font-bold rounded-md flex items-center gap-1">
-                          <Upload className="w-3 h-3" />
-                          <span>Cambiar</span>
-                        </span>
+                  {/* Right Upper Area: 3 Photos Grid sincronizado en altura */}
+                  <div className="col-span-6 flex flex-col gap-2.5 h-full">
+                    {/* Fila Superior: Foto 1 y Foto 2 */}
+                    <div className="grid grid-cols-2 gap-2.5 flex-1 min-h-[185px]">
+                      {/* Photo 1 (Vertical) */}
+                      <div
+                        onClick={() => triggerUpload('p2Photo1')}
+                        className="group relative h-full min-h-[185px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      >
+                        <img
+                          src={agustinData.p2Photo1}
+                          alt="Foto 1"
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
+                          <span className="px-2.5 py-1 bg-slate-900/90 text-cyan-300 text-xs font-bold rounded-md flex items-center gap-1">
+                            <Upload className="w-3 h-3" />
+                            <span>Cambiar</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Photo 2 (Angle Facade) */}
+                      <div
+                        onClick={() => triggerUpload('p2Photo2')}
+                        className="group relative h-full min-h-[185px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      >
+                        <img
+                          src={agustinData.p2Photo2}
+                          alt="Foto 2"
+                          className="w-full h-full object-cover group-hover:scale-102 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
+                          <span className="px-2.5 py-1 bg-slate-900/90 text-cyan-300 text-xs font-bold rounded-md flex items-center gap-1">
+                            <Upload className="w-3 h-3" />
+                            <span>Cambiar</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Photo 2 (Angle Facade) */}
-                    <div
-                      onClick={() => triggerUpload('p2Photo2')}
-                      className="group relative h-[190px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
-                    >
-                      <img
-                        src={agustinData.p2Photo2}
-                        alt="Foto 2"
-                        className="w-full h-full object-cover group-hover:scale-102 transition-transform"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity no-print">
-                        <span className="px-2.5 py-1 bg-slate-900/90 text-cyan-300 text-xs font-bold rounded-md flex items-center gap-1">
-                          <Upload className="w-3 h-3" />
-                          <span>Cambiar</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Photo 3 (Full width across two cols) */}
+                    {/* Fila Inferior: Foto 3 (Ancho completo) */}
                     <div
                       onClick={() => triggerUpload('p2Photo3')}
-                      className="col-span-2 group relative h-[165px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+                      className="group relative flex-1 min-h-[160px] bg-slate-100 overflow-hidden cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
                     >
                       <img
                         src={agustinData.p2Photo3}
